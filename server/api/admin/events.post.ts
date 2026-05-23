@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
   const { data: adminRow } = await admin
     .from('admins')
     .select('user_id')
-    .eq('user_id', user.id)
+    .eq('user_id', ((user as any).id ?? (user as any).sub))
     .maybeSingle()
   if (!adminRow) {
     throw createError({ statusCode: 403, statusMessage: 'Not an admin' })

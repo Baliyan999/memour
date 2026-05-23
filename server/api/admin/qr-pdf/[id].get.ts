@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
   const { data: adminRow } = await admin
     .from('admins')
     .select('user_id')
-    .eq('user_id', user!.id)
+    .eq('user_id', ((user as any).id ?? (user as any).sub))
     .maybeSingle()
   if (!adminRow) fail(403, 'forbidden')
 
@@ -126,11 +126,16 @@ export default defineEventHandler(async (event) => {
   doc.end()
   const pdf = await done
 
+  // RFC 5987 encoding for non-ASCII filenames. The ASCII fallback
+  // keeps older clients happy; the filename* token carries the real
+  // UTF-8 couple names.
+  const asciiName = `memour-qr-${ev!.couple_names.replace(/[^a-z0-9 ]/gi, '_').slice(0, 40) || 'event'}.pdf`
+  const utf8Name = `memour-qr-${ev!.couple_names.slice(0, 40)}.pdf`
   setResponseHeader(event, 'Content-Type', 'application/pdf')
   setResponseHeader(
     event,
     'Content-Disposition',
-    `attachment; filename="memour-qr-${ev!.couple_names.replace(/[^a-z0-9а-яё ]/gi, '_').slice(0, 40)}.pdf"`,
+    `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(utf8Name)}`,
   )
   setResponseHeader(event, 'Content-Length', String(pdf.length))
   return pdf

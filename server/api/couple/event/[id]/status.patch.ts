@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
     .eq('id', id!)
     .maybeSingle()
   if (!ev) fail(404, 'event_not_found')
-  if (ev!.owner_id !== user!.id) fail(403, 'forbidden')
+  if (ev!.owner_id !== ((user as any).id ?? (user as any).sub)) fail(403, 'forbidden')
 
   // Validate transition.
   const allowed =

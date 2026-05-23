@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
     .eq('id', parsed.data.event_id)
     .maybeSingle()
   if (!ev) fail(404, 'event_not_found')
-  if (ev!.owner_id !== user!.id) fail(403, 'forbidden')
+  if (ev!.owner_id !== ((user as any).id ?? (user as any).sub)) fail(403, 'forbidden')
   if (ev!.status === 'active') fail(409, 'already_paid')
 
   const amount = getTierPriceTiyin(ev!.plan_tier ?? 'basic')

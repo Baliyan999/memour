@@ -29,12 +29,16 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   // Admin gate: the logged-in user must also appear in public.admins.
+  // On the server side useSupabaseUser() returns the raw JWT claims
+  // (id lives at `.sub`), on the client it returns the Supabase User
+  // object (with `.id`). Handle both shapes.
   if (isAdminRoute) {
+    const uid = (user.value as any).id ?? (user.value as any).sub
     const supabase = useSupabaseClient()
     const { data, error } = await supabase
       .from('admins')
       .select('user_id')
-      .eq('user_id', user.value.id)
+      .eq('user_id', uid)
       .maybeSingle()
     if (error || !data) {
       return navigateTo(localePath('/admin/login'))

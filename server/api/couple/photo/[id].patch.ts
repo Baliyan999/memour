@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
     .maybeSingle()
   if (!photo) fail(404, 'photo_not_found')
   // @ts-expect-error nested relation typing
-  if (photo.events.owner_id !== user!.id) fail(403, 'forbidden')
+  if (photo.events.owner_id !== ((user as any).id ?? (user as any).sub)) fail(403, 'forbidden')
 
   const updates: Record<string, boolean> = {}
   if (parsed.data.is_hidden !== undefined) updates.is_hidden = parsed.data.is_hidden
