@@ -1,0 +1,22 @@
+{
+  "name": "Memour",
+  "short_name": "Memour",
+  "description": "Memour — все фото свадьбы от ваших гостей. Сканируй QR и присылай фото.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fdfaf3",
+  "theme_color": "#fdfaf3",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

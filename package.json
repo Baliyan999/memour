@@ -1,0 +1,42 @@
+{
+  "name": "memour-nuxt",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@fontsource/cormorant-garamond": "^5.2.11",
+    "@fontsource/manrope": "^5.2.8",
+    "@lucide/vue": "^1.16.0",
+    "@nuxtjs/google-fonts": "^3.2.0",
+    "@nuxtjs/i18n": "^10.3.0",
+    "@nuxtjs/supabase": "^2.0.8",
+    "@tailwindcss/vite": "^4.3.0",
+    "@vuepic/vue-datepicker": "^12.1.0",
+    "@vueuse/core": "^14.3.0",
+    "@vueuse/motion": "^3.0.3",
+    "@vueuse/nuxt": "^14.3.0",
+    "archiver": "^8.0.0",
+    "browser-image-compression": "^2.0.2",
+    "date-fns": "^4.2.1",
+    "motion-v": "^2.2.1",
+    "nuxt": "^4.4.6",
+    "pdfkit": "^0.18.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^4.3.0",
+    "vue": "^3.5.34",
+    "vue-router": "^5.0.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/archiver": "^7.0.0",
+    "@types/pdfkit": "^0.17.6",
+    "@types/qrcode": "^1.5.6"
+  }
+}
