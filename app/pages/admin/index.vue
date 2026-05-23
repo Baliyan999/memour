@@ -42,9 +42,17 @@ function fmtDate(d: string) {
       >+ Создать событие</NuxtLink>
     </div>
 
-    <div v-if="pending" class="rounded-(--radius-xl) border border-(--color-border) p-8 text-center text-(--color-muted-foreground)">
-      Загрузка…
-    </div>
+    <ul v-if="pending" class="grid gap-3" aria-busy="true">
+      <li v-for="i in 4" :key="i">
+        <div class="surface-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-(--radius-xl) p-5">
+          <div class="flex-1 space-y-2">
+            <Skeleton class="h-5 w-48" />
+            <Skeleton class="h-3 w-64" />
+          </div>
+          <Skeleton class="h-7 w-20" rounded="full" />
+        </div>
+      </li>
+    </ul>
 
     <div v-else-if="!data || data.events.length === 0" class="surface-card rounded-(--radius-xl) p-10 text-center">
       <h2 class="text-xl">Событий ещё нет</h2>

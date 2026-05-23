@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm exec nuxt typecheck
+        env:
+          # Stub values so the build doesn't bail in env-check plugin.
+          # Real secrets live in Vercel / production env at deploy time.
+          NUXT_PUBLIC_SITE_URL: https://memour.uz
+          NUXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NUXT_PUBLIC_SUPABASE_KEY: stub-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: stub-service-role-key
+
+      - name: Build
+        run: pnpm build
+        env:
+          NUXT_PUBLIC_SITE_URL: https://memour.uz
+          NUXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NUXT_PUBLIC_SUPABASE_KEY: stub-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: stub-service-role-key

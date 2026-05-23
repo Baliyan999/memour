@@ -2,7 +2,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n, useLocalePath } from '#imports'
 import { motion } from 'motion-v'
-import { ArrowRight, Phone, Shield } from '@lucide/vue'
+import { ArrowRight, Phone, Shield, Mail } from '@lucide/vue'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -33,8 +33,19 @@ watch(
   { immediate: true },
 )
 
+// Login channel — phone (primary) or email (fallback when SMS doesn't
+// arrive, or for couples who prefer email).
+type Channel = 'phone' | 'email'
+const channel = ref<Channel>('phone')
+
 type Step = 'phone' | 'code'
 const step = ref<Step>('phone')
+
+// Email-channel state
+const supabase = useSupabaseClient()
+const emailAddr = ref('')
+const emailSent = ref(false)
+const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddr.value))
 
 // Phone-step state — mirrors LeadForm: digits is the raw 9-digit
 // user portion, modelValue is the formatted "+998 XX XXX XX XX".
@@ -141,6 +152,28 @@ function backToPhone() {
   code.value = ''
   error.value = null
 }
+
+async function sendEmailLink() {
+  if (!emailValid.value) return
+  error.value = null
+  pending.value = true
+  try {
+    const redirectTo =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}${localePath('/dashboard')}`
+        : undefined
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email: emailAddr.value,
+      options: { emailRedirectTo: redirectTo },
+    })
+    if (err) throw err
+    emailSent.value = true
+  } catch (e: any) {
+    error.value = e?.message ?? t('couple.errors.unknown')
+  } finally {
+    pending.value = false
+  }
+}
 </script>
 
 <template>
@@ -180,6 +213,39 @@ function backToPhone() {
           </p>
         </div>
 
+        <!-- Channel switcher (phone / email) — only on the entry step -->
+        <div
+          v-if="step === 'phone' && !emailSent"
+          class="mb-4 flex items-center gap-1 rounded-full border border-(--color-border) bg-white p-0.5"
+        >
+          <button
+            type="button"
+            :class="[
+              'flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors',
+              channel === 'phone'
+                ? 'bg-(--color-primary) text-(--color-primary-foreground)'
+                : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
+            ]"
+            @click="channel = 'phone'"
+          >
+            <Phone class="h-3.5 w-3.5" :stroke-width="1.8" />
+            По телефону
+          </button>
+          <button
+            type="button"
+            :class="[
+              'flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors',
+              channel === 'email'
+                ? 'bg-(--color-primary) text-(--color-primary-foreground)'
+                : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
+            ]"
+            @click="channel = 'email'"
+          >
+            <Mail class="h-3.5 w-3.5" :stroke-width="1.8" />
+            По email
+          </button>
+        </div>
+
         <!-- Step transition -->
         <Transition
           enter-active-class="transition duration-300"
@@ -190,9 +256,57 @@ function backToPhone() {
           leave-to-class="opacity-0 -translate-x-3"
           mode="out-in"
         >
+          <!-- Email channel — sent state -->
+          <div v-if="channel === 'email' && emailSent" key="email-sent" class="text-center">
+            <div class="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-(--color-primary) text-white">
+              <Mail class="h-7 w-7" :stroke-width="1.6" />
+            </div>
+            <p class="text-base">Проверьте почту</p>
+            <p class="mt-1 break-all text-sm text-(--color-muted-foreground)">{{ emailAddr }}</p>
+            <p class="mt-3 text-[11px] text-(--color-muted-foreground)">
+              Ссылка действительна 60 минут. Не забудьте папку «Спам».
+            </p>
+          </div>
+
+          <!-- Email channel — form -->
+          <form
+            v-else-if="channel === 'email'"
+            key="email-form"
+            class="flex flex-col gap-4"
+            @submit.prevent="sendEmailLink"
+          >
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Email</label>
+              <div class="relative">
+                <Mail class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-muted-foreground)" :stroke-width="1.6" />
+                <input
+                  v-model="emailAddr"
+                  type="email"
+                  required
+                  placeholder="you@example.com"
+                  class="flex h-11 w-full rounded-md border border-(--color-border) bg-white pl-10 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
+                >
+              </div>
+            </div>
+
+            <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+
+            <button
+              type="submit"
+              :disabled="!emailValid || pending"
+              class="inline-flex h-12 items-center justify-center rounded-md bg-(--color-primary) px-6 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90 disabled:opacity-50"
+            >
+              {{ pending ? 'Отправляем…' : 'Отправить magic-link' }}
+            </button>
+
+            <p class="text-center text-[11px] text-(--color-muted-foreground)">
+              Пришлём ссылку для входа на email
+            </p>
+          </form>
+
           <!-- Phone step -->
           <form
-            v-if="step === 'phone'"
+            v-else-if="step === 'phone'"
             key="phone"
             class="flex flex-col gap-4"
             @submit.prevent="sendCode"
