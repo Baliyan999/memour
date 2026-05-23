@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useLocalePath } from '#imports'
 import { motion } from 'motion-v'
 import { ArrowRight, Mail, Lock } from '@lucide/vue'
@@ -30,16 +30,34 @@ watch(
   user,
   async (u) => {
     if (!u) return
+    const uid = (u as any).id ?? (u as any).sub
     const { data } = await supabase
       .from('admins')
       .select('user_id')
-      .eq('user_id', u.id)
+      .eq('user_id', uid)
       .maybeSingle()
     if (data) navigateTo(localePath('/admin'))
     else error.value = 'Этот аккаунт не имеет прав администратора.'
   },
   { immediate: true },
 )
+
+// Magic-link fragment recovery (see notes on dashboard/login.vue).
+onMounted(async () => {
+  if (typeof window === 'undefined') return
+  const hash = window.location.hash
+  if (!hash || !hash.includes('access_token=')) return
+  const params = new URLSearchParams(hash.slice(1))
+  const access_token = params.get('access_token')
+  const refresh_token = params.get('refresh_token')
+  if (!access_token || !refresh_token) return
+  try {
+    await supabase.auth.setSession({ access_token, refresh_token })
+    window.history.replaceState({}, '', window.location.pathname + window.location.search)
+  } catch (e) {
+    console.error('[admin/login] setSession from hash failed', e)
+  }
+})
 
 async function submit() {
   error.value = null

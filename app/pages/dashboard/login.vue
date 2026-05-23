@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useI18n, useLocalePath } from '#imports'
 import { motion } from 'motion-v'
 import { ArrowRight, Phone, Shield, Mail } from '@lucide/vue'
@@ -32,6 +32,29 @@ watch(
   },
   { immediate: true },
 )
+
+// Magic-link fragment recovery. When the auth middleware bounces a
+// magic-link callback (e.g. /dashboard#access_token=…) to this login
+// page, the access token rides along in the URL hash. We hand it to
+// the Supabase client manually so it sets the session cookie + the
+// reactive user, then the watcher above redirects to /dashboard.
+const supabaseAuthClient = useSupabaseClient()
+onMounted(async () => {
+  if (typeof window === 'undefined') return
+  const hash = window.location.hash
+  if (!hash || !hash.includes('access_token=')) return
+  const params = new URLSearchParams(hash.slice(1))
+  const access_token = params.get('access_token')
+  const refresh_token = params.get('refresh_token')
+  if (!access_token || !refresh_token) return
+  try {
+    await supabaseAuthClient.auth.setSession({ access_token, refresh_token })
+    // Clean the hash so a refresh doesn't reapply the (now used) token.
+    window.history.replaceState({}, '', window.location.pathname + window.location.search)
+  } catch (e) {
+    console.error('[login] setSession from hash failed', e)
+  }
+})
 
 // Login channel — phone (primary) or email (fallback when SMS doesn't
 // arrive, or for couples who prefer email).
@@ -229,7 +252,7 @@ async function sendEmailLink() {
             @click="channel = 'phone'"
           >
             <Phone class="h-3.5 w-3.5" :stroke-width="1.8" />
-            По телефону
+            {{ t('couple.channelPhone') }}
           </button>
           <button
             type="button"
@@ -242,7 +265,7 @@ async function sendEmailLink() {
             @click="channel = 'email'"
           >
             <Mail class="h-3.5 w-3.5" :stroke-width="1.8" />
-            По email
+            {{ t('couple.channelEmail') }}
           </button>
         </div>
 
@@ -261,10 +284,10 @@ async function sendEmailLink() {
             <div class="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-(--color-primary) text-white">
               <Mail class="h-7 w-7" :stroke-width="1.6" />
             </div>
-            <p class="text-base">Проверьте почту</p>
+            <p class="text-base">{{ t('couple.emailCheckInbox') }}</p>
             <p class="mt-1 break-all text-sm text-(--color-muted-foreground)">{{ emailAddr }}</p>
             <p class="mt-3 text-[11px] text-(--color-muted-foreground)">
-              Ссылка действительна 60 минут. Не забудьте папку «Спам».
+              {{ t('couple.emailValidNote') }}
             </p>
           </div>
 
@@ -276,7 +299,7 @@ async function sendEmailLink() {
             @submit.prevent="sendEmailLink"
           >
             <div class="flex flex-col gap-1.5">
-              <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Email</label>
+              <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('couple.emailLabel') }}</label>
               <div class="relative">
                 <Mail class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-muted-foreground)" :stroke-width="1.6" />
                 <input
@@ -296,11 +319,11 @@ async function sendEmailLink() {
               :disabled="!emailValid || pending"
               class="inline-flex h-12 items-center justify-center rounded-md bg-(--color-primary) px-6 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90 disabled:opacity-50"
             >
-              {{ pending ? 'Отправляем…' : 'Отправить magic-link' }}
+              {{ pending ? t('couple.sending') : t('couple.sendMagicLink') }}
             </button>
 
             <p class="text-center text-[11px] text-(--color-muted-foreground)">
-              Пришлём ссылку для входа на email
+              {{ t('couple.emailNote') }}
             </p>
           </form>
 
@@ -373,9 +396,9 @@ async function sendEmailLink() {
                 </svg>
               </div>
               <div class="min-w-0 flex-1">
-                <p class="text-[10px] font-medium uppercase tracking-wider text-amber-800">DEV-режим</p>
+                <p class="text-[10px] font-medium uppercase tracking-wider text-amber-800">{{ t('couple.devBannerEyebrow') }}</p>
                 <p class="mt-0.5 text-sm text-amber-900">
-                  Eskiz пока шлёт тестовый текст без кода. Ваш код:
+                  {{ t('couple.devBannerText') }}
                   <span class="ml-1 font-mono text-base font-semibold tracking-widest">{{ devCode }}</span>
                 </p>
               </div>
