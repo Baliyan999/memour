@@ -1,15 +1,49 @@
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import { useLocalePath } from '#imports'
 
 /**
- * Admin layout — separate chrome from couple dashboard. Compact nav
- * with links between admin pages (events list, referrals, etc.) and
- * a sign-out button.
+ * Admin layout — separate chrome from couple dashboard.
+ *
+ * The chrome (nav + email) only renders for users who are CONFIRMED
+ * admins (row exists in `public.admins`). A regular couple-user who
+ * stumbles onto /admin shouldn't see the admin navigation or have
+ * their synthetic phone-derived email exposed in the header.
+ *
+ * We check admin status reactively; while the check is in flight the
+ * chrome stays minimal (just the logo + back-to-site link).
  */
 const localePath = useLocalePath()
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
 const router = useRouter()
+
+const isAdmin = ref(false)
+const adminEmail = ref<string | null>(null)
+
+watch(
+  user,
+  async (u) => {
+    if (!u) {
+      isAdmin.value = false
+      adminEmail.value = null
+      return
+    }
+    const uid = (u as any).id ?? (u as any).sub
+    const { data } = await supabase
+      .from('admins')
+      .select('user_id')
+      .eq('user_id', uid)
+      .maybeSingle()
+    isAdmin.value = !!data
+    // Don't expose synthetic phone+998…@phone.memour.local emails —
+    // those belong to couple-side users who happened to authenticate
+    // before landing on an admin URL.
+    const email = (u as any).email as string | undefined
+    adminEmail.value = email && !/@phone\.memour\.local$/.test(email) ? email : null
+  },
+  { immediate: true },
+)
 
 async function signOut() {
   await supabase.auth.signOut()
@@ -35,7 +69,10 @@ const navLinks = [
             <img src="/memour-logo.png" alt="Memour" width="28" height="28" class="h-7 w-7">
             <span>Memour <span class="text-(--color-muted-foreground)">/ admin</span></span>
           </NuxtLink>
-          <nav class="hidden gap-4 text-sm md:flex">
+
+          <!-- Nav only when actually an admin — otherwise the links
+               look clickable but middleware would just bounce. -->
+          <nav v-if="isAdmin" class="hidden gap-4 text-sm md:flex">
             <NuxtLink
               v-for="link in navLinks"
               :key="link.to"
@@ -45,8 +82,9 @@ const navLinks = [
             >{{ link.label }}</NuxtLink>
           </nav>
         </div>
-        <div v-if="user" class="flex items-center gap-3">
-          <span class="hidden text-xs text-(--color-muted-foreground) sm:inline">{{ user.email }}</span>
+
+        <div v-if="isAdmin" class="flex items-center gap-3">
+          <span v-if="adminEmail" class="hidden text-xs text-(--color-muted-foreground) sm:inline">{{ adminEmail }}</span>
           <button
             type="button"
             class="rounded-full border border-(--color-border)/60 bg-white px-3 py-1.5 text-xs hover:bg-(--color-muted)"

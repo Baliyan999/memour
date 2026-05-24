@@ -2,30 +2,33 @@
 import { ref, watch, computed, onMounted } from 'vue'
 import { useLocalePath } from '#imports'
 import { motion } from 'motion-v'
-import { ArrowRight, Mail, Lock } from '@lucide/vue'
+import { ArrowRight, Mail, Lock, Eye, EyeOff } from '@lucide/vue'
 
 definePageMeta({ layout: 'admin' })
 
 /**
- * Admin login — magic-link entry to the back office. Visual language:
- *   • Memour logo + decorative gold rings ornament behind the card
- *   • Sparkle decorations drifting in the card corners
- *   • Italic display title with gold gradient
- *   • Email input with subtle Mail icon affordance
- *   • Primary button with shimmer hover (matches landing CTAs)
+ * /admin/login — password-based admin entry.
  *
- * After Supabase auth succeeds the watcher confirms the user is in
- * the `admins` table; if not, an inline error explains why.
+ *   Step 1: email + password → supabase.auth.signInWithPassword
+ *   Step 2 (after sign-in): verify the user is in the admins table.
+ *     If yes → /admin. If no → sign out, show "no admin rights".
+ *
+ * No magic link, no synthetic redirects — flow stays on this page
+ * until success. A future 2FA layer would slot in between steps 1
+ * and 2 once we wire an email provider.
  */
 const localePath = useLocalePath()
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
+const router = useRouter()
 
 const email = ref('')
+const password = ref('')
+const showPassword = ref(false)
 const pending = ref(false)
-const sent = ref(false)
 const error = ref<string | null>(null)
 
+// If already an admin and arrives here, jump straight to /admin.
 watch(
   user,
   async (u) => {
@@ -37,44 +40,45 @@ watch(
       .eq('user_id', uid)
       .maybeSingle()
     if (data) navigateTo(localePath('/admin'))
-    else error.value = 'Этот аккаунт не имеет прав администратора.'
   },
   { immediate: true },
 )
 
-// Magic-link fragment recovery (see notes on dashboard/login.vue).
-onMounted(async () => {
-  if (typeof window === 'undefined') return
-  const hash = window.location.hash
-  if (!hash || !hash.includes('access_token=')) return
-  const params = new URLSearchParams(hash.slice(1))
-  const access_token = params.get('access_token')
-  const refresh_token = params.get('refresh_token')
-  if (!access_token || !refresh_token) return
-  try {
-    await supabase.auth.setSession({ access_token, refresh_token })
-    window.history.replaceState({}, '', window.location.pathname + window.location.search)
-  } catch (e) {
-    console.error('[admin/login] setSession from hash failed', e)
-  }
-})
-
 async function submit() {
-  error.value = null
+  if (!email.value || !password.value) return
   pending.value = true
+  error.value = null
   try {
-    const redirectTo =
-      typeof window !== 'undefined'
-        ? `${window.location.origin}${localePath('/admin')}`
-        : undefined
-    const { error: err } = await supabase.auth.signInWithOtp({
-      email: email.value,
-      options: { emailRedirectTo: redirectTo },
+    const { data, error: signErr } = await supabase.auth.signInWithPassword({
+      email: email.value.trim(),
+      password: password.value,
     })
-    if (err) throw err
-    sent.value = true
+    if (signErr || !data.session) {
+      // Supabase returns generic 400 for both wrong-password and
+      // unknown-email. Show one neutral message — don't leak whether
+      // the email exists.
+      error.value = 'Неверный email или пароль'
+      return
+    }
+    // Verify admin row exists.
+    const uid = (data.user as any).id
+    const { data: adminRow } = await supabase
+      .from('admins')
+      .select('user_id')
+      .eq('user_id', uid)
+      .maybeSingle()
+    if (!adminRow) {
+      // Sign back out so the synthetic non-admin session doesn't
+      // linger and let them see the admin layout chrome.
+      await supabase.auth.signOut()
+      error.value = 'Этот аккаунт не имеет прав администратора'
+      return
+    }
+    // All good — the watcher above will navigate to /admin once user
+    // becomes set.
+    router.push(localePath('/admin'))
   } catch (e: any) {
-    error.value = e?.message ?? 'Login error'
+    error.value = e?.message ?? 'Ошибка входа'
   } finally {
     pending.value = false
   }
@@ -83,10 +87,9 @@ async function submit() {
 
 <template>
   <div class="relative min-h-[80vh]">
-    <!-- Decorative gold rings ornament floating behind the card -->
     <div
       aria-hidden="true"
-      class="pointer-events-none absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 opacity-50"
+      class="pointer-events-none absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 opacity-40"
     >
       <MarketingOrnaments kind="rings" :size="520" />
     </div>
@@ -97,15 +100,10 @@ async function submit() {
         :animate="{ opacity: 1, y: 0, scale: 1 }"
         :transition="{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }"
       >
-        <div
-          class="surface-card relative overflow-hidden rounded-(--radius-xl) p-8 sm:p-10"
-        >
-          <!-- Sparkles in corners -->
+        <div class="surface-card relative overflow-hidden rounded-(--radius-xl) p-8 sm:p-10">
           <MarketingOrnaments kind="sparkle" :size="14" x="6%" y="8%" :delay="0" />
           <MarketingOrnaments kind="sparkle" :size="10" x="92%" y="14%" :delay="1.2" />
-          <MarketingOrnaments kind="sparkle" :size="12" x="88%" y="86%" :delay="0.6" />
 
-          <!-- Logo + lock badge -->
           <div class="mb-7 flex flex-col items-center">
             <div class="relative">
               <img
@@ -130,104 +128,91 @@ async function submit() {
             >
               <span class="text-gradient-gold">Вход</span>
             </h1>
-
-            <!-- Ornament divider -->
             <div class="mt-3 flex items-center gap-3 text-(--color-muted-foreground)">
               <span class="h-px w-12 bg-(--color-border)" />
               <span style="font-size: 10px;">⋄</span>
               <span class="h-px w-12 bg-(--color-border)" />
             </div>
-
-            <p class="mt-3 max-w-xs text-center text-sm text-(--color-muted-foreground)">
-              Введите email — пришлём защищённую ссылку для входа
-            </p>
           </div>
 
-          <!-- Sent state -->
-          <Transition
-            enter-active-class="transition duration-300"
-            enter-from-class="opacity-0 translate-y-2"
-            enter-to-class="opacity-100 translate-y-0"
-            mode="out-in"
-          >
-            <div v-if="sent" key="sent" class="text-center">
-              <div
-                class="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full text-white shadow-(--shadow-glow)"
-                style="background: linear-gradient(135deg, oklch(60% 0.09 35), oklch(50% 0.08 30));"
-              >
-                <Mail class="h-7 w-7" :stroke-width="1.6" />
+          <form class="flex flex-col gap-4" @submit.prevent="submit">
+            <div class="flex flex-col gap-1.5">
+              <label
+                for="admin-email"
+                class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)"
+              >Email</label>
+              <div class="relative">
+                <Mail
+                  class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-muted-foreground)"
+                  :stroke-width="1.6"
+                />
+                <input
+                  id="admin-email"
+                  v-model="email"
+                  type="email"
+                  required
+                  autocomplete="email"
+                  class="flex h-12 w-full rounded-md border border-(--color-border) bg-white pl-10 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
+                >
               </div>
-              <p class="font-display text-xl">Проверьте почту</p>
-              <p class="mt-2 break-all text-sm text-(--color-muted-foreground)">
-                {{ email }}
-              </p>
-              <p class="mt-3 text-[11px] text-(--color-muted-foreground)">
-                Письмо приходит за 5–30 секунд. Не забудьте папку «Спам».
-              </p>
             </div>
 
-            <form v-else key="form" class="flex flex-col gap-4" @submit.prevent="submit">
-              <div class="flex flex-col gap-1.5">
-                <label
-                  for="admin-email"
-                  class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)"
-                >
-                  Email администратора
-                </label>
-                <div class="relative">
-                  <Mail
-                    class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-muted-foreground)"
-                    :stroke-width="1.6"
-                  />
-                  <input
-                    id="admin-email"
-                    v-model="email"
-                    type="email"
-                    required
-                    autocomplete="email"
-                    placeholder="you@memour.uz"
-                    class="flex h-12 w-full rounded-md border border-(--color-border) bg-white pl-10 pr-3 text-sm placeholder:text-(--color-muted-foreground)/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
-                  >
-                </div>
-              </div>
-
-              <p
-                v-if="error"
-                class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-              >{{ error }}</p>
-
-              <button
-                type="submit"
-                :disabled="pending || !email"
-                class="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-md bg-(--color-primary) px-7 text-sm font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) transition-colors hover:opacity-95 disabled:opacity-50"
-              >
-                <span class="relative z-10 flex items-center gap-2">
-                  {{ pending ? 'Отправляем…' : 'Отправить magic-link' }}
-                  <ArrowRight
-                    v-if="!pending"
-                    class="h-4 w-4 transition-transform group-hover:translate-x-1"
-                  />
-                </span>
-                <span
-                  class="absolute inset-0 -z-0 bg-gradient-to-r from-(--color-primary) via-(--color-rose) to-(--color-primary) bg-[length:200%_100%] opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-hover:[animation:shimmer_2.4s_linear_infinite]"
+            <div class="flex flex-col gap-1.5">
+              <label
+                for="admin-password"
+                class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)"
+              >Пароль</label>
+              <div class="relative">
+                <Lock
+                  class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-muted-foreground)"
+                  :stroke-width="1.6"
                 />
-              </button>
+                <input
+                  id="admin-password"
+                  v-model="password"
+                  :type="showPassword ? 'text' : 'password'"
+                  required
+                  autocomplete="current-password"
+                  minlength="6"
+                  class="flex h-12 w-full rounded-md border border-(--color-border) bg-white pl-10 pr-11 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
+                >
+                <button
+                  type="button"
+                  class="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-(--color-muted-foreground) hover:text-(--color-foreground)"
+                  :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'"
+                  @click="showPassword = !showPassword"
+                >
+                  <EyeOff v-if="showPassword" class="h-4 w-4" :stroke-width="1.6" />
+                  <Eye v-else class="h-4 w-4" :stroke-width="1.6" />
+                </button>
+              </div>
+            </div>
 
-              <p class="mt-1 text-center text-[11px] text-(--color-muted-foreground)">
-                Доступ только для зарегистрированных администраторов
-              </p>
-            </form>
-          </Transition>
+            <p
+              v-if="error"
+              class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+            >{{ error }}</p>
+
+            <button
+              type="submit"
+              :disabled="pending || !email || !password"
+              class="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-md bg-(--color-primary) px-7 text-sm font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) transition-colors hover:opacity-95 disabled:opacity-50"
+            >
+              <span class="relative z-10 flex items-center gap-2">
+                {{ pending ? 'Входим…' : 'Войти' }}
+                <ArrowRight
+                  v-if="!pending"
+                  class="h-4 w-4 transition-transform group-hover:translate-x-1"
+                />
+              </span>
+            </button>
+
+            <p class="mt-1 text-center text-[11px] text-(--color-muted-foreground)">
+              Доступ только для зарегистрированных администраторов
+            </p>
+          </form>
         </div>
       </motion.div>
-
-      <!-- Bottom helper link -->
-      <p class="mt-6 text-center text-xs text-(--color-muted-foreground)">
-        Не админ? <NuxtLink
-          :to="localePath('/dashboard/login')"
-          class="text-(--color-primary) underline decoration-(--color-primary)/30 underline-offset-2 hover:decoration-(--color-primary)"
-        >Вход для пары</NuxtLink>
-      </p>
     </div>
   </div>
 </template>
