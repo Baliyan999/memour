@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useLocalePath } from '#imports'
 
 definePageMeta({ layout: 'admin' })
@@ -22,6 +23,13 @@ const { data, refresh, pending } = await useFetch<{
     created_at: string
   }>
 }>('/api/admin/events')
+
+// QR customizer modal state — clicking «QR PDF» on any event row
+// opens the modal pre-populated with that event's id + couple names.
+const qrModalEvent = ref<{ id: string; couple_names: string } | null>(null)
+function openQr(ev: { id: string; couple_names: string }) {
+  qrModalEvent.value = { id: ev.id, couple_names: ev.couple_names }
+}
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('ru-RU', {
@@ -99,12 +107,11 @@ function statusLabel(s: string): string {
           </div>
           <div class="flex flex-col items-end gap-2">
             <code class="text-[10px] text-(--color-muted-foreground)">{{ ev.id.slice(0, 8) }}</code>
-            <a
-              :href="`/api/admin/qr-pdf/${ev.id}`"
-              target="_blank"
-              rel="noopener"
+            <button
+              type="button"
               class="inline-flex h-7 items-center gap-1 rounded-full border border-(--color-border) bg-white px-3 text-[11px] text-(--color-foreground) hover:bg-(--color-muted)"
-              title="Скачать PDF с QR-кодами"
+              title="Открыть настройки QR PDF"
+              @click="openQr(ev)"
             >
               <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -112,10 +119,19 @@ function statusLabel(s: string): string {
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
               QR PDF
-            </a>
+            </button>
           </div>
         </div>
       </li>
     </ul>
+
+    <!-- QR customizer modal -->
+    <AdminQrCustomizer
+      v-if="qrModalEvent"
+      :open="!!qrModalEvent"
+      :event-id="qrModalEvent.id"
+      :couple="qrModalEvent.couple_names"
+      @update:open="qrModalEvent = null"
+    />
   </div>
 </template>
