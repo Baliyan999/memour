@@ -4,9 +4,18 @@ import { ref, reactive, computed } from 'vue'
 definePageMeta({ layout: 'admin' })
 
 /**
- * /admin/team — admin roster. Super-admin can invite new admins
- * (by email; Supabase sends a magic-link invite), change their role,
- * and remove them. Regular admins see the list read-only.
+ * /admin/team — admin roster.
+ *
+ * Super-admin can:
+ *   • Add a new admin by setting email + password + Telegram chat ID
+ *     directly (no email invitations — the super-admin shares the
+ *     password with the teammate out-of-band).
+ *   • Remove existing admins (except themselves).
+ *
+ * The 'super' role can't be assigned via the UI — it only exists for
+ * the founding admin set via SQL. New admins are always role='admin'.
+ *
+ * Regular admins see the list read-only.
  */
 interface AdminRow {
   user_id: string
@@ -23,29 +32,41 @@ const { data, refresh, pending } = await useFetch<{
 const isSuper = computed(() => data.value?.me.role === 'super')
 
 const showForm = ref(false)
-const form = reactive({ email: '', role: 'admin' as 'admin' | 'super' })
+const form = reactive({
+  email: '',
+  password: '',
+  telegram_chat_id: '',
+})
+const showPwd = ref(false)
 const submitting = ref(false)
 const error = ref<string | null>(null)
-const successMsg = ref<string | null>(null)
+const { toast } = useToast()
 
 async function invite() {
   submitting.value = true
   error.value = null
-  successMsg.value = null
   try {
     await $fetch('/api/admin/admins', {
       method: 'POST',
-      body: { email: form.email, role: form.role },
+      body: {
+        email: form.email,
+        password: form.password,
+        telegram_chat_id: form.telegram_chat_id,
+      },
     })
-    successMsg.value = `Приглашение отправлено на ${form.email}`
+    toast.success(`Админ добавлен: ${form.email}`)
     form.email = ''
+    form.password = ''
+    form.telegram_chat_id = ''
     showForm.value = false
     await refresh()
   } catch (e: any) {
     const code = e?.data?.data?.code ?? e?.data?.code
     error.value =
       code === 'not_super' ? 'Только главный админ может добавлять'
-      : code === 'invite_failed' ? 'Не удалось пригласить. Проверьте email'
+      : code === 'invalid_input' ? 'Проверьте поля. Chat ID — только цифры, пароль ≥ 6 символов'
+      : code === 'create_failed' ? 'Не удалось создать аккаунт'
+      : code === 'update_failed' ? 'Не удалось обновить пароль существующего аккаунта'
       : 'Ошибка при добавлении'
   } finally {
     submitting.value = false
@@ -53,14 +74,21 @@ async function invite() {
 }
 
 async function remove(row: AdminRow) {
-  if (typeof window !== 'undefined' && !window.confirm(`Удалить ${row.email ?? row.user_id} из админов?`)) return
+  const ok = await confirmDialog({
+    title: 'Удалить администратора?',
+    description: `Аккаунт ${row.email ?? row.user_id} потеряет доступ к админ-панели. Сам Supabase-аккаунт сохранится.`,
+    confirmLabel: 'Удалить',
+    cancelLabel: 'Отмена',
+    tone: 'danger',
+  })
+  if (!ok) return
   try {
     await $fetch(`/api/admin/admins/${row.user_id}`, { method: 'DELETE' })
-    successMsg.value = 'Удалён'
+    toast.success('Удалён')
     await refresh()
   } catch (e: any) {
     const code = e?.data?.data?.code ?? e?.data?.code
-    error.value = code === 'cannot_remove_self' ? 'Нельзя удалить себя' : 'Ошибка удаления'
+    toast.error(code === 'cannot_remove_self' ? 'Нельзя удалить себя' : 'Ошибка удаления')
   }
 }
 
@@ -78,52 +106,70 @@ function fmtDate(d: string) {
         type="button"
         class="inline-flex h-10 items-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90"
         @click="showForm = !showForm"
-      >
-        {{ showForm ? 'Отмена' : '+ Пригласить' }}
-      </button>
+      >{{ showForm ? 'Отмена' : '+ Добавить админа' }}</button>
     </div>
 
-    <p v-if="successMsg" class="mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-      {{ successMsg }}
-    </p>
-    <p v-if="error" class="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-      {{ error }}
-    </p>
+    <p v-if="error" class="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
 
-    <div
-      v-if="showForm"
-      class="mb-6 surface-card rounded-(--radius-xl) p-6"
-    >
-      <form class="grid grid-cols-[1fr_auto_auto] gap-3" @submit.prevent="invite">
-        <div class="flex flex-col gap-1.5">
-          <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Email</label>
-          <input
-            v-model="form.email"
-            type="email"
-            required
-            placeholder="teammate@example.com"
-            class="h-11 rounded-md border border-(--color-border) bg-white px-3 text-sm"
-          >
+    <div v-if="showForm" class="mb-6 surface-card rounded-(--radius-xl) p-6">
+      <form class="flex flex-col gap-4" @submit.prevent="invite">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Email</label>
+            <input
+              v-model="form.email"
+              type="email"
+              required
+              placeholder="teammate@example.com"
+              class="h-11 rounded-md border border-(--color-border) bg-white px-3 text-sm"
+            >
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Telegram chat ID</label>
+            <input
+              v-model="form.telegram_chat_id"
+              type="text"
+              required
+              pattern="\d{5,15}"
+              placeholder="718997850"
+              class="h-11 rounded-md border border-(--color-border) bg-white px-3 font-mono text-sm"
+            >
+          </div>
         </div>
+
         <div class="flex flex-col gap-1.5">
-          <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Роль</label>
-          <select
-            v-model="form.role"
-            class="h-11 rounded-md border border-(--color-border) bg-white px-3 text-sm"
-          >
-            <option value="admin">Админ</option>
-            <option value="super">Главный</option>
-          </select>
+          <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Пароль</label>
+          <div class="relative">
+            <input
+              v-model="form.password"
+              :type="showPwd ? 'text' : 'password'"
+              required
+              minlength="6"
+              placeholder="минимум 6 символов"
+              class="h-11 w-full rounded-md border border-(--color-border) bg-white pl-3 pr-11 text-sm"
+            >
+            <button
+              type="button"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-(--color-muted-foreground) hover:text-(--color-foreground)"
+              @click="showPwd = !showPwd"
+            >{{ showPwd ? 'скрыть' : 'показать' }}</button>
+          </div>
         </div>
+
+        <p class="rounded-md border border-(--color-border) bg-(--color-muted)/30 px-3 py-2.5 text-[12px] text-(--color-muted-foreground)">
+          📨 Передайте напарнику <strong class="text-(--color-foreground)">email + пароль</strong> устно или в личке.
+          При входе сюда наша система пришлёт ему 6-значный код в указанный
+          Telegram-chat (он узнает свой chat ID, написав боту
+          <code>@QRFotografBot</code> и проверив свой ID, например через
+          <code>@userinfobot</code>).
+        </p>
+
         <button
           type="submit"
           :disabled="submitting"
-          class="h-11 self-end rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90 disabled:opacity-60"
-        >{{ submitting ? 'Добавляем…' : 'Пригласить' }}</button>
+          class="inline-flex h-11 items-center justify-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90 disabled:opacity-60"
+        >{{ submitting ? 'Добавляем…' : 'Добавить' }}</button>
       </form>
-      <p class="mt-3 text-[11px] text-(--color-muted-foreground)">
-        Если у человека ещё нет аккаунта, на email придёт ссылка для входа. Если уже регистрировался — просто получит роль.
-      </p>
     </div>
 
     <ul v-if="pending" class="grid gap-3" aria-busy="true">
