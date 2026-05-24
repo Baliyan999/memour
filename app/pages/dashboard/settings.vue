@@ -47,15 +47,17 @@ async function signOut() {
 
 <template>
   <div class="mx-auto max-w-2xl">
-    <h1 class="heading-display-md mb-6">Настройки</h1>
+    <h1 class="heading-display-md mb-6">{{ t('couple.settings.title') }}</h1>
 
     <div class="flex flex-col gap-3">
       <!-- Account -->
       <div class="surface-card rounded-(--radius-xl) p-6">
-        <p class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Аккаунт</p>
+        <p class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">
+          {{ t('couple.settings.account') }}
+        </p>
         <div class="mt-3 flex flex-col gap-1.5 text-sm">
           <p v-if="phone">
-            <span class="text-(--color-muted-foreground)">Телефон:</span>
+            <span class="text-(--color-muted-foreground)">{{ t('couple.settings.phoneLabel') }}:</span>
             <span class="ml-2 font-medium">{{ phone }}</span>
           </p>
           <p v-if="displayEmail">
@@ -73,8 +75,8 @@ async function signOut() {
               <Globe class="h-5 w-5" :stroke-width="1.6" />
             </div>
             <div>
-              <p class="font-medium">Язык интерфейса</p>
-              <p class="text-xs text-(--color-muted-foreground)">Применяется ко всему кабинету</p>
+              <p class="font-medium">{{ t('couple.settings.languageTitle') }}</p>
+              <p class="text-xs text-(--color-muted-foreground)">{{ t('couple.settings.languageHint') }}</p>
             </div>
           </div>
           <div class="flex items-center gap-1 rounded-full border border-(--color-border) bg-white p-0.5">
@@ -105,9 +107,9 @@ async function signOut() {
             <MessageSquare class="h-5 w-5" :stroke-width="1.6" />
           </div>
           <div>
-            <p class="font-medium">Telegram-бот</p>
+            <p class="font-medium">{{ t('couple.settings.telegramTitle') }}</p>
             <p class="text-xs text-(--color-muted-foreground)">
-              Получайте уведомления о новых фото и напоминание скачать архив
+              {{ t('couple.settings.telegramHint') }}
             </p>
           </div>
         </div>
@@ -117,7 +119,7 @@ async function signOut() {
       <!-- Sign out -->
       <button
         type="button"
-        class="surface-card group flex items-center justify-between gap-4 rounded-(--radius-xl) p-6 text-left transition-colors hover:bg-red-50"
+        class="surface-card group flex w-full items-center justify-between gap-4 rounded-(--radius-xl) p-6 text-left transition-colors hover:bg-red-50"
         @click="signOut"
       >
         <div class="flex items-center gap-3">
@@ -125,8 +127,8 @@ async function signOut() {
             <LogOut class="h-5 w-5" :stroke-width="1.6" />
           </div>
           <div>
-            <p class="font-medium">Выйти из аккаунта</p>
-            <p class="text-xs text-(--color-muted-foreground)">Закроет сессию на этом устройстве</p>
+            <p class="font-medium">{{ t('couple.settings.signOutTitle') }}</p>
+            <p class="text-xs text-(--color-muted-foreground)">{{ t('couple.settings.signOutHint') }}</p>
           </div>
         </div>
         <ChevronRight class="h-5 w-5 text-(--color-muted-foreground) transition-transform group-hover:translate-x-1" />

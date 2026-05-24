@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useLocalePath } from '#imports'
+import { useI18n, useLocalePath } from '#imports'
 import type { Database } from '~/types/database.types'
 
 definePageMeta({ layout: 'dashboard' })
@@ -12,6 +12,7 @@ definePageMeta({ layout: 'dashboard' })
  * cover photo. Posts to /api/couple/branding/[id] as multipart so the
  * file ride can ride along the text fields.
  */
+const { t } = useI18n()
 const route = useRoute()
 const localePath = useLocalePath()
 const supabase = useSupabaseClient<Database>()
@@ -83,10 +84,10 @@ async function save() {
     const code = e?.data?.data?.code ?? e?.data?.code
     error.value =
       code === 'file_too_large'
-        ? 'Фото слишком тяжёлое (макс. 8 МБ).'
+        ? t('couple.branding.tooLarge')
         : code === 'unsupported_mime'
-          ? 'Формат не поддерживается. Используйте JPG, PNG или WebP.'
-          : 'Не удалось сохранить. Попробуйте ещё раз.'
+          ? t('couple.branding.unsupportedFormat')
+          : t('couple.branding.saveFailed')
   } finally {
     pending.value = false
   }
@@ -102,18 +103,18 @@ async function save() {
       <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6" />
       </svg>
-      Назад
+      {{ t('couple.event.back') }}
     </NuxtLink>
-    <h1 class="heading-display-md mb-1">Оформление</h1>
+    <h1 class="heading-display-md mb-1">{{ t('couple.branding.title') }}</h1>
     <p class="mb-6 text-(--color-muted-foreground)">
-      Как ваша страница для гостей будет выглядеть, когда они отсканируют QR
+      {{ t('couple.branding.desc') }}
     </p>
 
     <form class="surface-card flex flex-col gap-5 rounded-(--radius-xl) p-7" @submit.prevent="save">
       <!-- Cover photo -->
       <div class="flex flex-col gap-2">
         <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">
-          Обложка
+          {{ t('couple.branding.cover') }}
         </label>
         <div
           class="relative aspect-[4/3] overflow-hidden rounded-md border border-(--color-border) bg-(--color-muted)"
@@ -125,11 +126,11 @@ async function save() {
             class="h-full w-full object-cover"
           >
           <div v-else class="grid h-full w-full place-items-center text-(--color-muted-foreground)">
-            Фото не выбрано
+            {{ t('couple.branding.noPhoto') }}
           </div>
         </div>
         <label class="inline-flex h-10 cursor-pointer items-center justify-center self-start rounded-md border border-(--color-border) bg-white px-4 text-sm hover:bg-(--color-muted)">
-          {{ coverPreviewUrl ? 'Сменить фото' : 'Выбрать фото' }}
+          {{ coverPreviewUrl ? t('couple.branding.changePhoto') : t('couple.branding.pickPhoto') }}
           <input type="file" accept="image/*" class="hidden" @change="onCoverChange">
         </label>
       </div>
@@ -137,7 +138,7 @@ async function save() {
       <div class="grid grid-cols-2 gap-4">
         <div class="flex flex-col gap-1.5">
           <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">
-            Имя невесты
+            {{ t('couple.branding.brideName') }}
           </label>
           <input
             v-model="form.bride_name"
@@ -148,7 +149,7 @@ async function save() {
         </div>
         <div class="flex flex-col gap-1.5">
           <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">
-            Имя жениха
+            {{ t('couple.branding.groomName') }}
           </label>
           <input
             v-model="form.groom_name"
@@ -161,7 +162,7 @@ async function save() {
 
       <div class="flex flex-col gap-1.5">
         <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">
-          Цвет акцента
+          {{ t('couple.branding.accentColor') }}
         </label>
         <div class="flex items-center gap-3">
           <input
@@ -180,13 +181,13 @@ async function save() {
 
       <div class="flex flex-col gap-1.5">
         <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">
-          Приветствие гостям
+          {{ t('couple.branding.greeting') }}
         </label>
         <textarea
           v-model="form.greeting_text"
           rows="3"
           maxlength="400"
-          placeholder="Спасибо что разделили этот день с нами..."
+          :placeholder="t('couple.branding.greetingPlaceholder')"
           class="rounded-md border border-(--color-border) bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
         />
         <p class="text-[11px] text-(--color-muted-foreground)">
@@ -198,7 +199,7 @@ async function save() {
         {{ error }}
       </p>
       <p v-if="saved" class="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-        Сохранено
+        {{ t('couple.branding.saved') }}
       </p>
 
       <button
@@ -206,7 +207,7 @@ async function save() {
         :disabled="pending"
         class="inline-flex h-12 items-center justify-center rounded-md bg-(--color-primary) text-sm font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) hover:opacity-90 disabled:opacity-60"
       >
-        {{ pending ? 'Сохраняем…' : 'Сохранить' }}
+        {{ pending ? t('couple.branding.saving') : t('couple.branding.save') }}
       </button>
     </form>
   </div>

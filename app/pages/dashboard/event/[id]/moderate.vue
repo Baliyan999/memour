@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useLocalePath } from '#imports'
+import { useI18n, useLocalePath } from '#imports'
 import { motion, useMotionValue, useTransform } from 'motion-v'
 import { X, Heart, Star, Undo2 } from '@lucide/vue'
 import type { Database } from '~/types/database.types'
@@ -23,6 +23,7 @@ definePageMeta({ layout: 'dashboard' })
  *     decision and pop the card off the stack.
  *   - Undo lets the couple revert the last decision (one level deep).
  */
+const { t } = useI18n()
 const route = useRoute()
 const localePath = useLocalePath()
 const id = route.params.id as string
@@ -144,19 +145,19 @@ onMounted(() => {
       <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6" />
       </svg>
-      Назад к событию
+      {{ t('couple.event.backToEvent') }}
     </NuxtLink>
 
     <div class="mb-6 flex items-end justify-between gap-4">
       <div>
-        <h1 class="heading-display-md">Модерация</h1>
+        <h1 class="heading-display-md">{{ t('couple.moderate.title') }}</h1>
         <p class="mt-1 text-sm text-(--color-muted-foreground)">
-          Свайп вправо — оставить, влево — скрыть, ★ — в избранное
+          {{ t('couple.moderate.desc') }}
         </p>
       </div>
       <div class="text-right">
         <p class="font-display text-2xl">{{ processed }} / {{ total }}</p>
-        <p class="text-[10px] uppercase tracking-widest text-(--color-muted-foreground)">обработано</p>
+        <p class="text-[10px] uppercase tracking-widest text-(--color-muted-foreground)">{{ t('couple.moderate.processed') }}</p>
       </div>
     </div>
 
@@ -170,8 +171,8 @@ onMounted(() => {
 
     <!-- Empty state -->
     <div v-if="total === 0" class="surface-card rounded-(--radius-xl) p-10 text-center">
-      <h2 class="text-xl">Фото ещё не загружены</h2>
-      <p class="mt-2 text-(--color-muted-foreground)">Подождите гостей — после первой загрузки можно начать модерацию.</p>
+      <h2 class="text-xl">{{ t('couple.moderate.emptyTitle') }}</h2>
+      <p class="mt-2 text-(--color-muted-foreground)">{{ t('couple.moderate.emptyDesc') }}</p>
     </div>
 
     <!-- All done -->
@@ -181,8 +182,8 @@ onMounted(() => {
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </div>
-      <h2 class="text-xl">Готово!</h2>
-      <p class="mt-2 text-(--color-muted-foreground)">Вы просмотрели все фото.</p>
+      <h2 class="text-xl">{{ t('couple.moderate.doneTitle') }}</h2>
+      <p class="mt-2 text-(--color-muted-foreground)">{{ t('couple.moderate.doneDesc') }}</p>
       <button
         v-if="lastAction"
         type="button"
@@ -190,7 +191,7 @@ onMounted(() => {
         @click="undo"
       >
         <Undo2 class="h-4 w-4" />
-        Отменить последнее
+        {{ t('couple.moderate.undoLast') }}
       </button>
     </div>
 
@@ -231,11 +232,11 @@ onMounted(() => {
           <motion.div
             :style="{ opacity: hideTagOpacity }"
             class="absolute left-4 top-4 rotate-[-12deg] rounded-md border-4 border-red-500 px-4 py-2 font-display text-2xl font-semibold text-red-500"
-          >СКРЫТЬ</motion.div>
+          >{{ t('couple.moderate.tagHide') }}</motion.div>
           <motion.div
             :style="{ opacity: keepTagOpacity }"
             class="absolute right-4 top-4 rotate-[12deg] rounded-md border-4 border-emerald-500 px-4 py-2 font-display text-2xl font-semibold text-emerald-500"
-          >ОСТАВИТЬ</motion.div>
+          >{{ t('couple.moderate.tagKeep') }}</motion.div>
 
           <!-- Highlight star indicator if already highlighted -->
           <div
@@ -250,9 +251,9 @@ onMounted(() => {
             class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-10 text-white"
           >
             <p class="text-sm">
-              <span v-if="current.guest_name">{{ current.guest_name }}</span>
-              <span v-else class="text-white/70">гость</span>
-              <span v-if="current.guest_table"> · стол {{ current.guest_table }}</span>
+              <span v-if="current.guest_name">{{ t('couple.moderate.fromGuest', { name: current.guest_name }) }}</span>
+              <span v-else class="text-white/70">{{ t('couple.moderate.guestAnon') }}</span>
+              <span v-if="current.guest_table"> · {{ t('couple.moderate.tableSuffix', { n: current.guest_table }) }}</span>
             </p>
           </div>
         </div>
