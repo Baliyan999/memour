@@ -30,6 +30,15 @@ function fmtDate(d: string) {
     year: 'numeric',
   })
 }
+
+const STATUS_LABEL: Record<string, string> = {
+  active: 'Активно',
+  draft: 'Черновик',
+  archived: 'Архив',
+}
+function statusLabel(s: string): string {
+  return STATUS_LABEL[s] ?? s
+}
 </script>
 
 <template>
@@ -74,13 +83,19 @@ function fmtDate(d: string) {
                       ? 'bg-(--color-accent)/60 text-(--color-primary)'
                       : 'bg-(--color-muted) text-(--color-muted-foreground)',
                 ]"
-              >{{ ev.status }}</span>
+              >{{ statusLabel(ev.status) }}</span>
               <span class="rounded-full bg-(--color-muted) px-2 py-0.5 text-[10px] uppercase tracking-wider text-(--color-muted-foreground)">{{ ev.plan_tier }}</span>
             </div>
             <p class="mt-1 text-sm text-(--color-muted-foreground)">
               {{ fmtDate(ev.wedding_date) }}<span v-if="ev.venue_name"> · {{ ev.venue_name }}</span>
             </p>
-            <p v-if="!ev.owner_id" class="mt-1 text-[11px] text-amber-700">⚠ owner не назначен</p>
+            <p
+              v-if="!ev.owner_id"
+              class="mt-1 text-[11px] text-amber-700"
+              title="Пара ещё не входила в кабинет. После первого SMS-входа аккаунт автоматически привяжется к этому событию."
+            >
+              ⚠ Пара ещё не вошла в кабинет
+            </p>
           </div>
           <div class="flex flex-col items-end gap-2">
             <code class="text-[10px] text-(--color-muted-foreground)">{{ ev.id.slice(0, 8) }}</code>

@@ -183,8 +183,8 @@ async function submit() {
             v-model="status"
             class="h-11 rounded-md border border-(--color-border) bg-white px-3 text-sm"
           >
-            <option value="draft">draft</option>
-            <option value="active">active</option>
+            <option value="draft">Черновик (ждёт оплаты)</option>
+            <option value="active">Активно (оплачено)</option>
           </select>
         </div>
       </div>
