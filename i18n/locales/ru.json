@@ -208,6 +208,7 @@
   },
   "couple": {
     "signOut": "Выйти",
+    "backToSite": "На сайт",
     "eyebrow": "Memour · кабинет пары",
     "loginPhoneTitle": "Вход",
     "loginPhoneDesc": "Введите номер телефона — пришлём SMS с кодом",

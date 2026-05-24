@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n, useLocalePath } from '#imports'
+import { ArrowLeft } from '@lucide/vue'
 
 /**
  * Dashboard layout — couple-facing chrome around the protected pages.
@@ -47,6 +48,19 @@ async function signOut() {
               </svg>
             </NuxtLink>
           </div>
+
+          <!-- When logged out (i.e. on /dashboard/login) the right side
+               would otherwise sit empty. Show a quiet back-link to the
+               marketing site so the user has somewhere to go besides
+               the form. -->
+          <NuxtLink
+            v-else
+            :to="localePath('/')"
+            class="inline-flex h-9 items-center gap-1.5 rounded-full border border-(--color-border)/60 bg-white/80 px-3.5 text-xs text-(--color-muted-foreground) backdrop-blur transition-colors hover:bg-white hover:text-(--color-foreground)"
+          >
+            <ArrowLeft class="h-3.5 w-3.5" :stroke-width="1.8" />
+            {{ t('couple.backToSite') }}
+          </NuxtLink>
         </div>
       </div>
     </header>
