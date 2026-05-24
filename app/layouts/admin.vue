@@ -20,6 +20,7 @@ const navLinks = [
   { to: '/admin', label: 'События' },
   { to: '/admin/leads', label: 'Лиды' },
   { to: '/admin/referrals', label: 'Рефералы' },
+  { to: '/admin/team', label: 'Команда' },
 ]
 </script>
 
