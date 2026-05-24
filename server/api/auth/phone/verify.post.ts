@@ -24,6 +24,10 @@ import { hashCode, normalizePhone } from '../../../utils/phone-otp'
 const schema = z.object({
   phone: z.string().min(7).max(20),
   code: z.string().regex(/^\d{4,8}$/, 'code must be digits'),
+  // Locale the user is currently viewing — passed so the magic-link
+  // redirect lands them back on the same language they started in
+  // instead of always bouncing to the default locale.
+  locale: z.enum(['ru', 'uz']).optional(),
 })
 
 const MAX_ATTEMPTS = 5
@@ -92,8 +96,11 @@ export default defineEventHandler(async (event) => {
   }
 
   // Generate a one-time magic link the client will navigate to.
+  // Honor the caller's current locale so a Russian-speaking user
+  // doesn't get bounced into the Uzbek dashboard after sign-in.
   const config = useRuntimeConfig()
-  const redirectTo = `${config.public.siteUrl}/dashboard`
+  const locale = parsed.data.locale ?? 'uz'
+  const redirectTo = `${config.public.siteUrl}/${locale}/dashboard`
   // Auto-claim: link any events that were pre-created by the admin
   // for this phone (events.owner_phone = phone) to the fresh user_id.
   // Also link the latest lead with the same phone so admin reports

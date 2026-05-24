@@ -151,7 +151,11 @@ async function verifyCode() {
       '/api/auth/phone/verify',
       {
         method: 'POST',
-        body: { phone: `+998${phoneDigits.value}`, code: code.value },
+        body: {
+          phone: `+998${phoneDigits.value}`,
+          code: code.value,
+          locale: locale.value,
+        },
       },
     )
     if (typeof window !== 'undefined') {
