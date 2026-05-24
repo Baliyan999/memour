@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
 
   const { data, error } = await admin
     .from('events')
-    .select('id, couple_names, wedding_date, venue_name, status, plan_tier, owner_id, created_at')
+    .select('id, couple_names, wedding_date, venue_name, status, plan_tier, owner_id, created_at, table_count')
     .order('created_at', { ascending: false })
 
   if (error) throw createError({ statusCode: 500, statusMessage: error.message })

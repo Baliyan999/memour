@@ -16,6 +16,7 @@ const props = defineProps<{
   open: boolean
   eventId: string
   couple: string
+  tableCount?: number
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
@@ -35,9 +36,9 @@ const PRESETS = [
   { id: 'gradient-gold', label: 'Градиент' },
 ]
 const LAYOUTS = [
-  { id: '2x2', label: '4 на лист', desc: 'A4, 2×2 — стандарт' },
-  { id: '4x2', label: '8 на лист', desc: 'A4, 4×2 — компактнее' },
-  { id: 'single', label: '1 на лист', desc: 'A4, крупный QR на всю страницу' },
+  { id: '2x2', label: 'По 4 на странице', desc: 'A4, сетка 2×2 — стандарт' },
+  { id: '4x2', label: 'По 8 на странице', desc: 'A4, сетка 4×2 — компактнее' },
+  { id: 'single', label: 'Крупный', desc: 'Один QR на всю страницу A4' },
 ]
 const DOTS = [
   { id: 'square', label: 'Квадраты' },
@@ -134,6 +135,23 @@ const previewUrl = computed(() => {
     }
   }
   return `/api/admin/qr-preview?${params.toString()}`
+})
+
+const perPage = computed(() => ({
+  '2x2': 4,
+  '4x2': 8,
+  'single': 1,
+}[state.layout] ?? 4))
+const totalPages = computed(() => {
+  const total = props.tableCount ?? 0
+  if (!total) return 0
+  return Math.ceil(total / perPage.value)
+})
+const pageSummary = computed(() => {
+  if (!props.tableCount) return ''
+  const last = props.tableCount % perPage.value
+  if (last === 0 || totalPages.value === 1) return ''
+  return `Последняя страница: ${last} QR`
 })
 
 const downloadUrl = computed(() => {
@@ -400,6 +418,12 @@ async function save() {
               <!-- Layout -->
               <div>
                 <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Раскладка PDF</p>
+                <p v-if="tableCount" class="mb-2 text-[11px] text-(--color-muted-foreground)">
+                  У события {{ tableCount }} {{ tableCount === 1 ? 'стол' : tableCount < 5 ? 'стола' : 'столов' }} —
+                  получится <strong class="text-(--color-foreground)">{{ totalPages }}</strong>
+                  {{ totalPages === 1 ? 'страница' : totalPages < 5 ? 'страницы' : 'страниц' }} A4.
+                  <template v-if="pageSummary"> {{ pageSummary }}.</template>
+                </p>
                 <div class="grid gap-2">
                   <button
                     v-for="l in LAYOUTS"

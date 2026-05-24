@@ -21,14 +21,20 @@ const { data, refresh, pending } = await useFetch<{
     plan_tier: string | null
     owner_id: string | null
     created_at: string
+    table_count: number | null
   }>
 }>('/api/admin/events')
 
 // QR customizer modal state — clicking «QR PDF» on any event row
-// opens the modal pre-populated with that event's id + couple names.
-const qrModalEvent = ref<{ id: string; couple_names: string } | null>(null)
-function openQr(ev: { id: string; couple_names: string }) {
-  qrModalEvent.value = { id: ev.id, couple_names: ev.couple_names }
+// opens the modal pre-populated with that event's id + couple names
+// + table count (so the layout summary can say "10 tables → 2 pages").
+const qrModalEvent = ref<{ id: string; couple_names: string; table_count: number | null } | null>(null)
+function openQr(ev: { id: string; couple_names: string; table_count?: number | null }) {
+  qrModalEvent.value = {
+    id: ev.id,
+    couple_names: ev.couple_names,
+    table_count: ev.table_count ?? null,
+  }
 }
 
 function fmtDate(d: string) {
@@ -131,6 +137,7 @@ function statusLabel(s: string): string {
       :open="!!qrModalEvent"
       :event-id="qrModalEvent.id"
       :couple="qrModalEvent.couple_names"
+      :table-count="qrModalEvent.table_count ?? undefined"
       @update:open="qrModalEvent = null"
     />
   </div>
