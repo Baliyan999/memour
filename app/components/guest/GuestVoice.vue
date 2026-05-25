@@ -4,6 +4,7 @@ import { Mic, Square, Check, X, Play, Pause, Loader2 } from '@lucide/vue'
 import { useI18n } from '#imports'
 
 const { t, te } = useI18n()
+const haptic = useHaptic()
 
 /**
  * GuestVoice — record a voice message (3-60 sec) and upload as
@@ -107,6 +108,7 @@ function runLevelLoop() {
 
 function startRecording() {
   if (!stream.value) return
+  haptic.tap()
   chunks.value = []
   lastMime.value = pickMime()
   const rec = new MediaRecorder(stream.value, { mimeType: lastMime.value })
@@ -131,6 +133,7 @@ function startRecording() {
 }
 
 function stopRecording() {
+  haptic.tap()
   if (timer) clearInterval(timer)
   if (timeoutId) clearTimeout(timeoutId)
   if (recorder.value && recorder.value.state !== 'inactive') recorder.value.stop()
@@ -171,8 +174,10 @@ async function send() {
   if (!lastBlob.value) return
   if (elapsedMs.value < MIN_MS) {
     error.value = 'too_short'
+    haptic.error()
     return
   }
+  haptic.tap()
   state.value = 'uploading'
   error.value = null
   try {
@@ -201,6 +206,7 @@ async function send() {
       '/api/guest/upload',
       { method: 'POST', body: fd },
     )
+    haptic.success()
     emit('uploaded', {
       id: res.photo_id,
       uploaded_at: res.uploaded_at,
@@ -209,6 +215,7 @@ async function send() {
     retake()
   } catch (e: any) {
     state.value = 'review'
+    haptic.error()
     const code = e?.data?.data?.code ?? e?.data?.code ?? 'upload_failed'
     error.value = code
     if (code === 'quota_exceeded') emit('quota_exceeded')

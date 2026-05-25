@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { ref, onBeforeUnmount, watch, computed } from 'vue'
 import imageCompression from 'browser-image-compression'
-import { Camera, RefreshCw, Check, X, Upload, Loader2 } from '@lucide/vue'
+import { Camera, RefreshCw, Check, X, Upload, Loader2, Maximize2, Minimize2 } from '@lucide/vue'
 import { useI18n } from '#imports'
+
+const haptic = useHaptic()
+const { isFull, toggle: toggleFullscreen } = useFullscreen()
+const viewportEl = ref<HTMLElement | null>(null)
+function tapFullscreen() {
+  if (viewportEl.value) toggleFullscreen(viewportEl.value)
+}
 
 /**
  * GuestCamera — captures photos with the device camera and uploads
@@ -81,6 +88,7 @@ function flipCamera() {
 
 async function capture() {
   if (!videoEl.value || !canvasEl.value || !stream.value) return
+  haptic.tap()
   state.value = 'capturing'
   const video = videoEl.value
   const canvas = canvasEl.value
@@ -121,6 +129,7 @@ async function getLocation(): Promise<GeolocationCoordinates | null> {
 
 async function send() {
   if (!lastBlob.value) return
+  haptic.tap()
   state.value = 'uploading'
   uploadPercent.value = 0
   error.value = null
@@ -160,6 +169,7 @@ async function send() {
       throw { code: res.error?.code ?? 'upload_failed' }
     }
 
+    haptic.success()
     emit('uploaded', {
       id: res.data.photo_id,
       uploaded_at: res.data.uploaded_at,
@@ -171,6 +181,7 @@ async function send() {
     state.value = 'live'
   } catch (e: any) {
     state.value = 'review'
+    haptic.error()
     const code = e?.code ?? e?.data?.data?.code ?? 'upload_failed'
     error.value = code
     if (code === 'quota_exceeded') emit('quota_exceeded')
@@ -236,14 +247,32 @@ const errorMessage = computed(() => {
 
     <!-- LIVE / REVIEW / UPLOADING viewport.
          `flex-1 min-h-0` lets the box shrink to fit short phones
-         instead of forcing aspect-ratio 3/4 (which on a 5" screen
-         pushed the dock off the bottom and forced a scrollbar).
-         object-cover on the inner <video> still gives a clean
-         framed picture whatever the resulting box shape is. -->
+         instead of forcing aspect-ratio 3/4. When the user taps the
+         expand button the same element gets pinned `fixed inset-0
+         z-50` — covers header + dock + the browser URL bar without
+         needing the (flaky on iOS) native Fullscreen API. -->
     <div
+      ref="viewportEl"
       v-else-if="state !== 'error'"
-      class="relative flex-1 min-h-0 overflow-hidden rounded-(--radius-xl) border border-(--color-border)/60 bg-black"
+      :class="[
+        'relative overflow-hidden bg-black transition-[border-radius] duration-200',
+        isFull
+          ? 'fixed inset-0 z-50 rounded-none border-0'
+          : 'flex-1 min-h-0 rounded-(--radius-xl) border border-(--color-border)/60',
+      ]"
     >
+      <!-- Top-right: expand / minimize toggle. Live-only — no point
+           showing it during the upload progress state. -->
+      <button
+        v-if="state === 'live' || state === 'review'"
+        type="button"
+        :aria-label="isFull ? 'Exit fullscreen' : 'Fullscreen'"
+        class="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+        @click="tapFullscreen"
+      >
+        <Minimize2 v-if="isFull" class="h-4 w-4" :stroke-width="1.8" />
+        <Maximize2 v-else class="h-4 w-4" :stroke-width="1.8" />
+      </button>
       <!-- Live video -->
       <video
         v-show="state === 'live' || state === 'capturing'"

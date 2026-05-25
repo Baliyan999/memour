@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onBeforeUnmount } from 'vue'
-import { Video, RefreshCw, Check, X, Square, Circle, Loader2 } from '@lucide/vue'
+import { Video, RefreshCw, Check, X, Square, Circle, Loader2, Maximize2, Minimize2 } from '@lucide/vue'
 import { useI18n } from '#imports'
 
 const { t, te } = useI18n()
+const haptic = useHaptic()
+const { isFull, toggle: toggleFullscreen } = useFullscreen()
+const viewportEl = ref<HTMLElement | null>(null)
+function tapFullscreen() {
+  if (viewportEl.value) toggleFullscreen(viewportEl.value)
+}
 
 /**
  * GuestVideo — record a short clip (3-15 sec) through MediaRecorder
@@ -97,6 +103,7 @@ function flip() {
 
 function startRecording() {
   if (!stream.value) return
+  haptic.tap()
   chunks.value = []
   lastMime.value = pickMime()
   const rec = new MediaRecorder(stream.value, { mimeType: lastMime.value })
@@ -122,6 +129,7 @@ function startRecording() {
 }
 
 function stopRecording() {
+  haptic.tap()
   if (timer) clearInterval(timer)
   if (timeoutId) clearTimeout(timeoutId)
   if (recorder.value && recorder.value.state !== 'inactive') {
@@ -152,8 +160,10 @@ async function send() {
   if (!lastBlob.value) return
   if (elapsedMs.value < MIN_MS) {
     error.value = 'too_short'
+    haptic.error()
     return
   }
+  haptic.tap()
   state.value = 'uploading'
   error.value = null
   try {
@@ -180,6 +190,7 @@ async function send() {
       '/api/guest/upload',
       { method: 'POST', body: fd },
     )
+    haptic.success()
     emit('uploaded', {
       id: res.photo_id,
       uploaded_at: res.uploaded_at,
@@ -189,6 +200,7 @@ async function send() {
     state.value = 'live'
   } catch (e: any) {
     state.value = 'review'
+    haptic.error()
     const code = e?.data?.data?.code ?? e?.data?.code ?? 'upload_failed'
     error.value = code
     if (code === 'quota_exceeded') emit('quota_exceeded')
@@ -255,11 +267,30 @@ const errorMessage = computed(() => {
 
     <!-- Live / recording / review viewport. Same shrinking flex
          trick as GuestCamera so the dock never gets pushed off
-         the bottom on shorter phones. -->
+         the bottom on shorter phones; same fullscreen toggle for
+         the rare moment a guest wants to compose a wider shot. -->
     <div
+      ref="viewportEl"
       v-else-if="state !== 'error'"
-      class="relative flex-1 min-h-0 overflow-hidden rounded-(--radius-xl) border border-(--color-border)/60 bg-black"
+      :class="[
+        'relative overflow-hidden bg-black transition-[border-radius] duration-200',
+        isFull
+          ? 'fixed inset-0 z-50 rounded-none border-0'
+          : 'flex-1 min-h-0 rounded-(--radius-xl) border border-(--color-border)/60',
+      ]"
     >
+      <!-- Fullscreen toggle: hide while uploading so the user doesn't
+           tap it mid-progress. -->
+      <button
+        v-if="state === 'live' || state === 'review'"
+        type="button"
+        :aria-label="isFull ? 'Exit fullscreen' : 'Fullscreen'"
+        class="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+        @click="tapFullscreen"
+      >
+        <Minimize2 v-if="isFull" class="h-4 w-4" :stroke-width="1.8" />
+        <Maximize2 v-else class="h-4 w-4" :stroke-width="1.8" />
+      </button>
       <video
         v-show="state === 'live' || state === 'recording'"
         ref="videoEl"
