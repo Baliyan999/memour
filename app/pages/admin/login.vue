@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, computed, nextTick, onMounted } from 'vue'
-import { useI18n, useLocalePath } from '#imports'
+import { ref, watch, nextTick, onMounted } from 'vue'
+import { useLocalePath } from '#imports'
 import { motion } from 'motion-v'
 import { ArrowRight, Mail, Lock, Eye, EyeOff, MessageSquare, Shield } from '@lucide/vue'
 
@@ -12,18 +12,18 @@ definePageMeta({ layout: 'admin' })
  *   Step 1: email + password → POST /api/admin-auth/login
  *     The server verifies the password against Supabase Auth, looks
  *     up the admin's telegram_chat_id, and sends a 6-digit code to
- *     that Telegram chat via the Memour bot.
+ *     that Telegram chat via the Memour bot. Nothing is logged in yet.
  *
- *   Step 2: 6-digit code → POST /api/admin-auth/verify
- *     The server validates the code and returns a one-time magic
- *     link. We navigate to it; Supabase sets the session cookies and
- *     redirects to /admin.
+ *   Step 2: email + password + code → POST /api/admin-auth/verify
+ *     The server validates the code AND re-checks the password, then
+ *     returns { access_token, refresh_token } as JSON. We call
+ *     supabase.auth.setSession() which writes them straight into
+ *     httpOnly cookies — no magic-link, no token in the URL fragment.
  *
- * If the admin has no telegram_chat_id set (i.e. invitation never
- * filled it in), step 1 fails with `no_chat_id` and we show an
- * explanatory message instead of looping forever.
+ * Sending the password again at step 2 is intentional: it makes 2FA
+ * real. A leaked TG code on its own cannot mint a session, and a
+ * leaked password on its own cannot either.
  */
-const { locale } = useI18n()
 const localePath = useLocalePath()
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
@@ -55,7 +55,9 @@ watch(
   { immediate: true },
 )
 
-// Magic-link landing handler — see notes in dashboard/login.vue.
+// Legacy magic-link landing handler — kept temporarily so anyone
+// holding an old emailed magic link can still complete login. New
+// logins go through setSession directly without touching the URL.
 onMounted(async () => {
   if (typeof window === 'undefined') return
   const hash = window.location.hash
@@ -83,6 +85,7 @@ function mapError(code?: string): string {
     case 'code_expired': return 'Срок действия кода истёк. Запросите новый.'
     case 'too_many_attempts': return 'Слишком много попыток. Запросите новый код.'
     case 'link_failed': return 'Не удалось завершить вход. Попробуйте снова.'
+    case 'session_failed': return 'Не удалось завершить вход. Возможно, пароль был изменён — попробуйте начать заново.'
     default: return 'Ошибка входа'
   }
 }
@@ -97,6 +100,7 @@ function startResendCooldown(seconds: number) {
 }
 
 async function submitCreds() {
+  if (pending.value) return
   if (!email.value || !password.value) return
   pending.value = true
   error.value = null
@@ -116,19 +120,38 @@ async function submitCreds() {
   }
 }
 
+// Track whether the user has already completed verify in this page
+// lifetime — once setSession fires, the input may still emit another
+// `input` event from autofill / IME composition and we don't want a
+// duplicate POST. `pending` covers the in-flight window, `consumed`
+// covers the post-success window before navigateTo unmounts us.
+let consumed = false
+
 async function submitCode() {
+  if (pending.value || consumed) return
   if (code.value.length !== 6) return
   pending.value = true
   error.value = null
   try {
-    const res = await $fetch<{ ok: boolean; action_link: string }>(
-      '/api/admin-auth/verify',
-      {
-        method: 'POST',
-        body: { email: email.value, code: code.value, locale: locale.value },
+    const res = await $fetch<{
+      ok: boolean
+      access_token: string
+      refresh_token: string
+    }>('/api/admin-auth/verify', {
+      method: 'POST',
+      body: {
+        email: email.value,
+        password: password.value,
+        code: code.value,
       },
-    )
-    if (typeof window !== 'undefined') window.location.href = res.action_link
+    })
+    consumed = true
+    const { error: sessErr } = await supabase.auth.setSession({
+      access_token: res.access_token,
+      refresh_token: res.refresh_token,
+    })
+    if (sessErr) throw sessErr
+    await navigateTo(localePath('/admin'))
   } catch (e: any) {
     error.value = mapError(e?.data?.data?.code ?? e?.data?.code)
   } finally {
