@@ -2,6 +2,7 @@
 import { ref, onBeforeUnmount, watch, computed } from 'vue'
 import imageCompression from 'browser-image-compression'
 import { Camera, RefreshCw, Check, X, Upload, Loader2 } from '@lucide/vue'
+import { useI18n } from '#imports'
 
 /**
  * GuestCamera — captures photos with the device camera and uploads
@@ -187,22 +188,18 @@ onBeforeUnmount(() => {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
 })
 
+// Map server codes → i18n keys under guest.errors.*. Some codes need
+// a kind-specific suffix (file_too_large_photo vs ..._video) because
+// the human-readable text differs.
+const { t, te } = useI18n()
 const errorMessage = computed(() => {
   if (!error.value) return null
-  const map: Record<string, string> = {
-    permission_denied: 'Разрешите доступ к камере в настройках браузера, иначе мы не сможем снимать.',
-    camera_unavailable: 'Не удалось включить камеру. Попробуйте перезагрузить страницу.',
-    outside_window: 'Загрузка фото открывается только в день свадьбы.',
-    outside_geofence: 'Вы слишком далеко от места свадьбы. Загрузка фото доступна только на площадке.',
-    event_not_active: 'Событие пока не активно — попробуйте позже.',
-    event_not_found: 'Событие не найдено.',
-    file_too_large: 'Фото слишком тяжёлое. Попробуйте ещё раз — мы автоматически уменьшим размер.',
-    unsupported_mime: 'Этот формат фото не поддерживается.',
-    quota_exceeded: 'Лимит фото для этого устройства исчерпан.',
-    wrong_table: 'Это устройство уже привязано к другому столу.',
-    upload_failed: 'Не удалось отправить фото. Проверьте интернет и попробуйте снова.',
-  }
-  return map[error.value] ?? 'Что-то пошло не так. Попробуйте снова.'
+  const code = error.value
+  const kindKey = `guest.errors.${code}_photo`
+  if (te(kindKey)) return t(kindKey)
+  const baseKey = `guest.errors.${code}`
+  if (te(baseKey)) return t(baseKey)
+  return t('guest.camera.genericError')
 })
 </script>
 
@@ -219,7 +216,7 @@ const errorMessage = computed(() => {
         @click="startCamera"
       >
         <Camera class="h-5 w-5" :stroke-width="1.8" />
-        <span>Открыть камеру</span>
+        <span>{{ t('guest.camera.openCamera') }}</span>
       </button>
       <p class="mt-3 max-w-xs text-center text-xs text-(--color-muted-foreground)">
         Браузер попросит разрешение на камеру — нажмите «Разрешить».
@@ -267,7 +264,7 @@ const errorMessage = computed(() => {
           </svg>
           <span class="absolute inset-0 grid place-items-center font-mono text-base">{{ uploadPercent }}%</span>
         </div>
-        <p class="mt-3 text-sm">Отправляем…</p>
+        <p class="mt-3 text-sm">{{ t('guest.camera.uploadingShort') }}</p>
       </div>
 
       <!-- Bottom controls bar -->
@@ -328,7 +325,7 @@ const errorMessage = computed(() => {
         type="button"
         class="mt-4 inline-flex h-11 items-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-white hover:opacity-90"
         @click="startCamera"
-      >Попробовать снова</button>
+      >{{ t('guest.camera.tryAgain') }}</button>
     </div>
 
     <!-- Inline error toast under viewport (non-fatal) -->

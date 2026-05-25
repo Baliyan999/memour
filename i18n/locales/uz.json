@@ -178,23 +178,85 @@
     "rights": "Barcha huquqlar himoyalangan"
   },
   "guest": {
-    "splashHello": "To'yga xush kelibsiz",
-    "splashSubtitle": "Kelin-kuyovga eng to'liq albomni yig'ishga yordam bering",
-    "ctaStart": "Suratga olishni boshlash",
-    "askName": "Ismingiz nima?",
-    "namePlaceholder": "Ismingiz (ixtiyoriy)",
-    "continue": "Davom etish",
-    "shotsLeft": "{count} / {total} qoldi",
-    "shotsUsed": "Limit tugadi",
-    "permissionTitle": "Kameraga ruxsat kerak",
-    "permissionDesc": "Kamerasiz suratga ololmaysiz. Brauzer sozlamalarini oching va ruxsat bering.",
-    "switchCamera": "Kamerani almashtirish",
-    "torch": "Chaqnoq",
-    "send": "Yuborish",
-    "retake": "Qayta olish",
-    "uploading": "Yuklanmoqda…",
-    "uploaded": "Yuborildi",
-    "offline": "Aloqa yo'q — internet paydo bo'lishi bilan suratlar yuboriladi"
+    "switchLang": "Русский",
+    "welcome": {
+      "eyebrow": "to'yimiz",
+      "tableEyebrow": "stolingiz",
+      "greetingDefault": "Bu maxsus kunda biz bilan birga bo'lganingiz uchun rahmat. Sizni xursand qiladigan har bir lahzani suratga oling — biz hammasini bitta albomga yig'amiz.",
+      "nameQuestion": "ismingiz nima?",
+      "namePlaceholder": "Ismingizni kiriting",
+      "openCamera": "Kamerani ochish",
+      "nameHint": "Ismingiz suratlaringizni imzolaydi — kelin-kuyovga imzo ko'rish yoqimli bo'ladi."
+    },
+    "noTable": {
+      "title": "Stolingizdagi QR-kodni skanerlang",
+      "desc": "Har bir stolda o'z QR-kodi bor. Telefon kamerasini unga to'g'rilang — yuklash formasini darhol ochamiz."
+    },
+    "wrongTable": {
+      "title": "Bu qurilma allaqachon biriktirilgan",
+      "descBefore": "Bugun ushbu telefondan siz allaqachon suratlar yuborgansiz —",
+      "descAfter": "Boshqa stolga o'tish uchun kelin-kuyovdan biriktirishni qayta tiklashni so'rang.",
+      "tableLabel": "Stol № {n}",
+      "currentScan": "Hozir siz Stol №{table} QR-kodini skanerladingiz."
+    },
+    "quotaFull": {
+      "title": "Rahmat!",
+      "desc": "Siz ushbu qurilmadan maksimal miqdordagi kadrlarni yukladingiz. Kelin-kuyov siz olgan barcha narsani oldi.",
+      "photo": "surat",
+      "video": "video",
+      "voice": "ovoz"
+    },
+    "camera": {
+      "tableChip": "stol",
+      "photoTab": "Surat",
+      "videoTab": "Video",
+      "voiceTab": "Ovoz",
+      "openCamera": "Kamerani ochish",
+      "recordVideo": "Video yozish",
+      "startRecording": "Yozishni boshlash",
+      "stopRecording": "To'xtatish",
+      "send": "Yuborish",
+      "retake": "Qayta olish",
+      "switchCamera": "Kamerani almashtirish",
+      "uploading": "Yuklanmoqda…",
+      "uploadingShort": "Yuborilmoqda…",
+      "tryAgain": "Qayta urinib ko'rish",
+      "genericError": "Nimadir noto'g'ri ketdi. Qaytadan urinib ko'ring.",
+      "uploadedHeader": "Yuborildi · {count}",
+      "videoHint": "3–15 soniyalik klip. Brauzer kamera va mikrofonga ruxsat so'raydi.",
+      "voiceHint": "3–60 soniyalik ovozli xabar."
+    },
+    "errors": {
+      "permission_denied": "Brauzer sozlamalarida kameraga ruxsat bering, aks holda surat ololmaymiz.",
+      "permission_denied_mic": "Brauzer sozlamalarida kamera va mikrofonga ruxsat bering.",
+      "permission_denied_mic_only": "Brauzer sozlamalarida mikrofonga ruxsat bering.",
+      "camera_unavailable": "Kamerani yoqib bo'lmadi. Sahifani qayta yuklashga harakat qiling.",
+      "mic_unavailable": "Mikrofonni yoqib bo'lmadi.",
+      "too_short": "Yozuv juda qisqa — kamida {sec} soniya kerak.",
+      "outside_window": "Yuklash faqat to'y kuni ochiladi.",
+      "outside_geofence": "Siz to'y joyidan juda uzoqdasiz.",
+      "event_not_active": "Tadbir hozircha faol emas — keyinroq harakat qiling.",
+      "event_not_found": "Tadbir topilmadi.",
+      "file_too_large_photo": "Surat juda og'ir. Qaytadan urinib ko'ring — biz hajmni avtomatik kichraytiramiz.",
+      "file_too_large_video": "Video juda og'ir.",
+      "file_too_large_voice": "Yozuv juda og'ir.",
+      "unsupported_mime_photo": "Bu surat formati qo'llab-quvvatlanmaydi.",
+      "unsupported_mime_video": "Video formati ushbu brauzer tomonidan qo'llab-quvvatlanmaydi.",
+      "unsupported_mime_voice": "Audio formati ushbu brauzer tomonidan qo'llab-quvvatlanmaydi.",
+      "quota_exceeded_photo": "Ushbu qurilma uchun surat limiti tugadi.",
+      "quota_exceeded_video": "Ushbu qurilma uchun video limiti tugadi.",
+      "quota_exceeded_voice": "Ushbu qurilma uchun ovoz limiti tugadi.",
+      "wrong_table": "Bu qurilma allaqachon boshqa stolga biriktirilgan.",
+      "upload_failed": "Yuborib bo'lmadi. Internet ulanishingizni tekshiring."
+    },
+    "state": {
+      "loading": "Yuklanmoqda…",
+      "notFoundTitle": "Tadbir topilmadi",
+      "notFoundDesc": "Ehtimol, havola eskirgan yoki QR-kod boshqa tadbirga tegishli.",
+      "draftEyebrow": "{couple}",
+      "draftTitle": "Tez orada tayyor bo'lamiz",
+      "draftDesc": "Suratlar yuklash hali ochilmagan. To'y kunida qayta tashrif buyuring."
+    }
   },
   "error": {
     "notFoundEyebrow": "Sahifa topilmadi",

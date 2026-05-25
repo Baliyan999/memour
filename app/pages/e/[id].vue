@@ -2,8 +2,11 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { motion } from 'motion-v'
+import { useI18n } from '#imports'
 
 definePageMeta({ layout: 'guest' })
+
+const { t, locale } = useI18n()
 
 /**
  * /e/[id] — public landing for wedding guests.
@@ -220,7 +223,9 @@ const monogram = computed(() => {
 
 const formattedDate = computed(() => {
   if (!ev.value?.wedding_date) return null
-  return new Date(ev.value.wedding_date).toLocaleDateString('ru-RU', {
+  // Locale-aware date — Cyrillic month names in RU, Latin in UZ.
+  const tag = locale.value === 'uz' ? 'uz-UZ' : 'ru-RU'
+  return new Date(ev.value.wedding_date).toLocaleDateString(tag, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -237,24 +242,24 @@ useSeoMeta({
   <!-- 404 -->
   <div v-if="fetchError" class="grid min-h-[100dvh] place-items-center p-6">
     <div class="surface-card max-w-md rounded-(--radius-xl) p-8 text-center">
-      <h1 class="heading-display-md">Событие не найдено</h1>
+      <h1 class="heading-display-md">{{ t('guest.state.notFoundTitle') }}</h1>
       <p class="mt-2 text-(--color-muted-foreground)">
-        Возможно, ссылка устарела или QR-код принадлежит другому событию.
+        {{ t('guest.state.notFoundDesc') }}
       </p>
     </div>
   </div>
 
   <div v-else-if="pending" class="grid min-h-[100dvh] place-items-center">
-    <div class="text-(--color-muted-foreground)">Загружаем…</div>
+    <div class="text-(--color-muted-foreground)">{{ t('guest.state.loading') }}</div>
   </div>
 
   <!-- Draft -->
   <div v-else-if="isDraft" class="grid min-h-[100dvh] place-items-center p-6">
     <div class="surface-card max-w-md rounded-(--radius-xl) p-8 text-center">
       <p class="text-xs uppercase tracking-[0.3em] text-(--color-muted-foreground)">{{ ev?.couple_names }}</p>
-      <h1 class="heading-display-md mt-3">Скоро будем готовы</h1>
+      <h1 class="heading-display-md mt-3">{{ t('guest.state.draftTitle') }}</h1>
       <p class="mt-3 text-(--color-muted-foreground)">
-        Загрузка фото ещё не открыта. Возвращайтесь в день свадьбы.
+        {{ t('guest.state.draftDesc') }}
       </p>
     </div>
   </div>
@@ -298,7 +303,7 @@ useSeoMeta({
             <span class="font-display text-2xl italic text-gradient-gold">{{ monogram }}</span>
           </div>
           <p class="mt-5 text-[10px] uppercase tracking-[0.42em] text-(--color-muted-foreground)">
-            наша свадьба
+            {{ t('guest.welcome.eyebrow') }}
           </p>
           <h1 class="mt-2 font-display text-[2rem] leading-tight italic">
             <span class="text-gradient-gold">{{ ev.couple_names }}</span>
@@ -322,14 +327,14 @@ useSeoMeta({
           class="mt-8 flex justify-center"
         >
           <div class="relative inline-flex flex-col items-center rounded-full border border-amber-200/60 bg-gradient-to-br from-amber-50 via-[#fdf6e3] to-amber-100 px-12 py-5 shadow-[0_10px_36px_rgb(180_130_60_/_0.18)]">
-            <span class="text-[10px] uppercase tracking-[0.4em] text-amber-700/80">ваш стол</span>
+            <span class="text-[10px] uppercase tracking-[0.4em] text-amber-700/80">{{ t('guest.welcome.tableEyebrow') }}</span>
             <span class="font-display text-5xl italic leading-none text-amber-900">№ {{ tableParam }}</span>
           </div>
         </motion.div>
 
         <!-- Greeting -->
         <p class="mx-auto mt-6 max-w-sm text-center text-sm italic text-(--color-muted-foreground)">
-          {{ ev.branding?.greeting_text || 'Спасибо что вы с нами в этот особенный день. Снимайте всё что вас радует — мы соберём всё в один альбом.' }}
+          {{ ev.branding?.greeting_text || t('guest.welcome.greetingDefault') }}
         </p>
 
         <!-- Name input card -->
@@ -340,13 +345,13 @@ useSeoMeta({
           class="mt-8 rounded-(--radius-xl) border border-(--color-border)/60 bg-white/90 p-6 backdrop-blur"
         >
           <label class="block text-center text-[10px] uppercase tracking-[0.3em] text-(--color-muted-foreground)">
-            как вас зовут?
+            {{ t('guest.welcome.nameQuestion') }}
           </label>
           <input
             v-model="guestName"
             type="text"
             maxlength="80"
-            placeholder="Введите ваше имя"
+            :placeholder="t('guest.welcome.namePlaceholder')"
             autofocus
             class="mt-3 h-12 w-full rounded-md border border-(--color-border)/70 bg-(--color-background) px-4 text-center text-base placeholder:text-(--color-muted-foreground)/60 focus-visible:border-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60"
             @keydown.enter="startCapture"
@@ -357,10 +362,10 @@ useSeoMeta({
             class="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-(--color-primary) text-sm font-medium tracking-wide text-(--color-primary-foreground) shadow-(--shadow-soft) transition-opacity hover:opacity-90 disabled:opacity-40"
             @click="startCapture"
           >
-            Открыть камеру
+            {{ t('guest.welcome.openCamera') }}
           </button>
           <p class="mt-3 text-center text-[11px] leading-relaxed text-(--color-muted-foreground)">
-            Имя подпишет ваши снимки — паре будет приятно увидеть подпись.
+            {{ t('guest.welcome.nameHint') }}
           </p>
         </motion.div>
       </div>
@@ -371,9 +376,9 @@ useSeoMeta({
           <div class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-amber-50">
             <span class="text-2xl">⌫</span>
           </div>
-          <h2 class="mt-4 font-display text-2xl italic">Отсканируйте QR вашего стола</h2>
+          <h2 class="mt-4 font-display text-2xl italic">{{ t('guest.noTable.title') }}</h2>
           <p class="mt-2 text-sm text-(--color-muted-foreground)">
-            На каждом столе есть свой QR-код. Наведите камеру телефона на него — мы сразу откроем форму загрузки.
+            {{ t('guest.noTable.desc') }}
           </p>
         </div>
       </div>
@@ -384,14 +389,14 @@ useSeoMeta({
           <div class="mx-auto grid h-14 w-14 place-items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700">
             <span class="text-xl">⊘</span>
           </div>
-          <h2 class="mt-4 font-display text-2xl italic">Это устройство уже занято</h2>
+          <h2 class="mt-4 font-display text-2xl italic">{{ t('guest.wrongTable.title') }}</h2>
           <p class="mt-3 text-sm leading-relaxed text-(--color-muted-foreground)">
-            Сегодня с этого телефона вы уже отправляли фото на
-            <strong class="font-medium text-(--color-foreground)">Стол № {{ binding.table_number }}</strong>.
-            Чтобы переключиться на другой стол — попросите пару сбросить привязку.
+            {{ t('guest.wrongTable.descBefore') }}
+            <strong class="font-medium text-(--color-foreground)">{{ t('guest.wrongTable.tableLabel', { n: binding.table_number }) }}</strong>.
+            {{ t('guest.wrongTable.descAfter') }}
           </p>
           <p class="mt-3 text-xs italic text-(--color-muted-foreground)">
-            Сейчас вы навели на QR Стола №{{ tableParam }}.
+            {{ t('guest.wrongTable.currentScan', { table: tableParam }) }}
           </p>
         </div>
       </div>
@@ -402,21 +407,21 @@ useSeoMeta({
           <div class="mx-auto grid h-14 w-14 place-items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700">
             <span class="text-xl">✓</span>
           </div>
-          <h2 class="mt-4 font-display text-2xl italic">Спасибо!</h2>
+          <h2 class="mt-4 font-display text-2xl italic">{{ t('guest.quotaFull.title') }}</h2>
           <p class="mt-3 text-sm leading-relaxed text-(--color-muted-foreground)">
-            Вы загрузили максимум кадров с этого устройства. Пара уже получила всё, что вы для них сняли.
+            {{ t('guest.quotaFull.desc') }}
           </p>
           <div class="mt-5 grid grid-cols-3 gap-3 text-center">
             <div class="rounded-md border border-(--color-border)/60 bg-white/70 px-2 py-3">
-              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">фото</p>
+              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">{{ t('guest.quotaFull.photo') }}</p>
               <p class="mt-1 font-display text-lg">{{ counts.photo_count }}<span class="text-(--color-muted-foreground)">/{{ limits.photo }}</span></p>
             </div>
             <div v-if="showVideo" class="rounded-md border border-(--color-border)/60 bg-white/70 px-2 py-3">
-              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">видео</p>
+              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">{{ t('guest.quotaFull.video') }}</p>
               <p class="mt-1 font-display text-lg">{{ counts.video_count }}<span class="text-(--color-muted-foreground)">/{{ limits.video }}</span></p>
             </div>
             <div v-if="showVoice" class="rounded-md border border-(--color-border)/60 bg-white/70 px-2 py-3">
-              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">голос</p>
+              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">{{ t('guest.quotaFull.voice') }}</p>
               <p class="mt-1 font-display text-lg">{{ counts.voice_count }}<span class="text-(--color-muted-foreground)">/{{ limits.voice }}</span></p>
             </div>
           </div>
@@ -429,7 +434,7 @@ useSeoMeta({
         <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div class="flex items-center gap-2">
             <span class="inline-flex items-center gap-1.5 rounded-full border border-amber-200/60 bg-gradient-to-br from-amber-50 to-amber-100 px-3 py-1 text-xs font-medium text-amber-900">
-              <span class="text-[9px] uppercase tracking-[0.2em] text-amber-700/80">стол</span>
+              <span class="text-[9px] uppercase tracking-[0.2em] text-amber-700/80">{{ t('guest.camera.tableChip') }}</span>
               № {{ tableParam }}
             </span>
             <span v-if="guestName" class="text-xs text-(--color-muted-foreground)">{{ guestName }}</span>
@@ -460,7 +465,7 @@ useSeoMeta({
                 : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
             ]"
             @click="mode = 'photo'"
-          >📸 Фото</button>
+          >📸 {{ t('guest.camera.photoTab') }}</button>
           <button
             v-if="showVideo"
             type="button"
@@ -471,7 +476,7 @@ useSeoMeta({
                 : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
             ]"
             @click="mode = 'video'"
-          >🎥 Видео</button>
+          >🎥 {{ t('guest.camera.videoTab') }}</button>
           <button
             v-if="showVoice"
             type="button"
@@ -482,7 +487,7 @@ useSeoMeta({
                 : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
             ]"
             @click="mode = 'voice'"
-          >🎤 Голос</button>
+          >🎤 {{ t('guest.camera.voiceTab') }}</button>
         </div>
 
         <Transition
@@ -532,7 +537,7 @@ useSeoMeta({
         <!-- Recently uploaded badges -->
         <div v-if="uploads.length > 0" class="mt-6">
           <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">
-            Отправлено · {{ uploads.length }}
+            {{ t('guest.camera.uploadedHeader', { count: uploads.length }) }}
           </p>
           <div class="grid grid-cols-6 gap-1.5">
             <div

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onBeforeUnmount } from 'vue'
 import { Mic, Square, Check, X, Play, Pause, Loader2 } from '@lucide/vue'
+import { useI18n } from '#imports'
+
+const { t, te } = useI18n()
 
 /**
  * GuestVoice — record a voice message (3-60 sec) and upload as
@@ -228,19 +231,18 @@ const progress = computed(() => Math.min(100, (elapsedMs.value / MAX_MS) * 100))
 
 const errorMessage = computed(() => {
   if (!error.value) return null
-  const map: Record<string, string> = {
-    permission_denied: 'Разрешите доступ к микрофону в настройках браузера.',
-    mic_unavailable: 'Не удалось включить микрофон.',
-    too_short: `Запись слишком короткая — минимум ${MIN_MS / 1000} секунд.`,
-    outside_window: 'Загрузка открывается только в день свадьбы.',
-    outside_geofence: 'Вы слишком далеко от места свадьбы.',
-    file_too_large: 'Запись слишком тяжёлая.',
-    unsupported_mime: 'Формат аудио не поддерживается этим браузером.',
-    quota_exceeded: 'Лимит голосовых для этого устройства исчерпан.',
-    wrong_table: 'Это устройство уже привязано к другому столу.',
-    upload_failed: 'Не удалось отправить. Проверьте интернет.',
+  const code = error.value
+  if (code === 'too_short') {
+    return t('guest.errors.too_short', { sec: MIN_MS / 1000 })
   }
-  return map[error.value] ?? 'Что-то пошло не так.'
+  if (code === 'permission_denied') {
+    return t('guest.errors.permission_denied_mic_only')
+  }
+  const kindKey = `guest.errors.${code}_voice`
+  if (te(kindKey)) return t(kindKey)
+  const baseKey = `guest.errors.${code}`
+  if (te(baseKey)) return t(baseKey)
+  return t('guest.camera.genericError')
 })
 </script>
 
@@ -306,7 +308,7 @@ const errorMessage = computed(() => {
           @click="startRecording"
         >
           <span class="h-3 w-3 rounded-full bg-white" />
-          Начать запись
+          {{ t('guest.camera.startRecording') }}
         </button>
 
         <!-- Recording state -->
@@ -317,7 +319,7 @@ const errorMessage = computed(() => {
           @click="stopRecording"
         >
           <Square class="h-4 w-4" fill="currentColor" />
-          Остановить
+          {{ t('guest.camera.stopRecording') }}
         </button>
 
         <!-- Review state -->
@@ -345,7 +347,7 @@ const errorMessage = computed(() => {
             @click="send"
           >
             <Check class="h-5 w-5" />
-            Отправить
+            {{ t('guest.camera.send') }}
           </button>
         </template>
 
@@ -360,7 +362,7 @@ const errorMessage = computed(() => {
         type="button"
         class="mt-4 inline-flex h-11 items-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-white hover:opacity-90"
         @click="requestMic"
-      >Попробовать снова</button>
+      >{{ t('guest.camera.tryAgain') }}</button>
     </div>
 
     <p

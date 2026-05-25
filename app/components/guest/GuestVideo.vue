@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onBeforeUnmount } from 'vue'
 import { Video, RefreshCw, Check, X, Square, Circle, Loader2 } from '@lucide/vue'
+import { useI18n } from '#imports'
+
+const { t, te } = useI18n()
 
 /**
  * GuestVideo — record a short clip (3-15 sec) through MediaRecorder
@@ -206,20 +209,21 @@ const seconds = computed(() => (elapsedMs.value / 1000).toFixed(1))
 
 const errorMessage = computed(() => {
   if (!error.value) return null
-  const map: Record<string, string> = {
-    permission_denied: 'Разрешите доступ к камере и микрофону в настройках браузера.',
-    camera_unavailable: 'Не удалось включить камеру.',
-    too_short: `Видео слишком короткое — нужно минимум ${MIN_MS / 1000} секунд.`,
-    outside_window: 'Загрузка открывается только в день свадьбы.',
-    outside_geofence: 'Вы слишком далеко от места свадьбы.',
-    event_not_active: 'Событие пока не активно.',
-    file_too_large: 'Видео слишком тяжёлое.',
-    unsupported_mime: 'Формат видео не поддерживается этим браузером.',
-    quota_exceeded: 'Лимит видео для этого устройства исчерпан.',
-    wrong_table: 'Это устройство уже привязано к другому столу.',
-    upload_failed: 'Не удалось отправить. Проверьте интернет.',
+  const code = error.value
+  // too_short carries a duration parameter; resolve it through the
+  // pluralised key with the seconds we care about.
+  if (code === 'too_short') {
+    return t('guest.errors.too_short', { sec: MIN_MS / 1000 })
   }
-  return map[error.value] ?? 'Что-то пошло не так.'
+  // Kind-specific override first (e.g. unsupported_mime_video), then
+  // the generic code, then a fallback.
+  const kindKey = `guest.errors.${code}_video`
+  if (te(kindKey)) return t(kindKey)
+  const baseKey = `guest.errors.${code}`
+  if (te(baseKey)) return t(baseKey)
+  // Permission denied for video needs cam+mic copy, not photo-only.
+  if (code === 'permission_denied') return t('guest.errors.permission_denied_mic')
+  return t('guest.camera.genericError')
 })
 </script>
 
@@ -233,10 +237,10 @@ const errorMessage = computed(() => {
         @click="startCamera"
       >
         <Video class="h-5 w-5" :stroke-width="1.8" />
-        Записать видео
+        {{ t('guest.camera.recordVideo') }}
       </button>
       <p class="mt-3 max-w-xs text-center text-xs text-(--color-muted-foreground)">
-        Клип 3–15 секунд. Браузер попросит разрешение на камеру и микрофон.
+        {{ t('guest.camera.videoHint') }}
       </p>
     </div>
 
@@ -346,7 +350,7 @@ const errorMessage = computed(() => {
         type="button"
         class="mt-4 inline-flex h-11 items-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-white hover:opacity-90"
         @click="startCamera"
-      >Попробовать снова</button>
+      >{{ t('guest.camera.tryAgain') }}</button>
     </div>
 
     <p
