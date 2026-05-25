@@ -209,12 +209,16 @@ function onWrongTable() {
   }
 }
 
-// Build a small monogram from "Albert & Anna" → "A & A", falling back
-// to a couple letters from the front of the string for non-standard
-// values like "Albert and Anna" or single names.
+// Build a small monogram from "Albert & Anna" → "A & A". Splits on
+// `&`, `·`, `+`, " и " (Russian and), " va " (Uzbek and), " and "
+// (English) so couple_names entered in any of the three languages
+// gives a clean two-letter result.
 const monogram = computed(() => {
   const raw = ev.value?.couple_names ?? ''
-  const parts = raw.split(/\s*[&·+]\s*|\s+и\s+|\s+and\s+/i).map((s) => s.trim()).filter(Boolean)
+  const parts = raw
+    .split(/\s*[&·+]\s*|\s+и\s+|\s+va\s+|\s+and\s+/i)
+    .map((s) => s.trim())
+    .filter(Boolean)
   if (parts.length >= 2) {
     return `${parts[0]![0]?.toUpperCase() ?? ''} & ${parts[1]![0]?.toUpperCase() ?? ''}`
   }
@@ -234,7 +238,7 @@ const formattedDate = computed(() => {
 
 useSeoMeta({
   title: () => (ev.value?.couple_names ? `Memour · ${ev.value.couple_names}` : 'Memour'),
-  description: () => 'Загрузите фото со свадьбы — все кадры в одном альбоме.',
+  description: () => t('guest.seo.description'),
 })
 </script>
 

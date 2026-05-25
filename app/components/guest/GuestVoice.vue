@@ -256,10 +256,10 @@ const errorMessage = computed(() => {
         @click="requestMic"
       >
         <Mic class="h-5 w-5" :stroke-width="1.8" />
-        Записать голос
+        {{ t('guest.camera.recordVoice') }}
       </button>
       <p class="mt-3 max-w-xs text-center text-xs text-(--color-muted-foreground)">
-        От 3 до 60 секунд. Браузер попросит разрешение на микрофон.
+        {{ t('guest.camera.voiceHint') }}
       </p>
     </div>
 
@@ -328,14 +328,14 @@ const errorMessage = computed(() => {
             type="button"
             class="grid h-12 w-12 place-items-center rounded-full border border-(--color-border) bg-white text-(--color-foreground) hover:bg-(--color-muted)"
             @click="togglePlay"
-            :aria-label="playing ? 'Пауза' : 'Воспроизвести'"
+            :aria-label="playing ? t('guest.aria.pause') : t('guest.aria.play')"
           >
             <Pause v-if="playing" class="h-5 w-5" />
             <Play v-else class="h-5 w-5" />
           </button>
           <button
             type="button"
-            aria-label="Переписать"
+            :aria-label="t('guest.aria.rerecord')"
             class="grid h-12 w-12 place-items-center rounded-full border border-(--color-border) bg-white text-(--color-foreground) hover:bg-(--color-muted)"
             @click="retake"
           >

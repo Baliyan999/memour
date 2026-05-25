@@ -292,7 +292,7 @@ const errorMessage = computed(() => {
         <button
           v-if="state === 'live'"
           type="button"
-          aria-label="Сменить камеру"
+          :aria-label="t('guest.aria.switchCamera')"
           class="grid h-11 w-11 place-items-center rounded-full bg-white/15 text-white backdrop-blur"
           @click="flip"
         >
@@ -312,7 +312,7 @@ const errorMessage = computed(() => {
           <button
             v-if="state === 'live'"
             type="button"
-            aria-label="Начать запись"
+            :aria-label="t('guest.aria.startRecording')"
             class="grid h-16 w-16 place-items-center rounded-full border-4 border-white/80 bg-red-500 shadow-[0_0_0_4px_rgb(0_0_0_/_0.2)] transition-transform active:scale-95"
             @click="startRecording"
           >
@@ -321,7 +321,7 @@ const errorMessage = computed(() => {
           <button
             v-else-if="state === 'recording'"
             type="button"
-            aria-label="Остановить"
+            :aria-label="t('guest.aria.stopRecording')"
             class="grid h-16 w-16 place-items-center rounded-full border-4 border-white/80 bg-red-500 shadow-[0_0_0_4px_rgb(0_0_0_/_0.2)] transition-transform active:scale-95"
             @click="stopRecording"
           >
@@ -330,7 +330,7 @@ const errorMessage = computed(() => {
           <button
             v-else-if="state === 'review'"
             type="button"
-            aria-label="Отправить"
+            :aria-label="t('guest.aria.send')"
             class="grid h-16 w-16 place-items-center rounded-full bg-(--color-primary) text-white shadow-[0_0_0_4px_rgb(0_0_0_/_0.2)] transition-transform active:scale-95"
             @click="send"
           >

@@ -219,7 +219,7 @@ const errorMessage = computed(() => {
         <span>{{ t('guest.camera.openCamera') }}</span>
       </button>
       <p class="mt-3 max-w-xs text-center text-xs text-(--color-muted-foreground)">
-        Браузер попросит разрешение на камеру — нажмите «Разрешить».
+        {{ t('guest.camera.cameraHint') }}
       </p>
     </div>
 
@@ -273,7 +273,7 @@ const errorMessage = computed(() => {
         <button
           v-if="state === 'live'"
           type="button"
-          aria-label="Сменить камеру"
+          :aria-label="t('guest.aria.switchCamera')"
           class="grid h-11 w-11 place-items-center rounded-full bg-white/15 text-white backdrop-blur transition-colors hover:bg-white/25"
           @click="flipCamera"
         >
@@ -284,7 +284,7 @@ const errorMessage = computed(() => {
         <button
           v-else-if="state === 'review'"
           type="button"
-          aria-label="Переснять"
+          :aria-label="t('guest.aria.retake')"
           class="grid h-11 w-11 place-items-center rounded-full bg-white/15 text-white backdrop-blur transition-colors hover:bg-white/25"
           @click="retake"
         >
@@ -298,14 +298,14 @@ const errorMessage = computed(() => {
           <button
             v-if="state === 'live'"
             type="button"
-            aria-label="Снять"
+            :aria-label="t('guest.aria.snap')"
             class="h-16 w-16 rounded-full border-4 border-white/80 bg-white shadow-[0_0_0_4px_rgb(0_0_0_/_0.2)] transition-transform active:scale-95"
             @click="capture"
           />
           <button
             v-else-if="state === 'review'"
             type="button"
-            aria-label="Отправить"
+            :aria-label="t('guest.aria.send')"
             class="grid h-16 w-16 place-items-center rounded-full bg-(--color-primary) text-white shadow-[0_0_0_4px_rgb(0_0_0_/_0.2)] transition-transform active:scale-95"
             @click="send"
           >

@@ -213,6 +213,7 @@
       "voiceTab": "Ovoz",
       "openCamera": "Kamerani ochish",
       "recordVideo": "Video yozish",
+      "recordVoice": "Ovoz yozish",
       "startRecording": "Yozishni boshlash",
       "stopRecording": "To'xtatish",
       "send": "Yuborish",
@@ -223,8 +224,23 @@
       "tryAgain": "Qayta urinib ko'rish",
       "genericError": "Nimadir noto'g'ri ketdi. Qaytadan urinib ko'ring.",
       "uploadedHeader": "Yuborildi · {count}",
+      "cameraHint": "Brauzer kameraga ruxsat so'raydi — «Ruxsat berish»ni bosing.",
       "videoHint": "3–15 soniyalik klip. Brauzer kamera va mikrofonga ruxsat so'raydi.",
-      "voiceHint": "3–60 soniyalik ovozli xabar."
+      "voiceHint": "3 dan 60 soniyagacha. Brauzer mikrofonga ruxsat so'raydi."
+    },
+    "aria": {
+      "snap": "Olish",
+      "send": "Yuborish",
+      "retake": "Qayta olish",
+      "switchCamera": "Kamerani almashtirish",
+      "startRecording": "Yozishni boshlash",
+      "stopRecording": "To'xtatish",
+      "play": "Ijro etish",
+      "pause": "Pauza",
+      "rerecord": "Qayta yozish"
+    },
+    "seo": {
+      "description": "To'ydan suratlarni yuklang — barcha kadrlar bitta albomda."
     },
     "errors": {
       "permission_denied": "Brauzer sozlamalarida kameraga ruxsat bering, aks holda surat ololmaymiz.",
