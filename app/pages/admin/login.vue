@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useLocalePath } from '#imports'
 import { motion } from 'motion-v'
 import { ArrowRight, Mail, Lock, Eye, EyeOff, MessageSquare, Shield } from '@lucide/vue'
@@ -31,13 +31,26 @@ const user = useSupabaseUser()
 const step = ref<'creds' | 'code'>('creds')
 const email = ref('')
 const password = ref('')
-const code = ref('')
-const codeInputEl = ref<HTMLInputElement | null>(null)
+const digits = ref<string[]>(['', '', '', '', '', ''])
+const code = computed(() => digits.value.join(''))
+const digitInputs: HTMLInputElement[] = []
 const showPassword = ref(false)
 const pending = ref(false)
 const error = ref<string | null>(null)
 const resendIn = ref(0)
 let resendTimer: number | undefined
+
+function setDigitRef(el: any, i: number) {
+  if (el) digitInputs[i] = el as HTMLInputElement
+}
+
+function focusDigit(i: number) {
+  nextTick(() => digitInputs[i]?.focus())
+}
+
+function resetDigits() {
+  digits.value = ['', '', '', '', '', '']
+}
 
 // Skip the form entirely if already a logged-in admin.
 watch(
@@ -111,8 +124,8 @@ async function submitCreds() {
     })
     step.value = 'code'
     startResendCooldown(30)
-    await nextTick()
-    codeInputEl.value?.focus()
+    resetDigits()
+    focusDigit(0)
   } catch (e: any) {
     error.value = mapError(e?.data?.data?.code ?? e?.data?.code)
   } finally {
@@ -120,15 +133,8 @@ async function submitCreds() {
   }
 }
 
-// Track whether the user has already completed verify in this page
-// lifetime — once setSession fires, the input may still emit another
-// `input` event from autofill / IME composition and we don't want a
-// duplicate POST. `pending` covers the in-flight window, `consumed`
-// covers the post-success window before navigateTo unmounts us.
-let consumed = false
-
 async function submitCode() {
-  if (pending.value || consumed) return
+  if (pending.value) return
   if (code.value.length !== 6) return
   pending.value = true
   error.value = null
@@ -145,18 +151,77 @@ async function submitCode() {
         code: code.value,
       },
     })
-    consumed = true
     const { error: sessErr } = await supabase.auth.setSession({
       access_token: res.access_token,
       refresh_token: res.refresh_token,
     })
     if (sessErr) throw sessErr
-    await navigateTo(localePath('/admin'))
+    // Hard nav: forces the next request to read the freshly-set
+    // session cookies from scratch, bypassing any client-side router
+    // race where the global auth middleware checks user.value before
+    // the SDK's auth state listener has fired.
+    if (typeof window !== 'undefined') {
+      window.location.href = localePath('/admin')
+    }
   } catch (e: any) {
+    console.error('[admin/login] verify failed', e)
     error.value = mapError(e?.data?.data?.code ?? e?.data?.code)
+    resetDigits()
+    focusDigit(0)
   } finally {
     pending.value = false
   }
+}
+
+// Per-box input — single digit, advance focus on entry, jump back on
+// Backspace, swallow paste and distribute across remaining boxes.
+function onDigitInput(i: number, e: Event) {
+  const input = e.target as HTMLInputElement
+  const raw = input.value.replace(/\D/g, '')
+  if (raw.length > 1) {
+    distributeText(raw, i)
+    return
+  }
+  digits.value[i] = raw
+  // Reflect cleaned value back to DOM (rejects non-digit input)
+  input.value = raw
+  if (raw && i < 5) focusDigit(i + 1)
+}
+
+function onDigitKeydown(i: number, e: KeyboardEvent) {
+  if (e.key === 'Backspace') {
+    if (digits.value[i]) {
+      digits.value[i] = ''
+      e.preventDefault()
+    } else if (i > 0) {
+      digits.value[i - 1] = ''
+      focusDigit(i - 1)
+      e.preventDefault()
+    }
+  } else if (e.key === 'ArrowLeft' && i > 0) {
+    focusDigit(i - 1)
+    e.preventDefault()
+  } else if (e.key === 'ArrowRight' && i < 5) {
+    focusDigit(i + 1)
+    e.preventDefault()
+  }
+  // Enter is handled by the surrounding <form @submit.prevent>
+}
+
+function onDigitPaste(i: number, e: ClipboardEvent) {
+  e.preventDefault()
+  const text = e.clipboardData?.getData('text') ?? ''
+  distributeText(text, i)
+}
+
+function distributeText(text: string, startIdx: number) {
+  const cleaned = text.replace(/\D/g, '').slice(0, 6 - startIdx)
+  if (!cleaned) return
+  for (let j = 0; j < cleaned.length; j++) {
+    digits.value[startIdx + j] = cleaned[j]!
+  }
+  const target = Math.min(startIdx + cleaned.length, 5)
+  focusDigit(target)
 }
 
 async function resend() {
@@ -166,15 +231,10 @@ async function resend() {
 
 function backToCreds() {
   step.value = 'creds'
-  code.value = ''
+  resetDigits()
   error.value = null
 }
 
-function onCodeInput(e: Event) {
-  const v = (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6)
-  code.value = v
-  if (v.length === 6) submitCode()
-}
 </script>
 
 <template>
@@ -297,18 +357,25 @@ function onCodeInput(e: Event) {
               class="flex flex-col gap-4"
               @submit.prevent="submitCode"
             >
-              <div class="flex flex-col gap-1.5">
-                <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Код из Telegram</label>
-                <input
-                  ref="codeInputEl"
-                  :value="code"
-                  inputmode="numeric"
-                  autocomplete="one-time-code"
-                  pattern="\d{6}"
-                  maxlength="6"
-                  class="h-14 w-full rounded-md border border-(--color-border) bg-white text-center font-mono text-2xl tracking-[0.5em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
-                  @input="onCodeInput"
-                >
+              <div class="flex flex-col gap-2">
+                <label class="text-center text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Код из Telegram</label>
+                <div class="flex justify-center gap-2 sm:gap-3">
+                  <input
+                    v-for="(_, i) in 6"
+                    :key="i"
+                    :ref="(el) => setDigitRef(el, i)"
+                    :value="digits[i]"
+                    type="text"
+                    inputmode="numeric"
+                    :autocomplete="i === 0 ? 'one-time-code' : 'off'"
+                    maxlength="1"
+                    class="h-14 w-11 rounded-md border border-(--color-border) bg-white text-center font-mono text-2xl font-medium tabular-nums sm:h-16 sm:w-12 sm:text-3xl focus-visible:border-(--color-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
+                    @input="onDigitInput(i, $event)"
+                    @keydown="onDigitKeydown(i, $event)"
+                    @paste="onDigitPaste(i, $event)"
+                    @focus="($event.target as HTMLInputElement).select()"
+                  >
+                </div>
               </div>
 
               <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
