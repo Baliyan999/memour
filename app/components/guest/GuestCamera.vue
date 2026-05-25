@@ -16,13 +16,23 @@ import { Camera, RefreshCw, Check, X, Upload, Loader2 } from '@lucide/vue'
  */
 const props = defineProps<{
   eventId: string
+  deviceId: string
   guestName?: string | null
-  guestTable?: number | null
+  guestTable: number
   geofenceEnabled: boolean
 }>()
 
 const emit = defineEmits<{
-  (e: 'uploaded', photo: { id: string; uploaded_at: string }): void
+  (
+    e: 'uploaded',
+    photo: {
+      id: string
+      uploaded_at: string
+      counts?: { photo_count: number; video_count: number; voice_count: number }
+    },
+  ): void
+  (e: 'quota_exceeded'): void
+  (e: 'wrong_table'): void
 }>()
 
 type State = 'idle' | 'live' | 'capturing' | 'review' | 'uploading' | 'error'
@@ -125,15 +135,21 @@ async function send() {
 
     const fd = new FormData()
     fd.append('event_id', props.eventId)
+    fd.append('device_id', props.deviceId)
+    fd.append('guest_table', String(props.guestTable))
     fd.append('file', compressed, 'photo.jpg')
     if (props.guestName) fd.append('guest_name', props.guestName)
-    if (props.guestTable) fd.append('guest_table', String(props.guestTable))
     if (coords) {
       fd.append('guest_lat', String(coords.latitude))
       fd.append('guest_lng', String(coords.longitude))
     }
 
-    const res = await uploadWithProgress<{ ok: boolean; photo_id: string; uploaded_at: string }>(
+    const res = await uploadWithProgress<{
+      ok: boolean
+      photo_id: string
+      uploaded_at: string
+      counts: { photo_count: number; video_count: number; voice_count: number }
+    }>(
       '/api/guest/upload',
       fd,
       (pct) => { uploadPercent.value = pct },
@@ -143,14 +159,21 @@ async function send() {
       throw { code: res.error?.code ?? 'upload_failed' }
     }
 
-    emit('uploaded', { id: res.data.photo_id, uploaded_at: res.data.uploaded_at })
+    emit('uploaded', {
+      id: res.data.photo_id,
+      uploaded_at: res.data.uploaded_at,
+      counts: res.data.counts,
+    })
     if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
     previewUrl.value = null
     lastBlob.value = null
     state.value = 'live'
   } catch (e: any) {
     state.value = 'review'
-    error.value = e?.code ?? e?.data?.data?.code ?? 'upload_failed'
+    const code = e?.code ?? e?.data?.data?.code ?? 'upload_failed'
+    error.value = code
+    if (code === 'quota_exceeded') emit('quota_exceeded')
+    if (code === 'wrong_table') emit('wrong_table')
   }
 }
 
@@ -175,6 +198,8 @@ const errorMessage = computed(() => {
     event_not_found: 'Событие не найдено.',
     file_too_large: 'Фото слишком тяжёлое. Попробуйте ещё раз — мы автоматически уменьшим размер.',
     unsupported_mime: 'Этот формат фото не поддерживается.',
+    quota_exceeded: 'Лимит фото для этого устройства исчерпан.',
+    wrong_table: 'Это устройство уже привязано к другому столу.',
     upload_failed: 'Не удалось отправить фото. Проверьте интернет и попробуйте снова.',
   }
   return map[error.value] ?? 'Что-то пошло не так. Попробуйте снова.'

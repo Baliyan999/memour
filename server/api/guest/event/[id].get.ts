@@ -1,5 +1,6 @@
 import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { DEVICE_LIMITS } from '../../../utils/guest-quota'
 
 /**
  * GET /api/guest/event/[id] — public read of an event (no auth).
@@ -11,14 +12,26 @@ import type { Database } from '~/types/database.types'
  * wedding date) + branding. Sensitive fields (owner_id, etc.) never
  * leave the server.
  *
- * Returns 404 if the event doesn't exist or is in `draft` status —
- * draft events aren't supposed to receive guest uploads.
+ * Optional `?device_id=<uuid>` query — when the guest's browser passes
+ * its persisted device id, we look up the existing binding (table,
+ * name, counters) for this event so the welcome screen can either
+ *   - skip the name input and jump straight to camera (same table), or
+ *   - show a polite "this device is already locked to table N" wall
+ *     (different table — they re-scanned someone else's QR).
+ *
+ * Returns 404 if the event doesn't exist or is in `archived` status.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
     throw createError({ statusCode: 400, statusMessage: 'invalid event id', data: { code: 'invalid_id' } })
   }
+
+  const query = getQuery(event)
+  const rawDeviceId = typeof query.device_id === 'string' ? query.device_id : ''
+  // Accept only well-formed UUIDs — we generate `crypto.randomUUID()`
+  // client-side, so anything else is malformed or hostile.
+  const deviceId = /^[0-9a-f-]{36}$/i.test(rawDeviceId) ? rawDeviceId : null
 
   const admin = serverSupabaseServiceRole<Database>(event)
 
@@ -51,5 +64,27 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 410, statusMessage: 'event archived', data: { code: 'event_archived' } })
   }
 
-  return { event: data }
+  let binding: {
+    table_number: number
+    guest_name: string | null
+    photo_count: number
+    video_count: number
+    voice_count: number
+  } | null = null
+
+  if (deviceId) {
+    const { data: row } = await admin
+      .from('guest_devices')
+      .select('table_number, guest_name, photo_count, video_count, voice_count')
+      .eq('event_id', id)
+      .eq('device_id', deviceId)
+      .maybeSingle()
+    if (row) binding = row
+  }
+
+  return {
+    event: data,
+    binding,
+    limits: DEVICE_LIMITS,
+  }
 })

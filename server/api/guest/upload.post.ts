@@ -5,6 +5,7 @@ import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
 import { notifyEventUpload } from '../../utils/telegram'
 import { checkRateLimit } from '../../utils/rate-limit'
+import { DEVICE_LIMITS, counterColumn, type GuestMediaKind } from '../../utils/guest-quota'
 
 /**
  * POST /api/guest/upload — accepts a single photo blob from an
@@ -96,10 +97,16 @@ export default defineEventHandler(async (event) => {
 
   const schema = z.object({
     event_id: z.string().uuid(),
+    // device_id is generated client-side once via crypto.randomUUID()
+    // and persisted in localStorage. Required from now on — it powers
+    // the per-device table binding and upload quota.
+    device_id: z.string().uuid(),
     media_type: z.enum(['photo', 'video', 'voice']).default('photo'),
     duration_ms: z.coerce.number().int().min(0).max(120_000).optional(),
     guest_name: z.string().max(80).optional(),
-    guest_table: z.coerce.number().int().min(1).max(500).optional(),
+    // guest_table is no longer "optional input from the form" — it
+    // arrives from the `?t=` query of the QR code. Required.
+    guest_table: z.coerce.number().int().min(1).max(500),
     guest_lat: z.coerce.number().min(-90).max(90).optional(),
     guest_lng: z.coerce.number().min(-180).max(180).optional(),
   })
@@ -147,6 +154,33 @@ export default defineEventHandler(async (event) => {
   if (ev!.venue_lat != null && ev!.venue_lng != null && input.guest_lat != null && input.guest_lng != null) {
     const dist = haversine(ev!.venue_lat, ev!.venue_lng, input.guest_lat, input.guest_lng)
     if (dist > (ev!.geofence_radius ?? 120)) fail(403, 'outside_geofence')
+  }
+
+  // --- Device binding + per-device quota ---
+  // Look up the existing binding for this (event, device) pair. The
+  // first time this device uploads at this event, no row exists yet —
+  // we create it after the photo lands. If a row already exists and
+  // points to a different table, the guest is trying to re-scan
+  // someone else's QR; refuse politely.
+  const kind = parsed.data.media_type as GuestMediaKind
+  const limit = DEVICE_LIMITS[kind]
+  const counterCol = counterColumn(kind)
+
+  const { data: existingBinding } = await admin
+    .from('guest_devices')
+    .select('table_number, guest_name, photo_count, video_count, voice_count')
+    .eq('event_id', ev!.id)
+    .eq('device_id', input.device_id)
+    .maybeSingle()
+
+  if (existingBinding) {
+    if (existingBinding.table_number !== input.guest_table) {
+      fail(409, 'wrong_table')
+    }
+    const currentCount = existingBinding[counterCol] ?? 0
+    if (currentCount >= limit) {
+      fail(429, 'quota_exceeded')
+    }
   }
 
   // Pick extension from MIME via the media-type's LIMITS table.
@@ -212,7 +246,7 @@ export default defineEventHandler(async (event) => {
       event_id: ev!.id,
       storage_path: storagePath,
       guest_name: input.guest_name || null,
-      guest_table: input.guest_table ?? null,
+      guest_table: input.guest_table,
       mime_type: storedMime ?? null,
       size_bytes: storedBuffer.length,
       media_type: parsed.data.media_type,
@@ -226,11 +260,58 @@ export default defineEventHandler(async (event) => {
     fail(500, 'storage_error')
   }
 
+  // Persist / increment the device binding now that the upload landed.
+  // First-time devices get a fresh row; returning devices get a counter
+  // bump. The select on top of upsert returns the new counters so the
+  // client can render "X / 15 photos used".
+  const nowIso = new Date().toISOString()
+  const counts = {
+    photo_count: existingBinding?.photo_count ?? 0,
+    video_count: existingBinding?.video_count ?? 0,
+    voice_count: existingBinding?.voice_count ?? 0,
+  }
+  counts[counterCol] = (counts[counterCol] ?? 0) + 1
+
+  // Preserve the name the guest entered on first visit if the camera
+  // component happened to omit it on a later upload (e.g., localStorage
+  // got cleared mid-session and only a fresh device_id survived).
+  const finalGuestName = input.guest_name ?? existingBinding?.guest_name ?? null
+
+  const { data: bindingRow, error: bindingErr } = await admin
+    .from('guest_devices')
+    .upsert(
+      {
+        device_id: input.device_id,
+        event_id: ev!.id,
+        table_number: input.guest_table,
+        guest_name: finalGuestName,
+        photo_count: counts.photo_count,
+        video_count: counts.video_count,
+        voice_count: counts.voice_count,
+        last_seen_at: nowIso,
+        ...(existingBinding ? {} : { first_seen_at: nowIso }),
+      },
+      { onConflict: 'device_id,event_id' },
+    )
+    .select('photo_count, video_count, voice_count')
+    .single()
+  if (bindingErr) {
+    // Log but don't fail the upload — photo already landed. Worst case
+    // the counter doesn't bump and the guest gets one extra upload.
+    console.error('[guest/upload] binding upsert failed', bindingErr)
+  }
+
   // Fire-and-forget debounced Telegram notification to the founder.
   // We don't await so the guest gets their upload confirmation fast;
   // notify will run on the next tick.
   void notifyEventUpload(ev!.id, ev!.couple_names)
 
-  return { ok: true, photo_id: photo.id, uploaded_at: photo.uploaded_at }
+  return {
+    ok: true,
+    photo_id: photo.id,
+    uploaded_at: photo.uploaded_at,
+    counts: bindingRow ?? counts,
+    limits: DEVICE_LIMITS,
+  }
 })
 

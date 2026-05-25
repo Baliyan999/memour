@@ -9,13 +9,23 @@ import { Mic, Square, Check, X, Play, Pause, Loader2 } from '@lucide/vue'
  */
 const props = defineProps<{
   eventId: string
+  deviceId: string
   guestName?: string | null
-  guestTable?: number | null
+  guestTable: number
   geofenceEnabled: boolean
 }>()
 
 const emit = defineEmits<{
-  (e: 'uploaded', media: { id: string; uploaded_at: string }): void
+  (
+    e: 'uploaded',
+    media: {
+      id: string
+      uploaded_at: string
+      counts?: { photo_count: number; video_count: number; voice_count: number }
+    },
+  ): void
+  (e: 'quota_exceeded'): void
+  (e: 'wrong_table'): void
 }>()
 
 const MIN_MS = 3000
@@ -169,25 +179,37 @@ async function send() {
     const coords = await getLocation()
     const fd = new FormData()
     fd.append('event_id', props.eventId)
+    fd.append('device_id', props.deviceId)
+    fd.append('guest_table', String(props.guestTable))
     fd.append('media_type', 'voice')
     fd.append('duration_ms', String(elapsedMs.value))
     fd.append('file', new File([lastBlob.value], `voice.${ext}`, { type: lastMime.value }))
     if (props.guestName) fd.append('guest_name', props.guestName)
-    if (props.guestTable) fd.append('guest_table', String(props.guestTable))
     if (coords) {
       fd.append('guest_lat', String(coords.latitude))
       fd.append('guest_lng', String(coords.longitude))
     }
-    const res = await $fetch<{ ok: boolean; photo_id: string; uploaded_at: string }>(
+    const res = await $fetch<{
+      ok: boolean
+      photo_id: string
+      uploaded_at: string
+      counts: { photo_count: number; video_count: number; voice_count: number }
+    }>(
       '/api/guest/upload',
       { method: 'POST', body: fd },
     )
-    emit('uploaded', { id: res.photo_id, uploaded_at: res.uploaded_at })
+    emit('uploaded', {
+      id: res.photo_id,
+      uploaded_at: res.uploaded_at,
+      counts: res.counts,
+    })
     retake()
   } catch (e: any) {
     state.value = 'review'
-    const code = e?.data?.data?.code ?? e?.data?.code
-    error.value = code ?? 'upload_failed'
+    const code = e?.data?.data?.code ?? e?.data?.code ?? 'upload_failed'
+    error.value = code
+    if (code === 'quota_exceeded') emit('quota_exceeded')
+    if (code === 'wrong_table') emit('wrong_table')
   }
 }
 
@@ -214,6 +236,8 @@ const errorMessage = computed(() => {
     outside_geofence: 'Вы слишком далеко от места свадьбы.',
     file_too_large: 'Запись слишком тяжёлая.',
     unsupported_mime: 'Формат аудио не поддерживается этим браузером.',
+    quota_exceeded: 'Лимит голосовых для этого устройства исчерпан.',
+    wrong_table: 'Это устройство уже привязано к другому столу.',
     upload_failed: 'Не удалось отправить. Проверьте интернет.',
   }
   return map[error.value] ?? 'Что-то пошло не так.'

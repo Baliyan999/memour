@@ -113,6 +113,50 @@ export type Database = {
         }
         Relationships: []
       }
+      guest_devices: {
+        Row: {
+          device_id: string
+          event_id: string
+          first_seen_at: string
+          guest_name: string | null
+          last_seen_at: string
+          photo_count: number
+          table_number: number
+          video_count: number
+          voice_count: number
+        }
+        Insert: {
+          device_id: string
+          event_id: string
+          first_seen_at?: string
+          guest_name?: string | null
+          last_seen_at?: string
+          photo_count?: number
+          table_number: number
+          video_count?: number
+          voice_count?: number
+        }
+        Update: {
+          device_id?: string
+          event_id?: string
+          first_seen_at?: string
+          guest_name?: string | null
+          last_seen_at?: string
+          photo_count?: number
+          table_number?: number
+          video_count?: number
+          voice_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_devices_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           created_at: string
