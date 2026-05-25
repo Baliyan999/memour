@@ -53,6 +53,18 @@ function fail(statusCode: number, code: string): never {
   throw createError({ statusCode, statusMessage: code, data: { code } })
 }
 
+/**
+ * Strip the codec suffix from a MIME string so we can compare it against
+ * a simple allow-list. Browsers attach things like
+ * `;codecs=vp9,opus` (Chrome desktop webm) or
+ * `;codecs=avc1.42E01E,mp4a.40.2` (iOS Safari mp4) to the type
+ * reported by MediaRecorder; if we don't strip them the upload was
+ * rejected with `unsupported_mime` for every video and voice clip.
+ */
+function baseMime(t: string | undefined | null): string {
+  return (t ?? '').split(';')[0]!.trim().toLowerCase()
+}
+
 /** Great-circle distance in metres between two lat/lng pairs. */
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -96,7 +108,13 @@ export default defineEventHandler(async (event) => {
   if (!file) fail(400, 'missing_file')
 
   const limits = LIMITS[parsed.data.media_type]
-  if (!limits.mimes.has(file!.type ?? '')) fail(415, 'unsupported_mime')
+  const mime = baseMime(file!.type)
+  if (!limits.mimes.has(mime)) {
+    console.warn(
+      `[guest/upload] rejected ${parsed.data.media_type} with mime=${file!.type ?? '<empty>'} (base=${mime || '<empty>'})`,
+    )
+    fail(415, 'unsupported_mime')
+  }
   if (file!.data.length > limits.maxBytes) fail(413, 'file_too_large')
 
   const input = parsed.data
@@ -132,7 +150,8 @@ export default defineEventHandler(async (event) => {
   }
 
   // Pick extension from MIME via the media-type's LIMITS table.
-  const ext = limits.ext[file!.type as string] ?? 'bin'
+  // `mime` was already normalized above (codec suffix stripped).
+  const ext = limits.ext[mime] ?? 'bin'
   const photoId = randomUUID()
   const folder = parsed.data.media_type === 'voice' ? 'voice'
     : parsed.data.media_type === 'video' ? 'video'
@@ -143,7 +162,8 @@ export default defineEventHandler(async (event) => {
   // phone embeds GPS into JPGs) and re-encode at a slightly lower
   // quality. For video/voice, pass through untouched.
   let storedBuffer = file!.data
-  let storedMime = file!.type
+  // Store the normalized base mime — Storage doesn't need codec hints.
+  let storedMime = mime
   let thumbnailPath: string | null = null
   if (parsed.data.media_type === 'photo') {
     try {
