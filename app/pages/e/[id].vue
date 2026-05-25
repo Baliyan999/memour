@@ -322,41 +322,54 @@ useSeoMeta({
       ? { '--color-primary': ev.branding.accent_color } as Record<string, string>
       : undefined"
   >
-    <!-- HEADER — identity row + single-line progress for active mode -->
-    <header class="mx-auto w-full max-w-md px-4 pt-5">
-      <div class="flex items-center gap-2">
-        <span class="inline-flex items-center gap-1 rounded-full border border-amber-200/60 bg-gradient-to-br from-amber-50 to-amber-100 px-2.5 py-1 text-[12px] font-medium text-amber-900">
-          <span class="text-[8px] uppercase tracking-[0.25em] text-amber-700/70">{{ t('guest.camera.tableChip') }}</span>
-          № {{ tableParam }}
-        </span>
-        <span v-if="guestName" class="truncate text-xs text-(--color-muted-foreground)">{{ guestName }}</span>
+    <!-- HEADER — two compact rows, no progress strip.
+         Row 1: identity left, language link right (so the lang chip
+         never overlaps the quota the way the floating pill did).
+         Row 2: all three quotas inline as tiny chips — easy to read,
+         doesn't depend on knowing which mode is active. -->
+    <header class="mx-auto w-full max-w-md shrink-0 px-4 pt-3 pb-1">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-2">
+          <span class="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200/60 bg-gradient-to-br from-amber-50 to-amber-100 px-2.5 py-1 text-[12px] font-medium text-amber-900">
+            <span class="text-[8px] uppercase tracking-[0.25em] text-amber-700/70">{{ t('guest.camera.tableChip') }}</span>
+            № {{ tableParam }}
+          </span>
+          <span v-if="guestName" class="truncate text-xs text-(--color-muted-foreground)">{{ guestName }}</span>
+        </div>
+        <NuxtLink
+          :to="switchLocalePath(otherLocale)"
+          class="inline-flex shrink-0 items-center gap-1 text-[11px] text-(--color-muted-foreground) transition-colors hover:text-(--color-foreground)"
+          :aria-label="otherLocaleLabel"
+        >
+          <svg viewBox="0 0 24 24" class="h-3 w-3 opacity-60" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7h13l-3-3" />
+            <path d="M21 17H8l3 3" />
+          </svg>
+          {{ otherLocaleLabel }}
+        </NuxtLink>
       </div>
 
-      <!-- Active-mode progress strip — single bar with icon left,
-           N/M right; switches to whatever mode the user just picked
-           so the most-relevant quota is always front and center. -->
-      <div class="mt-3 flex items-center gap-2">
-        <span class="text-base leading-none">{{ activeIcon }}</span>
-        <div class="h-1 flex-1 overflow-hidden rounded-full bg-(--color-muted)">
-          <div
-            class="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-500"
-            :style="{ width: activeProgress + '%' }"
-          />
-        </div>
-        <span class="text-[10px] tabular-nums text-(--color-muted-foreground)">
-          {{ activeUsed }}/{{ activeLimit }}
-        </span>
+      <!-- Compact quotas row — read-only chips matching the dock tabs.
+           Lives here so the user always sees what's left without
+           waiting for the dock to swing into view on a tall phone. -->
+      <div class="mt-1.5 flex items-center gap-3 text-[11px] tabular-nums text-(--color-muted-foreground)">
+        <span><span class="opacity-70">📸</span> {{ counts.photo_count }}/{{ limits.photo }}</span>
+        <span v-if="showVideo" class="opacity-50">·</span>
+        <span v-if="showVideo"><span class="opacity-70">🎥</span> {{ counts.video_count }}/{{ limits.video }}</span>
+        <span v-if="showVoice" class="opacity-50">·</span>
+        <span v-if="showVoice"><span class="opacity-70">🎤</span> {{ counts.voice_count }}/{{ limits.voice }}</span>
       </div>
-      <p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-(--color-muted-foreground)/70">
-        {{ activeLabel }}
-      </p>
     </header>
 
     <!-- MAIN — capture component fills remaining height. The
          component owns its idle illustration + capture button; this
-         wrapper just gives it room and a max-width on tablets. -->
-    <main class="flex flex-1 flex-col">
-      <div class="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pt-4">
+         wrapper just gives it room and a max-width on tablets.
+         `min-h-0` is the magic bit: without it, flex children with
+         intrinsic content (e.g. a <video> tag) refuse to shrink
+         below their content size and the whole page picks up a
+         scrollbar on shorter phones. -->
+    <main class="flex flex-1 flex-col min-h-0">
+      <div class="mx-auto flex w-full max-w-md flex-1 flex-col min-h-0 px-4 pt-3 pb-2">
         <Transition
           enter-active-class="transition duration-300"
           enter-from-class="opacity-0 translate-x-2"
@@ -403,14 +416,13 @@ useSeoMeta({
       </div>
     </main>
 
-    <!-- DOCK — mode switcher + language link, pinned to the bottom
-         of the viewport. Mode tabs are big enough to be reliable
-         thumb targets (each pill ≥ 44pt), and each carries its own
-         tiny quota readout so the user can see ALL three quotas at
-         a glance without taking horizontal room from the header. -->
+    <!-- DOCK — mode switcher only now. Each tab carries its own
+         N/M readout so the user can switch modes without leaving the
+         dock and confirms the count at a glance. Language link lives
+         in the header so this row stays focused on capture controls. -->
     <footer
-      class="sticky bottom-0 z-30 mx-auto w-full max-w-md border-t border-(--color-border)/40 bg-(--color-background)/95 px-4 pt-3 backdrop-blur"
-      :style="{ paddingBottom: 'max(env(safe-area-inset-bottom), 12px)' }"
+      class="sticky bottom-0 z-30 mx-auto w-full max-w-md shrink-0 border-t border-(--color-border)/40 bg-(--color-background)/95 px-4 pt-2.5 backdrop-blur"
+      :style="{ paddingBottom: 'max(env(safe-area-inset-bottom), 10px)' }"
     >
       <div v-if="showVideo || showVoice" class="flex items-center gap-1 rounded-full border border-(--color-border) bg-white p-1 shadow-[0_2px_8px_rgb(0_0_0_/_0.04)]">
         <button type="button" :class="modeTabClass('photo')" @click="mode = 'photo'">
@@ -425,22 +437,6 @@ useSeoMeta({
           <span class="text-sm leading-none">🎤</span>
           <span class="text-[10px] uppercase tracking-wider opacity-80">{{ counts.voice_count }}/{{ limits.voice }}</span>
         </button>
-      </div>
-
-      <!-- Language switcher — subtle text-only link, easy thumb
-           target but invisible until the user looks for it. -->
-      <div class="mt-2.5 flex justify-center">
-        <NuxtLink
-          :to="switchLocalePath(otherLocale)"
-          class="inline-flex items-center gap-1.5 text-[11px] text-(--color-muted-foreground) transition-colors hover:text-(--color-foreground)"
-          :aria-label="otherLocaleLabel"
-        >
-          <svg viewBox="0 0 24 24" class="h-3 w-3 opacity-60" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 7h13l-3-3" />
-            <path d="M21 17H8l3 3" />
-          </svg>
-          {{ otherLocaleLabel }}
-        </NuxtLink>
       </div>
     </footer>
   </div>

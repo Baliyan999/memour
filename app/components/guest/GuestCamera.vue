@@ -234,11 +234,15 @@ const errorMessage = computed(() => {
       </button>
     </div>
 
-    <!-- LIVE / REVIEW / UPLOADING viewport -->
+    <!-- LIVE / REVIEW / UPLOADING viewport.
+         `flex-1 min-h-0` lets the box shrink to fit short phones
+         instead of forcing aspect-ratio 3/4 (which on a 5" screen
+         pushed the dock off the bottom and forced a scrollbar).
+         object-cover on the inner <video> still gives a clean
+         framed picture whatever the resulting box shape is. -->
     <div
       v-else-if="state !== 'error'"
-      class="relative overflow-hidden rounded-(--radius-xl) border border-(--color-border)/60 bg-black"
-      style="aspect-ratio: 3/4"
+      class="relative flex-1 min-h-0 overflow-hidden rounded-(--radius-xl) border border-(--color-border)/60 bg-black"
     >
       <!-- Live video -->
       <video

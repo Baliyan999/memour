@@ -253,11 +253,12 @@ const errorMessage = computed(() => {
       </button>
     </div>
 
-    <!-- Live / recording / review -->
+    <!-- Live / recording / review viewport. Same shrinking flex
+         trick as GuestCamera so the dock never gets pushed off
+         the bottom on shorter phones. -->
     <div
       v-else-if="state !== 'error'"
-      class="relative overflow-hidden rounded-(--radius-xl) border border-(--color-border)/60 bg-black"
-      style="aspect-ratio: 3/4"
+      class="relative flex-1 min-h-0 overflow-hidden rounded-(--radius-xl) border border-(--color-border)/60 bg-black"
     >
       <video
         v-show="state === 'live' || state === 'recording'"
