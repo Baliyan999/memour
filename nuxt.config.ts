@@ -47,9 +47,20 @@ export default defineNuxtConfig({
   // Supabase auth — protected routes are gated by our own global
   // middleware (`middleware/auth.global.ts`), so the module's built-in
   // redirect is off. Types pulled from the auto-generated file.
+  //
+  // cookieOptions.secure is derived from NUXT_PUBLIC_SITE_URL's protocol
+  // because @nuxtjs/supabase defaults it to `true`, and Chrome silently
+  // discards `Secure` cookies arriving over plain http:// (which is
+  // what we serve from a bare IP before certbot is wired up). Flip it
+  // back on automatically as soon as siteUrl becomes https://.
   supabase: {
     redirect: false,
     types: '~/types/database.types.ts',
+    cookieOptions: {
+      maxAge: 60 * 60 * 8,
+      sameSite: 'lax',
+      secure: (process.env.NUXT_PUBLIC_SITE_URL ?? '').startsWith('https://'),
+    },
   },
 
   // Tailwind v4 via official Vite plugin (Nuxt 4 supports Vite plugins
