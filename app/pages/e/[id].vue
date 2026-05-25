@@ -346,7 +346,7 @@ useSeoMeta({
             v-model="guestName"
             type="text"
             maxlength="80"
-            placeholder="Алиса"
+            placeholder="Введите ваше имя"
             autofocus
             class="mt-3 h-12 w-full rounded-md border border-(--color-border)/70 bg-(--color-background) px-4 text-center text-base placeholder:text-(--color-muted-foreground)/60 focus-visible:border-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60"
             @keydown.enter="startCapture"
