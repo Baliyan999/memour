@@ -119,7 +119,23 @@ export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
   const baseUrl = config.public.siteUrl
 
-  const doc = new PDFDocument({ size: 'A4', margin: layout.margin })
+  // Set the PDF's internal /Title — Chrome / Safari / Firefox all use
+  // this for the tab label when the PDF renders inline. Without it the
+  // tab shows the URL slug ("660d104c-…"), which is what Albert was
+  // seeing. Also set Author so the metadata reads "Memour" instead of
+  // "PDFKit" in any reader that surfaces it.
+  const docTitle = `${ev!.couple_names || 'Memour'} — ${ev!.wedding_date}`
+  const doc = new PDFDocument({
+    size: 'A4',
+    margin: layout.margin,
+    info: {
+      Title: docTitle,
+      Author: 'Memour',
+      Subject: 'QR-коды столов',
+      Creator: 'Memour',
+      Producer: 'Memour',
+    },
+  })
   doc.registerFont('Manrope', getManrope())
   doc.registerFont('Cormorant', getCormorant())
   doc.font('Manrope')
