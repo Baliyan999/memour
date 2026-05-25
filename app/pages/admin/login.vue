@@ -139,11 +139,7 @@ async function submitCode() {
   pending.value = true
   error.value = null
   try {
-    const res = await $fetch<{
-      ok: boolean
-      access_token: string
-      refresh_token: string
-    }>('/api/admin-auth/verify', {
+    await $fetch('/api/admin-auth/verify', {
       method: 'POST',
       body: {
         email: email.value,
@@ -151,15 +147,8 @@ async function submitCode() {
         code: code.value,
       },
     })
-    const { error: sessErr } = await supabase.auth.setSession({
-      access_token: res.access_token,
-      refresh_token: res.refresh_token,
-    })
-    if (sessErr) throw sessErr
-    // Hard nav: forces the next request to read the freshly-set
-    // session cookies from scratch, bypassing any client-side router
-    // race where the global auth middleware checks user.value before
-    // the SDK's auth state listener has fired.
+    // Server already wrote the auth cookies to this response. Hard-nav
+    // so the next request includes them and SSR sees the session.
     if (typeof window !== 'undefined') {
       window.location.href = localePath('/admin')
     }

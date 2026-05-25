@@ -1,6 +1,9 @@
 import { z } from 'zod'
 import { createHash } from 'node:crypto'
-import { serverSupabaseServiceRole } from '#supabase/server'
+import {
+  serverSupabaseClient,
+  serverSupabaseServiceRole,
+} from '#supabase/server'
 import type { Database } from '~/types/database.types'
 
 /**
@@ -8,13 +11,17 @@ import type { Database } from '~/types/database.types'
  *
  *   1. Verify the 6-digit Telegram code matches the open OTP row.
  *   2. Mark the OTP consumed (single use).
- *   3. Re-verify the password via Supabase Auth /token endpoint and
- *      return the freshly-minted { access_token, refresh_token } to the
- *      browser. The client then calls `supabase.auth.setSession()` which
- *      writes them into httpOnly cookies via the Nuxt Supabase adapter.
+ *   3. Re-verify the password via Supabase Auth /token endpoint to
+ *      mint a fresh session, then call `setSession` on the server-bound
+ *      Supabase client — that writes the session cookies into the
+ *      response via `@supabase/ssr`'s cookie adapter in EXACTLY the
+ *      format the matching server reader (`serverSupabaseUser`) expects.
+ *      The browser stores them on the response, the next request
+ *      includes them, the global auth middleware sees the session.
  *
- * No magic-link, no token in the URL fragment — the session is
- * delivered over the JSON response and lands directly in cookies.
+ * The access_token / refresh_token never leave the server — the
+ * response body just says `{ ok: true }`. No URL fragment, no JSON
+ * token leak, just cookies that match what the SSR layer reads.
  *
  * Why the password is sent here again, not just the code:
  *   - Real 2FA requires both factors to mint a session. If we issued a
@@ -83,9 +90,20 @@ export default defineEventHandler(async (event) => {
   const tokenJson = (await tokenRes.json()) as any
   if (!tokenJson?.access_token || !tokenJson?.refresh_token) fail(500, 'session_failed')
 
-  return {
-    ok: true,
-    access_token: tokenJson.access_token as string,
-    refresh_token: tokenJson.refresh_token as string,
+  // --- 4. Write session cookies to the response server-side. The
+  //        @nuxtjs/supabase server client uses @supabase/ssr's cookie
+  //        adapter under the hood, so setSession() goes straight into
+  //        Set-Cookie headers in the exact format `serverSupabaseUser`
+  //        reads on the next request. No client-side setSession needed.
+  const userClient = await serverSupabaseClient<Database>(event)
+  const { error: sessErr } = await userClient.auth.setSession({
+    access_token: tokenJson.access_token,
+    refresh_token: tokenJson.refresh_token,
+  })
+  if (sessErr) {
+    console.error('[admin-auth/verify] setSession on server failed', sessErr)
+    fail(500, 'session_failed')
   }
+
+  return { ok: true }
 })
