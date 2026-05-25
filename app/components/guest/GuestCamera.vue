@@ -273,21 +273,31 @@ const errorMessage = computed(() => {
         <Minimize2 v-if="isFull" class="h-4 w-4" :stroke-width="1.8" />
         <Maximize2 v-else class="h-4 w-4" :stroke-width="1.8" />
       </button>
-      <!-- Live video -->
+      <!-- Live video.
+           iOS Safari historically renders `<video srcObject>` letter-
+           boxed (effective object-contain) even when CSS says
+           `object-fit: cover`. Forcing `position: absolute; inset: 0`
+           plus `display: block` + the `autoplay` attribute is the
+           known-good combo that gets the stream to actually fill
+           the box on every browser we care about. Without it the
+           viewport painted a black band at the bottom on iPhone. -->
       <video
         v-show="state === 'live' || state === 'capturing'"
         ref="videoEl"
         playsinline
         muted
-        class="h-full w-full object-cover"
+        autoplay
+        class="absolute inset-0 block h-full w-full object-cover"
       />
 
-      <!-- Review preview -->
+      <!-- Review preview — same absolute-fill trick as the live
+           video so swapping between live and review never paints a
+           letterbox stripe. -->
       <img
         v-if="state === 'review' || state === 'uploading'"
         :src="previewUrl ?? ''"
         alt=""
-        class="h-full w-full object-cover"
+        class="absolute inset-0 block h-full w-full object-cover"
       >
 
       <!-- Uploading overlay with real progress -->

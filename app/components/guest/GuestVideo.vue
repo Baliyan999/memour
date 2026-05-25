@@ -297,7 +297,7 @@ const errorMessage = computed(() => {
         playsinline
         muted
         autoplay
-        class="h-full w-full object-cover"
+        class="absolute inset-0 block h-full w-full object-cover"
       />
       <video
         v-if="state === 'review' || state === 'uploading'"

@@ -195,14 +195,56 @@ onMounted(async () => {
 
 watch([tableParam, binding], decideStage)
 
-function startCapture() {
-  if (!guestName.value.trim()) return
-  // Persist locally as a UX nicety. The authoritative copy is on the
-  // server inside guest_devices.guest_name, written on first upload.
+const welcomePending = ref(false)
+
+async function startCapture() {
+  if (welcomePending.value) return
+  if (!guestName.value.trim() || !tableParam.value || !deviceId.value) return
+  welcomePending.value = true
+  // Persist locally as a UX nicety.
   try {
-    localStorage.setItem(`memour:guest:${eventId.value}`, guestName.value)
+    localStorage.setItem(`memour:guest:${eventId.value}`, guestName.value.trim())
   } catch {/* ignore */}
-  stage.value = 'camera'
+
+  // Record the binding on the server NOW, not on first upload. This
+  // way a guest who scans, enters their name, then closes the tab
+  // (or wanders off and comes back later) jumps straight back to
+  // the camera — the server already knows who they are.
+  try {
+    const res = await $fetch<{ ok: boolean; binding: Binding }>(
+      `/api/guest/binding/${eventId.value}`,
+      {
+        method: 'POST',
+        body: {
+          device_id: deviceId.value,
+          guest_name: guestName.value.trim(),
+          guest_table: tableParam.value,
+        },
+      },
+    )
+    binding.value = res.binding
+    counts.value = {
+      photo_count: res.binding.photo_count,
+      video_count: res.binding.video_count,
+      voice_count: res.binding.voice_count,
+    }
+    stage.value = 'camera'
+  } catch (e: any) {
+    const code = e?.data?.data?.code ?? e?.data?.code
+    if (code === 'wrong_table') {
+      // Stale binding for this device points at a different table —
+      // server-side check beats client-side guesswork.
+      stage.value = 'wrong_table'
+    } else {
+      // Soft failure (network blip, server hiccup): let them in
+      // anyway. The upload endpoint also creates the binding as a
+      // safety net, so they're not stranded.
+      console.error('[guest/welcome] binding failed', e)
+      stage.value = 'camera'
+    }
+  } finally {
+    welcomePending.value = false
+  }
 }
 
 function onUploaded(photo: {
@@ -322,44 +364,11 @@ useSeoMeta({
       ? { '--color-primary': ev.branding.accent_color } as Record<string, string>
       : undefined"
   >
-    <!-- HEADER — two compact rows, no progress strip.
-         Row 1: identity left, language link right (so the lang chip
-         never overlaps the quota the way the floating pill did).
-         Row 2: all three quotas inline as tiny chips — easy to read,
-         doesn't depend on knowing which mode is active. -->
-    <header class="mx-auto w-full max-w-md shrink-0 px-4 pt-3 pb-1">
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex min-w-0 items-center gap-2">
-          <span class="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200/60 bg-gradient-to-br from-amber-50 to-amber-100 px-2.5 py-1 text-[12px] font-medium text-amber-900">
-            <span class="text-[8px] uppercase tracking-[0.25em] text-amber-700/70">{{ t('guest.camera.tableChip') }}</span>
-            № {{ tableParam }}
-          </span>
-          <span v-if="guestName" class="truncate text-xs text-(--color-muted-foreground)">{{ guestName }}</span>
-        </div>
-        <NuxtLink
-          :to="switchLocalePath(otherLocale)"
-          class="inline-flex shrink-0 items-center gap-1 text-[11px] text-(--color-muted-foreground) transition-colors hover:text-(--color-foreground)"
-          :aria-label="otherLocaleLabel"
-        >
-          <svg viewBox="0 0 24 24" class="h-3 w-3 opacity-60" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 7h13l-3-3" />
-            <path d="M21 17H8l3 3" />
-          </svg>
-          {{ otherLocaleLabel }}
-        </NuxtLink>
-      </div>
-
-      <!-- Compact quotas row — read-only chips matching the dock tabs.
-           Lives here so the user always sees what's left without
-           waiting for the dock to swing into view on a tall phone. -->
-      <div class="mt-1.5 flex items-center gap-3 text-[11px] tabular-nums text-(--color-muted-foreground)">
-        <span><span class="opacity-70">📸</span> {{ counts.photo_count }}/{{ limits.photo }}</span>
-        <span v-if="showVideo" class="opacity-50">·</span>
-        <span v-if="showVideo"><span class="opacity-70">🎥</span> {{ counts.video_count }}/{{ limits.video }}</span>
-        <span v-if="showVoice" class="opacity-50">·</span>
-        <span v-if="showVoice"><span class="opacity-70">🎤</span> {{ counts.voice_count }}/{{ limits.voice }}</span>
-      </div>
-    </header>
+    <!-- No header on the capture screen — every pixel goes to the
+         viewport. Identity was set on the welcome screen, language
+         was picked there too, and each per-mode quota already lives
+         on its corresponding dock tab below. -->
+    <div class="h-3 shrink-0" />
 
     <!-- MAIN — capture component fills remaining height. The
          component owns its idle illustration + capture button; this
@@ -541,11 +550,11 @@ useSeoMeta({
           >
           <button
             type="button"
-            :disabled="!guestName.trim()"
+            :disabled="!guestName.trim() || welcomePending"
             class="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-(--color-primary) text-sm font-medium tracking-wide text-(--color-primary-foreground) shadow-(--shadow-soft) transition-opacity hover:opacity-90 disabled:opacity-40"
             @click="startCapture"
           >
-            {{ t('guest.welcome.openCamera') }}
+            {{ welcomePending ? t('guest.camera.uploadingShort') : t('guest.welcome.openCamera') }}
           </button>
           <p class="mt-3 text-center text-[11px] leading-relaxed text-(--color-muted-foreground)">
             {{ t('guest.welcome.nameHint') }}
