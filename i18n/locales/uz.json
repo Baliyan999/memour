@@ -226,7 +226,13 @@
       "uploadedHeader": "Yuborildi · {count}",
       "cameraHint": "Brauzer kameraga ruxsat so'raydi — «Ruxsat berish»ni bosing.",
       "videoHint": "3–15 soniyalik klip. Brauzer kamera va mikrofonga ruxsat so'raydi.",
-      "voiceHint": "3 dan 60 soniyagacha. Brauzer mikrofonga ruxsat so'raydi."
+      "voiceHint": "3 dan 60 soniyagacha. Brauzer mikrofonga ruxsat so'raydi.",
+      "photoModeTitle": "Surat oling",
+      "videoModeTitle": "Klip yozib oling",
+      "voiceModeTitle": "Ovoz yozing",
+      "quotaPhotos": "{total} dan {used} ta surat",
+      "quotaVideos": "{total} dan {used} ta video",
+      "quotaVoices": "{total} dan {used} ta ovoz"
     },
     "aria": {
       "snap": "Olish",

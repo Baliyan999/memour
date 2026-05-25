@@ -204,23 +204,34 @@ const errorMessage = computed(() => {
 </script>
 
 <template>
-  <div class="relative">
+  <div class="relative flex h-full flex-1 flex-col">
     <!-- Hidden canvas — used only to convert video frame to blob -->
     <canvas ref="canvasEl" class="hidden" />
 
-    <!-- IDLE: pre-permission entry -->
-    <div v-if="state === 'idle'" class="grid place-items-center p-6">
+    <!-- IDLE: pre-permission entry. Illustration centered in the
+         available vertical space, CTA pinned to the bottom of the
+         column so the thumb falls on it without stretching. -->
+    <div v-if="state === 'idle'" class="flex flex-1 flex-col">
+      <div class="flex flex-1 flex-col items-center justify-center text-center">
+        <div class="grid h-24 w-24 place-items-center rounded-full bg-gradient-to-br from-amber-50 to-amber-100 shadow-[0_8px_24px_rgb(180_130_60_/_0.12)]">
+          <Camera class="h-10 w-10 text-amber-700" :stroke-width="1.4" />
+        </div>
+        <h3 class="mt-5 font-display text-2xl italic text-(--color-foreground)">
+          {{ t('guest.camera.photoModeTitle') }}
+        </h3>
+        <p class="mt-2 max-w-[14rem] text-sm leading-relaxed text-(--color-muted-foreground)">
+          {{ t('guest.camera.cameraHint') }}
+        </p>
+      </div>
+
       <button
         type="button"
-        class="group relative inline-flex h-14 items-center justify-center gap-2 overflow-hidden rounded-full bg-(--color-primary) px-8 text-base font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) hover:opacity-90"
+        class="mb-2 inline-flex h-14 w-full items-center justify-center gap-2 rounded-full bg-(--color-primary) text-base font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) transition-transform active:scale-[0.98]"
         @click="startCamera"
       >
         <Camera class="h-5 w-5" :stroke-width="1.8" />
         <span>{{ t('guest.camera.openCamera') }}</span>
       </button>
-      <p class="mt-3 max-w-xs text-center text-xs text-(--color-muted-foreground)">
-        {{ t('guest.camera.cameraHint') }}
-      </p>
     </div>
 
     <!-- LIVE / REVIEW / UPLOADING viewport -->

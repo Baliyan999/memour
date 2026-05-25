@@ -228,20 +228,29 @@ const errorMessage = computed(() => {
 </script>
 
 <template>
-  <div class="relative">
-    <!-- IDLE -->
-    <div v-if="state === 'idle'" class="grid place-items-center p-6">
+  <div class="relative flex h-full flex-1 flex-col">
+    <!-- IDLE — illustration above, full-width CTA at the bottom -->
+    <div v-if="state === 'idle'" class="flex flex-1 flex-col">
+      <div class="flex flex-1 flex-col items-center justify-center text-center">
+        <div class="grid h-24 w-24 place-items-center rounded-full bg-gradient-to-br from-amber-50 to-amber-100 shadow-[0_8px_24px_rgb(180_130_60_/_0.12)]">
+          <Video class="h-10 w-10 text-amber-700" :stroke-width="1.4" />
+        </div>
+        <h3 class="mt-5 font-display text-2xl italic text-(--color-foreground)">
+          {{ t('guest.camera.videoModeTitle') }}
+        </h3>
+        <p class="mt-2 max-w-[16rem] text-sm leading-relaxed text-(--color-muted-foreground)">
+          {{ t('guest.camera.videoHint') }}
+        </p>
+      </div>
+
       <button
         type="button"
-        class="inline-flex h-14 items-center gap-2 rounded-full bg-(--color-primary) px-8 text-base font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) hover:opacity-90"
+        class="mb-2 inline-flex h-14 w-full items-center justify-center gap-2 rounded-full bg-(--color-primary) text-base font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) transition-transform active:scale-[0.98]"
         @click="startCamera"
       >
         <Video class="h-5 w-5" :stroke-width="1.8" />
         {{ t('guest.camera.recordVideo') }}
       </button>
-      <p class="mt-3 max-w-xs text-center text-xs text-(--color-muted-foreground)">
-        {{ t('guest.camera.videoHint') }}
-      </p>
     </div>
 
     <!-- Live / recording / review -->

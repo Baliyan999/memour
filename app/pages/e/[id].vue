@@ -2,11 +2,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { motion } from 'motion-v'
-import { useI18n } from '#imports'
+import { useI18n, useSwitchLocalePath } from '#imports'
 
 definePageMeta({ layout: 'guest' })
 
 const { t, locale } = useI18n()
+const switchLocalePath = useSwitchLocalePath()
+const otherLocale = computed<'ru' | 'uz'>(() => (locale.value === 'ru' ? 'uz' : 'ru'))
+const otherLocaleLabel = computed(() => (locale.value === 'ru' ? "O'zbekcha" : 'Русский'))
 
 /**
  * /e/[id] — public landing for wedding guests.
@@ -116,6 +119,41 @@ watch(binding, (b) => {
     }
   }
 })
+
+// Helpers driving the active-mode progress strip in the header. The
+// strip shows whatever the user is currently doing (photo / video /
+// voice) so the most relevant quota is always front-and-centre; the
+// other modes' counts stay visible as small numbers next to their
+// dock tabs.
+const activeIcon = computed(() => (mode.value === 'photo' ? '📸' : mode.value === 'video' ? '🎥' : '🎤'))
+const activeUsed = computed(() => {
+  if (mode.value === 'photo') return counts.value.photo_count
+  if (mode.value === 'video') return counts.value.video_count
+  return counts.value.voice_count
+})
+const activeLimit = computed(() => {
+  if (mode.value === 'photo') return limits.value.photo
+  if (mode.value === 'video') return limits.value.video
+  return limits.value.voice
+})
+const activeProgress = computed(() => {
+  const lim = activeLimit.value || 1
+  return Math.min(100, (activeUsed.value / lim) * 100)
+})
+const activeLabel = computed(() => {
+  if (mode.value === 'photo') return t('guest.camera.quotaPhotos', { used: activeUsed.value, total: activeLimit.value })
+  if (mode.value === 'video') return t('guest.camera.quotaVideos', { used: activeUsed.value, total: activeLimit.value })
+  return t('guest.camera.quotaVoices', { used: activeUsed.value, total: activeLimit.value })
+})
+
+function modeTabClass(m: Mode): string {
+  return [
+    'flex flex-1 flex-col items-center gap-0.5 rounded-full px-2 py-2 text-xs transition-colors',
+    mode.value === m
+      ? 'bg-(--color-primary) text-(--color-primary-foreground)'
+      : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
+  ].join(' ')
+}
 
 // Initial routing decision once we know device_id, table, and binding.
 function decideStage() {
@@ -268,7 +306,152 @@ useSeoMeta({
     </div>
   </div>
 
-  <!-- Active event -->
+  <!-- ============================================================ -->
+  <!--  ACTIVE EVENT — CAMERA STAGE: full-screen 3-zone layout       -->
+  <!--                                                                -->
+  <!--  Built around the thumb: identity + active-mode progress at    -->
+  <!--  the top (only-read, never tap), the capture component fills   -->
+  <!--  the middle, and every interactive element (mode switcher,    -->
+  <!--  primary CTA, language switch) lives inside the bottom dock    -->
+  <!--  pinned to the safe-area-aware bottom edge.                    -->
+  <!-- ============================================================ -->
+  <div
+    v-else-if="isActive && ev && stage === 'camera' && tableParam && deviceId"
+    class="flex min-h-[100dvh] flex-col"
+    :style="ev.branding?.accent_color
+      ? { '--color-primary': ev.branding.accent_color } as Record<string, string>
+      : undefined"
+  >
+    <!-- HEADER — identity row + single-line progress for active mode -->
+    <header class="mx-auto w-full max-w-md px-4 pt-5">
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center gap-1 rounded-full border border-amber-200/60 bg-gradient-to-br from-amber-50 to-amber-100 px-2.5 py-1 text-[12px] font-medium text-amber-900">
+          <span class="text-[8px] uppercase tracking-[0.25em] text-amber-700/70">{{ t('guest.camera.tableChip') }}</span>
+          № {{ tableParam }}
+        </span>
+        <span v-if="guestName" class="truncate text-xs text-(--color-muted-foreground)">{{ guestName }}</span>
+      </div>
+
+      <!-- Active-mode progress strip — single bar with icon left,
+           N/M right; switches to whatever mode the user just picked
+           so the most-relevant quota is always front and center. -->
+      <div class="mt-3 flex items-center gap-2">
+        <span class="text-base leading-none">{{ activeIcon }}</span>
+        <div class="h-1 flex-1 overflow-hidden rounded-full bg-(--color-muted)">
+          <div
+            class="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-500"
+            :style="{ width: activeProgress + '%' }"
+          />
+        </div>
+        <span class="text-[10px] tabular-nums text-(--color-muted-foreground)">
+          {{ activeUsed }}/{{ activeLimit }}
+        </span>
+      </div>
+      <p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-(--color-muted-foreground)/70">
+        {{ activeLabel }}
+      </p>
+    </header>
+
+    <!-- MAIN — capture component fills remaining height. The
+         component owns its idle illustration + capture button; this
+         wrapper just gives it room and a max-width on tablets. -->
+    <main class="flex flex-1 flex-col">
+      <div class="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pt-4">
+        <Transition
+          enter-active-class="transition duration-300"
+          enter-from-class="opacity-0 translate-x-2"
+          enter-to-class="opacity-100"
+          mode="out-in"
+        >
+          <GuestCamera
+            v-if="mode === 'photo'"
+            key="photo"
+            :event-id="ev.id"
+            :device-id="deviceId"
+            :guest-name="guestName"
+            :guest-table="tableParam"
+            :geofence-enabled="geofenceEnabled"
+            @uploaded="onUploaded"
+            @quota_exceeded="onQuotaExceeded"
+            @wrong_table="onWrongTable"
+          />
+          <GuestVideo
+            v-else-if="mode === 'video'"
+            key="video"
+            :event-id="ev.id"
+            :device-id="deviceId"
+            :guest-name="guestName"
+            :guest-table="tableParam"
+            :geofence-enabled="geofenceEnabled"
+            @uploaded="onUploaded"
+            @quota_exceeded="onQuotaExceeded"
+            @wrong_table="onWrongTable"
+          />
+          <GuestVoice
+            v-else-if="mode === 'voice'"
+            key="voice"
+            :event-id="ev.id"
+            :device-id="deviceId"
+            :guest-name="guestName"
+            :guest-table="tableParam"
+            :geofence-enabled="geofenceEnabled"
+            @uploaded="onUploaded"
+            @quota_exceeded="onQuotaExceeded"
+            @wrong_table="onWrongTable"
+          />
+        </Transition>
+      </div>
+    </main>
+
+    <!-- DOCK — mode switcher + language link, pinned to the bottom
+         of the viewport. Mode tabs are big enough to be reliable
+         thumb targets (each pill ≥ 44pt), and each carries its own
+         tiny quota readout so the user can see ALL three quotas at
+         a glance without taking horizontal room from the header. -->
+    <footer
+      class="sticky bottom-0 z-30 mx-auto w-full max-w-md border-t border-(--color-border)/40 bg-(--color-background)/95 px-4 pt-3 backdrop-blur"
+      :style="{ paddingBottom: 'max(env(safe-area-inset-bottom), 12px)' }"
+    >
+      <div v-if="showVideo || showVoice" class="flex items-center gap-1 rounded-full border border-(--color-border) bg-white p-1 shadow-[0_2px_8px_rgb(0_0_0_/_0.04)]">
+        <button type="button" :class="modeTabClass('photo')" @click="mode = 'photo'">
+          <span class="text-sm leading-none">📸</span>
+          <span class="text-[10px] uppercase tracking-wider opacity-80">{{ counts.photo_count }}/{{ limits.photo }}</span>
+        </button>
+        <button v-if="showVideo" type="button" :class="modeTabClass('video')" @click="mode = 'video'">
+          <span class="text-sm leading-none">🎥</span>
+          <span class="text-[10px] uppercase tracking-wider opacity-80">{{ counts.video_count }}/{{ limits.video }}</span>
+        </button>
+        <button v-if="showVoice" type="button" :class="modeTabClass('voice')" @click="mode = 'voice'">
+          <span class="text-sm leading-none">🎤</span>
+          <span class="text-[10px] uppercase tracking-wider opacity-80">{{ counts.voice_count }}/{{ limits.voice }}</span>
+        </button>
+      </div>
+
+      <!-- Language switcher — subtle text-only link, easy thumb
+           target but invisible until the user looks for it. -->
+      <div class="mt-2.5 flex justify-center">
+        <NuxtLink
+          :to="switchLocalePath(otherLocale)"
+          class="inline-flex items-center gap-1.5 text-[11px] text-(--color-muted-foreground) transition-colors hover:text-(--color-foreground)"
+          :aria-label="otherLocaleLabel"
+        >
+          <svg viewBox="0 0 24 24" class="h-3 w-3 opacity-60" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7h13l-3-3" />
+            <path d="M21 17H8l3 3" />
+          </svg>
+          {{ otherLocaleLabel }}
+        </NuxtLink>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ============================================================ -->
+  <!--  ACTIVE EVENT — non-camera stages (welcome, errors, quota)    -->
+  <!--                                                                -->
+  <!--  Card-centric, scrolling layout. Cover photo at top, content   -->
+  <!--  card in the middle, language switch as a quiet text link at   -->
+  <!--  the bottom of the column so it never overlaps content.       -->
+  <!-- ============================================================ -->
   <div
     v-else-if="isActive && ev"
     class="relative mx-auto max-w-md px-4 pb-12 pt-4 sm:pt-10"
@@ -276,9 +459,9 @@ useSeoMeta({
       ? { '--color-primary': ev.branding.accent_color } as Record<string, string>
       : undefined"
   >
-    <!-- Cover hero — only on welcome / locked-state screens, not on camera -->
+    <!-- Cover hero — present on welcome / locked-state screens -->
     <div
-      v-if="ev.branding?.cover_photo && (stage === 'welcome' || stage === 'wrong_table' || stage === 'no_table' || stage === 'quota_full')"
+      v-if="ev.branding?.cover_photo"
       class="relative -mx-4 aspect-[4/3] overflow-hidden sm:rounded-(--radius-xl)"
     >
       <img :src="ev.branding.cover_photo" alt="" class="h-full w-full object-cover">
@@ -432,126 +615,24 @@ useSeoMeta({
         </div>
       </div>
 
-      <!-- ============== CAMERA ============== -->
-      <div v-else-if="stage === 'camera' && tableParam && deviceId" key="camera">
-        <!-- Top context bar: name + table chip + quota -->
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-amber-200/60 bg-gradient-to-br from-amber-50 to-amber-100 px-3 py-1 text-xs font-medium text-amber-900">
-              <span class="text-[9px] uppercase tracking-[0.2em] text-amber-700/80">{{ t('guest.camera.tableChip') }}</span>
-              № {{ tableParam }}
-            </span>
-            <span v-if="guestName" class="text-xs text-(--color-muted-foreground)">{{ guestName }}</span>
-          </div>
-          <div class="flex items-center gap-1.5 text-[10px] text-(--color-muted-foreground)">
-            <span :class="counts.photo_count >= limits.photo ? 'text-amber-700 font-medium' : ''">
-              📸 {{ counts.photo_count }}/{{ limits.photo }}
-            </span>
-            <span v-if="showVideo">·</span>
-            <span v-if="showVideo" :class="counts.video_count >= limits.video ? 'text-amber-700 font-medium' : ''">
-              🎥 {{ counts.video_count }}/{{ limits.video }}
-            </span>
-            <span v-if="showVoice">·</span>
-            <span v-if="showVoice" :class="counts.voice_count >= limits.voice ? 'text-amber-700 font-medium' : ''">
-              🎤 {{ counts.voice_count }}/{{ limits.voice }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Mode tabs -->
-        <div v-if="showVideo || showVoice" class="mb-4 flex items-center gap-1 rounded-full border border-(--color-border) bg-white p-0.5">
-          <button
-            type="button"
-            :class="[
-              'flex-1 rounded-full px-3 py-1.5 text-xs transition-colors',
-              mode === 'photo'
-                ? 'bg-(--color-primary) text-(--color-primary-foreground)'
-                : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
-            ]"
-            @click="mode = 'photo'"
-          >📸 {{ t('guest.camera.photoTab') }}</button>
-          <button
-            v-if="showVideo"
-            type="button"
-            :class="[
-              'flex-1 rounded-full px-3 py-1.5 text-xs transition-colors',
-              mode === 'video'
-                ? 'bg-(--color-primary) text-(--color-primary-foreground)'
-                : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
-            ]"
-            @click="mode = 'video'"
-          >🎥 {{ t('guest.camera.videoTab') }}</button>
-          <button
-            v-if="showVoice"
-            type="button"
-            :class="[
-              'flex-1 rounded-full px-3 py-1.5 text-xs transition-colors',
-              mode === 'voice'
-                ? 'bg-(--color-primary) text-(--color-primary-foreground)'
-                : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
-            ]"
-            @click="mode = 'voice'"
-          >🎤 {{ t('guest.camera.voiceTab') }}</button>
-        </div>
-
-        <Transition
-          enter-active-class="transition duration-300"
-          enter-from-class="opacity-0 translate-x-2"
-          enter-to-class="opacity-100"
-          mode="out-in"
-        >
-          <GuestCamera
-            v-if="mode === 'photo'"
-            key="photo"
-            :event-id="ev.id"
-            :device-id="deviceId"
-            :guest-name="guestName"
-            :guest-table="tableParam"
-            :geofence-enabled="geofenceEnabled"
-            @uploaded="onUploaded"
-            @quota_exceeded="onQuotaExceeded"
-            @wrong_table="onWrongTable"
-          />
-          <GuestVideo
-            v-else-if="mode === 'video'"
-            key="video"
-            :event-id="ev.id"
-            :device-id="deviceId"
-            :guest-name="guestName"
-            :guest-table="tableParam"
-            :geofence-enabled="geofenceEnabled"
-            @uploaded="onUploaded"
-            @quota_exceeded="onQuotaExceeded"
-            @wrong_table="onWrongTable"
-          />
-          <GuestVoice
-            v-else-if="mode === 'voice'"
-            key="voice"
-            :event-id="ev.id"
-            :device-id="deviceId"
-            :guest-name="guestName"
-            :guest-table="tableParam"
-            :geofence-enabled="geofenceEnabled"
-            @uploaded="onUploaded"
-            @quota_exceeded="onQuotaExceeded"
-            @wrong_table="onWrongTable"
-          />
-        </Transition>
-
-        <!-- Recently uploaded badges -->
-        <div v-if="uploads.length > 0" class="mt-6">
-          <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">
-            {{ t('guest.camera.uploadedHeader', { count: uploads.length }) }}
-          </p>
-          <div class="grid grid-cols-6 gap-1.5">
-            <div
-              v-for="u in uploads"
-              :key="u.id"
-              class="aspect-square overflow-hidden rounded-md bg-gradient-to-br from-(--color-accent) to-(--color-rose)"
-            />
-          </div>
-        </div>
-      </div>
     </Transition>
+
+    <!-- Language switch — quiet text link at the foot of every
+         non-camera state. Doesn't compete with content; one tap
+         swaps the locale prefix on the current path so the ?t=
+         query (the table the guest scanned) survives. -->
+    <div class="mt-10 flex justify-center">
+      <NuxtLink
+        :to="switchLocalePath(otherLocale)"
+        class="inline-flex items-center gap-1.5 text-[11px] text-(--color-muted-foreground) transition-colors hover:text-(--color-foreground)"
+        :aria-label="otherLocaleLabel"
+      >
+        <svg viewBox="0 0 24 24" class="h-3 w-3 opacity-60" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7h13l-3-3" />
+          <path d="M21 17H8l3 3" />
+        </svg>
+        {{ otherLocaleLabel }}
+      </NuxtLink>
+    </div>
   </div>
 </template>
