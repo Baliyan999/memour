@@ -12,11 +12,25 @@ import {
   type QRStyle,
 } from '../../../utils/qr-styled'
 
-const FONT_PATH = resolve(process.cwd(), 'server/assets/fonts/Manrope-Var.ttf')
-let cachedFont: Buffer | null = null
-function getFont(): Buffer {
-  if (!cachedFont) cachedFont = readFileSync(FONT_PATH)
-  return cachedFont
+// Two fonts on the card:
+//   Manrope handles the small ALL-CAPS "MEMOUR" eyebrow — sans-serif
+//   reads better at 9pt with letter-spacing.
+//   Cormorant Garamond Italic handles the table number, couple names
+//   and date — serif italic carries the wedding-stationery feel that
+//   was completely missing when everything was rendered in Manrope.
+const FONT_DIR = resolve(process.cwd(), 'server/assets/fonts')
+const MANROPE_PATH = resolve(FONT_DIR, 'Manrope-Var.ttf')
+const CORMORANT_ITALIC_PATH = resolve(FONT_DIR, 'CormorantGaramond-Italic.ttf')
+
+let cachedManrope: Buffer | null = null
+let cachedCormorant: Buffer | null = null
+function getManrope(): Buffer {
+  if (!cachedManrope) cachedManrope = readFileSync(MANROPE_PATH)
+  return cachedManrope
+}
+function getCormorant(): Buffer {
+  if (!cachedCormorant) cachedCormorant = readFileSync(CORMORANT_ITALIC_PATH)
+  return cachedCormorant
 }
 
 /**
@@ -106,7 +120,8 @@ export default defineEventHandler(async (event) => {
   const baseUrl = config.public.siteUrl
 
   const doc = new PDFDocument({ size: 'A4', margin: layout.margin })
-  doc.registerFont('Manrope', getFont())
+  doc.registerFont('Manrope', getManrope())
+  doc.registerFont('Cormorant', getCormorant())
   doc.font('Manrope')
   const chunks: Buffer[] = []
   doc.on('data', (c: Buffer) => chunks.push(c))
@@ -138,8 +153,11 @@ export default defineEventHandler(async (event) => {
       doc.restore()
     }
 
-    const reservedBottom = layout.decorative ? 70 : 28
-    const reservedTop = layout.decorative ? 32 : 14
+    // The decorative layouts need more headroom below the QR for the
+    // three-line wedding-stationery text block; the dense `4x2` layout
+    // is tighter and only shows the table number.
+    const reservedBottom = layout.decorative ? 90 : 30
+    const reservedTop = layout.decorative ? 36 : 14
     const qrSize = Math.min(colW, rowH - reservedBottom - reservedTop) - 16
     const qrX = x + (colW - qrSize) / 2
     const qrY = y + reservedTop
@@ -149,17 +167,50 @@ export default defineEventHandler(async (event) => {
     doc.image(png, qrX, qrY, { width: qrSize, height: qrSize })
 
     if (layout.decorative) {
+      // Top "MEMOUR" eyebrow stays in the sans-serif so the wedding
+      // text below it has more visual weight.
       doc.font('Manrope').fillColor('#7a5444').fontSize(9)
       doc.text('MEMOUR', x, y + 14, { width: colW, align: 'center', characterSpacing: 2 })
     }
 
-    const textY = qrY + qrSize + 10
-    doc.fillColor('#3a2010').fontSize(layout.cols === 1 ? 34 : 20)
-    doc.text(`Стол ${t}`, x, textY, { width: colW, align: 'center' })
+    // Type scale per layout: the single-card layout has room for
+    // wedding-invitation sizes; 2x2 still gives the serif room to
+    // breathe; 4x2 only gets the table number with no decoration.
+    const isSingle = layout.cols === 1
+    const sizeTable = isSingle ? 56 : 30
+    const sizeNames = isSingle ? 18 : 13
+    const sizeDate = isSingle ? 12 : 9
+
+    // Gold hairline divider between QR and text — gives the card the
+    // "save the date" feel even at a glance.
     if (layout.decorative) {
-      doc.fillColor('#7a5444').fontSize(layout.cols === 1 ? 14 : 10)
-      doc.text(ev!.couple_names, x, textY + (layout.cols === 1 ? 46 : 28), {
-        width: colW, align: 'center',
+      const divY = qrY + qrSize + 12
+      const divW = Math.min(colW * 0.4, 80)
+      doc.save()
+      doc.lineWidth(0.6).strokeColor('#c89e6a')
+      doc.moveTo(x + (colW - divW) / 2, divY)
+        .lineTo(x + (colW + divW) / 2, divY)
+        .stroke()
+      doc.restore()
+    }
+
+    const textTop = qrY + qrSize + (layout.decorative ? 22 : 10)
+
+    // Table number — serif italic, the hero text on the card.
+    doc.font('Cormorant').fillColor('#3a2010').fontSize(sizeTable)
+    doc.text(`Стол ${t}`, x, textTop, { width: colW, align: 'center' })
+
+    if (layout.decorative) {
+      // Couple names directly below, smaller serif italic
+      const namesY = textTop + sizeTable + (isSingle ? 6 : 2)
+      doc.font('Cormorant').fillColor('#7a5444').fontSize(sizeNames)
+      doc.text(ev!.couple_names, x, namesY, { width: colW, align: 'center' })
+
+      // Wedding date in soft taupe, slightly looser tracking
+      const dateY = namesY + sizeNames + (isSingle ? 6 : 3)
+      doc.font('Cormorant').fillColor('#a48068').fontSize(sizeDate)
+      doc.text(formatCardDate(ev!.wedding_date), x, dateY, {
+        width: colW, align: 'center', characterSpacing: 0.5,
       })
     }
   }
@@ -167,8 +218,16 @@ export default defineEventHandler(async (event) => {
   doc.end()
   const pdf = await done
 
-  const asciiName = `memour-qr-${ev!.couple_names.replace(/[^a-z0-9 ]/gi, '_').slice(0, 40) || 'event'}.pdf`
-  const utf8Name = `memour-qr-${ev!.couple_names.slice(0, 40)}.pdf`
+  // Self-identifying filename: "<couple names> <YYYY-MM-DD>.pdf".
+  // When the admin downloads several QR PDFs (multiple weddings),
+  // they can tell them apart in the Downloads folder at a glance.
+  const namePart = (ev!.couple_names || 'event').slice(0, 60).trim()
+  const datePart = ev!.wedding_date // already YYYY-MM-DD from the DB
+  const utf8Name = `${namePart} ${datePart}.pdf`
+  // ASCII fallback for old downloaders that ignore filename* — keep
+  // the same shape but transliterate non-Latin chars to underscores.
+  const asciiBody = namePart.replace(/[^a-z0-9 ]/gi, '_').replace(/_+/g, '_').trim()
+  const asciiName = `${asciiBody || 'event'} ${datePart}.pdf`
   setResponseHeader(event, 'Content-Type', 'application/pdf')
   setResponseHeader(
     event,
@@ -178,3 +237,22 @@ export default defineEventHandler(async (event) => {
   setResponseHeader(event, 'Content-Length', String(pdf.length))
   return pdf
 })
+
+/**
+ * Format a YYYY-MM-DD wedding date for the card. Russian readers
+ * expect "23 мая 2026"; falling back to ISO if the locale formatter
+ * produces nothing useful for whatever reason.
+ */
+function formatCardDate(iso: string): string {
+  try {
+    const d = new Date(`${iso}T00:00:00`)
+    const out = d.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+    return out || iso
+  } catch {
+    return iso
+  }
+}
