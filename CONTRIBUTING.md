@@ -28,8 +28,8 @@ Both must pass — CI runs exactly these two.
   ```
   A stale types file breaks typecheck (and CI) for everyone.
 - **Server endpoints** — Nitro handlers in `server/api/`, validation with zod, errors via `createError` with a `data.code` machine code (localized client-side).
-- **Secrets** — `.env` is never committed. Get the values from Albert through a secure channel (not chat/email). `.env.example` documents every key.
+- **Secrets** — `.env` is never committed and never shared. Each developer runs their own Supabase project and fills `.env` with their own values; `.env.example` documents every key. Production credentials stay with the repo owner.
 
 ## Setup
 
-See [README → Local dev](./README.md#local-dev). Supabase free tier is enough for development — or ask Albert for access to the shared dev project.
+See [README → Local dev](./README.md#local-dev). Create your own free Supabase project and apply the migrations listed in [README → Database](./README.md#database) — you get a fully working local environment without any shared credentials. Eskiz/Telegram/Payme are optional in dev (the app falls back gracefully without them).
