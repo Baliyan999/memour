@@ -43,8 +43,8 @@ const navItems = computed(() => [
 // The "other" locale = the one the user will switch to when clicking
 // the pill. Currently displayed is locale.value (active).
 const otherLocale = computed(() => {
-  const all = (locales.value as Array<{ code: string }>).map((l) => l.code)
-  return all.find((c) => c !== locale.value) ?? all[0]
+  const all = (locales.value as Array<{ code: 'ru' | 'uz' }>).map((l) => l.code)
+  return all.find((c) => c !== locale.value) ?? 'uz'
 })
 </script>
 

@@ -34,7 +34,7 @@ const displayEmail = computed(() => {
 })
 
 const localeOptions = computed(() =>
-  (locales.value as Array<{ code: string; name: string }>),
+  (locales.value as Array<{ code: 'ru' | 'uz'; name: string }>),
 )
 
 const botUsername = 'QRFotografBot'

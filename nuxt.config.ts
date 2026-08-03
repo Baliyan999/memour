@@ -10,7 +10,6 @@ export default defineNuxtConfig({
   app: {
     head: {
       title: 'Memour',
-      titleTemplate: (title?: string) => (title && title !== 'Memour' ? `${title} · Memour` : 'Memour'),
       meta: [
         { charset: 'utf-8' },
         {

@@ -3,7 +3,7 @@
 // the CJS factory function (`archiver('zip', opts)`) unchanged.
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
-const archiver = require('archiver') as typeof import('archiver').default
+const archiver = require('archiver') as typeof import('archiver')
 import { PassThrough } from 'node:stream'
 import {
   serverSupabaseUser,

@@ -155,7 +155,7 @@ const ParallaxTile = defineComponent({
           :index="i"
           :progress="scrollYProgress"
           :tile="tile"
-          :emoji="ICON_TYPES[i]"
+          :emoji="ICON_TYPES[i] ?? '✨'"
           :reduce="reduce ?? false"
         />
       </motion.div>

@@ -135,10 +135,10 @@ const titleText = computed(() => t('how.title'))
 const steps = computed(() =>
   [1, 2, 3].map((i, idx) => ({
     number: i,
-    Icon: ICONS[idx],
+    Icon: ICONS[idx]!,
     title: t(`how.step${i}Title`),
     desc: t(`how.step${i}Desc`),
-    activation: STEP_ACTIVATIONS[idx],
+    activation: STEP_ACTIVATIONS[idx]!,
     index: idx,
   })),
 )

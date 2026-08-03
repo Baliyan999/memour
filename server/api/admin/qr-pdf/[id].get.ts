@@ -250,7 +250,7 @@ export default defineEventHandler(async (event) => {
     'Content-Disposition',
     `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(utf8Name)}`,
   )
-  setResponseHeader(event, 'Content-Length', String(pdf.length))
+  setResponseHeader(event, 'Content-Length', pdf.length)
   return pdf
 })
 
