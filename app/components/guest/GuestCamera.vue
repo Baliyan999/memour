@@ -1,0 +1,390 @@
+<script setup lang="ts">
+import { ref, onBeforeUnmount, watch, computed } from 'vue'
+import imageCompression from 'browser-image-compression'
+import { Camera, RefreshCw, Check, X, Upload, Loader2, Maximize2, Minimize2 } from '@lucide/vue'
+import { useI18n } from '#imports'
+
+const haptic = useHaptic()
+const { isFull, toggle: toggleFullscreen } = useFullscreen()
+const viewportEl = ref<HTMLElement | null>(null)
+function tapFullscreen() {
+  if (viewportEl.value) toggleFullscreen(viewportEl.value)
+}
+
+/**
+ * GuestCamera — captures photos with the device camera and uploads
+ * them to /api/guest/upload one by one. Two states cycle: live (video
+ * preview) and review (last shot preview, choose to retake or send).
+ *
+ * Why <video> + <canvas> instead of <input type="file"
+ * capture="environment"> — the dedicated capture input opens the
+ * native camera app which kicks the user out of the browser tab and
+ * loses the session/UI continuity. Manual MediaStream gives us a
+ * persistent in-browser flow.
+ */
+const props = defineProps<{
+  eventId: string
+  deviceId: string
+  guestName?: string | null
+  guestTable: number
+  geofenceEnabled: boolean
+}>()
+
+const emit = defineEmits<{
+  (
+    e: 'uploaded',
+    photo: {
+      id: string
+      uploaded_at: string
+      counts?: { photo_count: number; video_count: number; voice_count: number }
+    },
+  ): void
+  (e: 'quota_exceeded'): void
+  (e: 'wrong_table'): void
+}>()
+
+type State = 'idle' | 'live' | 'capturing' | 'review' | 'uploading' | 'error'
+const state = ref<State>('idle')
+const error = ref<string | null>(null)
+const uploadPercent = ref(0)
+
+const videoEl = ref<HTMLVideoElement | null>(null)
+const canvasEl = ref<HTMLCanvasElement | null>(null)
+const stream = ref<MediaStream | null>(null)
+const previewUrl = ref<string | null>(null)
+const lastBlob = ref<Blob | null>(null)
+const facing = ref<'environment' | 'user'>('environment')
+
+async function startCamera() {
+  error.value = null
+  try {
+    if (stream.value) {
+      stream.value.getTracks().forEach((t) => t.stop())
+      stream.value = null
+    }
+    const s = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: facing.value }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false,
+    })
+    stream.value = s
+    state.value = 'live'
+    await nextTick()
+    if (videoEl.value) {
+      videoEl.value.srcObject = s
+      await videoEl.value.play().catch(() => {})
+    }
+  } catch (e: any) {
+    state.value = 'error'
+    error.value = e?.message === 'Permission denied' || e?.name === 'NotAllowedError'
+      ? 'permission_denied'
+      : 'camera_unavailable'
+  }
+}
+
+function flipCamera() {
+  facing.value = facing.value === 'environment' ? 'user' : 'environment'
+  startCamera()
+}
+
+async function capture() {
+  if (!videoEl.value || !canvasEl.value || !stream.value) return
+  haptic.tap()
+  state.value = 'capturing'
+  const video = videoEl.value
+  const canvas = canvasEl.value
+  const w = video.videoWidth
+  const h = video.videoHeight
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(video, 0, 0, w, h)
+  const blob: Blob = await new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', 0.92)
+  })
+  lastBlob.value = blob
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  previewUrl.value = URL.createObjectURL(blob)
+  state.value = 'review'
+}
+
+function retake() {
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  previewUrl.value = null
+  lastBlob.value = null
+  state.value = 'live'
+}
+
+async function getLocation(): Promise<GeolocationCoordinates | null> {
+  if (!props.geofenceEnabled || typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+    return null
+  }
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve(pos.coords),
+      () => resolve(null),
+      { timeout: 4000, enableHighAccuracy: false },
+    )
+  })
+}
+
+async function send() {
+  if (!lastBlob.value) return
+  haptic.tap()
+  state.value = 'uploading'
+  uploadPercent.value = 0
+  error.value = null
+  try {
+    // Client-side compression so the user's slow uplink doesn't choke
+    // on a 4 MB phone JPEG; we get ~500 KB at decent quality.
+    const compressed = await imageCompression(
+      new File([lastBlob.value], 'photo.jpg', { type: 'image/jpeg' }),
+      { maxSizeMB: 0.7, maxWidthOrHeight: 2200, useWebWorker: true, initialQuality: 0.85 },
+    )
+
+    const coords = await getLocation()
+
+    const fd = new FormData()
+    fd.append('event_id', props.eventId)
+    fd.append('device_id', props.deviceId)
+    fd.append('guest_table', String(props.guestTable))
+    fd.append('file', compressed, 'photo.jpg')
+    if (props.guestName) fd.append('guest_name', props.guestName)
+    if (coords) {
+      fd.append('guest_lat', String(coords.latitude))
+      fd.append('guest_lng', String(coords.longitude))
+    }
+
+    const res = await uploadWithProgress<{
+      ok: boolean
+      photo_id: string
+      uploaded_at: string
+      counts: { photo_count: number; video_count: number; voice_count: number }
+    }>(
+      '/api/guest/upload',
+      fd,
+      (pct) => { uploadPercent.value = pct },
+    )
+
+    if (!res.ok || !res.data) {
+      throw { code: res.error?.code ?? 'upload_failed' }
+    }
+
+    haptic.success()
+    emit('uploaded', {
+      id: res.data.photo_id,
+      uploaded_at: res.data.uploaded_at,
+      counts: res.data.counts,
+    })
+    if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = null
+    lastBlob.value = null
+    state.value = 'live'
+  } catch (e: any) {
+    state.value = 'review'
+    haptic.error()
+    const code = e?.code ?? e?.data?.data?.code ?? 'upload_failed'
+    error.value = code
+    if (code === 'quota_exceeded') emit('quota_exceeded')
+    if (code === 'wrong_table') emit('wrong_table')
+  }
+}
+
+watch(
+  () => state.value,
+  () => {},
+)
+
+onBeforeUnmount(() => {
+  if (stream.value) stream.value.getTracks().forEach((t) => t.stop())
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+})
+
+// Map server codes → i18n keys under guest.errors.*. Some codes need
+// a kind-specific suffix (file_too_large_photo vs ..._video) because
+// the human-readable text differs.
+const { t, te } = useI18n()
+const errorMessage = computed(() => {
+  if (!error.value) return null
+  const code = error.value
+  const kindKey = `guest.errors.${code}_photo`
+  if (te(kindKey)) return t(kindKey)
+  const baseKey = `guest.errors.${code}`
+  if (te(baseKey)) return t(baseKey)
+  return t('guest.camera.genericError')
+})
+</script>
+
+<template>
+  <div class="relative flex h-full flex-1 flex-col">
+    <!-- Hidden canvas — used only to convert video frame to blob -->
+    <canvas ref="canvasEl" class="hidden" />
+
+    <!-- IDLE: pre-permission entry. Illustration centered in the
+         available vertical space, CTA pinned to the bottom of the
+         column so the thumb falls on it without stretching. -->
+    <div v-if="state === 'idle'" class="flex flex-1 flex-col">
+      <div class="flex flex-1 flex-col items-center justify-center text-center">
+        <div class="grid h-24 w-24 place-items-center rounded-full bg-gradient-to-br from-amber-50 to-amber-100 shadow-[0_8px_24px_rgb(180_130_60_/_0.12)]">
+          <Camera class="h-10 w-10 text-amber-700" :stroke-width="1.4" />
+        </div>
+        <h3 class="mt-5 font-display text-2xl italic text-(--color-foreground)">
+          {{ t('guest.camera.photoModeTitle') }}
+        </h3>
+        <p class="mt-2 max-w-[14rem] text-sm leading-relaxed text-(--color-muted-foreground)">
+          {{ t('guest.camera.cameraHint') }}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        class="mb-2 inline-flex h-14 w-full items-center justify-center gap-2 rounded-full bg-(--color-primary) text-base font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) transition-transform active:scale-[0.98]"
+        @click="startCamera"
+      >
+        <Camera class="h-5 w-5" :stroke-width="1.8" />
+        <span>{{ t('guest.camera.openCamera') }}</span>
+      </button>
+    </div>
+
+    <!-- LIVE / REVIEW / UPLOADING viewport.
+         `flex-1 min-h-0` lets the box shrink to fit short phones
+         instead of forcing aspect-ratio 3/4. When the user taps the
+         expand button the same element gets pinned `fixed inset-0
+         z-50` — covers header + dock + the browser URL bar without
+         needing the (flaky on iOS) native Fullscreen API. -->
+    <div
+      ref="viewportEl"
+      v-else-if="state !== 'error'"
+      :class="[
+        'relative overflow-hidden bg-black transition-[border-radius] duration-200',
+        isFull
+          ? 'fixed inset-0 z-50 rounded-none border-0'
+          : 'flex-1 min-h-0 rounded-(--radius-xl) border border-(--color-border)/60',
+      ]"
+    >
+      <!-- Top-right: expand / minimize toggle. Live-only — no point
+           showing it during the upload progress state. -->
+      <button
+        v-if="state === 'live' || state === 'review'"
+        type="button"
+        :aria-label="isFull ? 'Exit fullscreen' : 'Fullscreen'"
+        class="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+        @click="tapFullscreen"
+      >
+        <Minimize2 v-if="isFull" class="h-4 w-4" :stroke-width="1.8" />
+        <Maximize2 v-else class="h-4 w-4" :stroke-width="1.8" />
+      </button>
+      <!-- Live video.
+           iOS Safari historically renders `<video srcObject>` letter-
+           boxed (effective object-contain) even when CSS says
+           `object-fit: cover`. Forcing `position: absolute; inset: 0`
+           plus `display: block` + the `autoplay` attribute is the
+           known-good combo that gets the stream to actually fill
+           the box on every browser we care about. Without it the
+           viewport painted a black band at the bottom on iPhone. -->
+      <video
+        v-show="state === 'live' || state === 'capturing'"
+        ref="videoEl"
+        playsinline
+        muted
+        autoplay
+        class="absolute inset-0 block h-full w-full object-cover"
+      />
+
+      <!-- Review preview — same absolute-fill trick as the live
+           video so swapping between live and review never paints a
+           letterbox stripe. -->
+      <img
+        v-if="state === 'review' || state === 'uploading'"
+        :src="previewUrl ?? ''"
+        alt=""
+        class="absolute inset-0 block h-full w-full object-cover"
+      >
+
+      <!-- Uploading overlay with real progress -->
+      <div
+        v-if="state === 'uploading'"
+        class="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white"
+      >
+        <div class="relative h-20 w-20">
+          <svg viewBox="0 0 100 100" class="h-full w-full -rotate-90">
+            <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="6" />
+            <circle
+              cx="50" cy="50" r="46" fill="none"
+              stroke="white" stroke-width="6" stroke-linecap="round"
+              :stroke-dasharray="289.027"
+              :stroke-dashoffset="289.027 - (289.027 * uploadPercent) / 100"
+              style="transition: stroke-dashoffset 200ms"
+            />
+          </svg>
+          <span class="absolute inset-0 grid place-items-center font-mono text-base">{{ uploadPercent }}%</span>
+        </div>
+        <p class="mt-3 text-sm">{{ t('guest.camera.uploadingShort') }}</p>
+      </div>
+
+      <!-- Bottom controls bar -->
+      <div class="absolute inset-x-0 bottom-0 grid grid-cols-3 items-center gap-4 bg-gradient-to-t from-black/70 to-transparent p-4">
+        <!-- Live: flip camera -->
+        <button
+          v-if="state === 'live'"
+          type="button"
+          :aria-label="t('guest.aria.switchCamera')"
+          class="grid h-11 w-11 place-items-center rounded-full bg-white/15 text-white backdrop-blur transition-colors hover:bg-white/25"
+          @click="flipCamera"
+        >
+          <RefreshCw class="h-5 w-5" :stroke-width="1.8" />
+        </button>
+
+        <!-- Review: retake -->
+        <button
+          v-else-if="state === 'review'"
+          type="button"
+          :aria-label="t('guest.aria.retake')"
+          class="grid h-11 w-11 place-items-center rounded-full bg-white/15 text-white backdrop-blur transition-colors hover:bg-white/25"
+          @click="retake"
+        >
+          <X class="h-5 w-5" :stroke-width="1.8" />
+        </button>
+
+        <div v-else />
+
+        <!-- Center button: shutter (live) or send (review) -->
+        <div class="grid place-items-center">
+          <button
+            v-if="state === 'live'"
+            type="button"
+            :aria-label="t('guest.aria.snap')"
+            class="h-16 w-16 rounded-full border-4 border-white/80 bg-white shadow-[0_0_0_4px_rgb(0_0_0_/_0.2)] transition-transform active:scale-95"
+            @click="capture"
+          />
+          <button
+            v-else-if="state === 'review'"
+            type="button"
+            :aria-label="t('guest.aria.send')"
+            class="grid h-16 w-16 place-items-center rounded-full bg-(--color-primary) text-white shadow-[0_0_0_4px_rgb(0_0_0_/_0.2)] transition-transform active:scale-95"
+            @click="send"
+          >
+            <Check class="h-7 w-7" :stroke-width="2" />
+          </button>
+          <div v-else class="h-16 w-16" />
+        </div>
+
+        <div />
+      </div>
+    </div>
+
+    <!-- ERROR state -->
+    <div v-else class="surface-card rounded-(--radius-xl) p-6 text-center">
+      <p class="font-medium text-red-700">{{ errorMessage }}</p>
+      <button
+        type="button"
+        class="mt-4 inline-flex h-11 items-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-white hover:opacity-90"
+        @click="startCamera"
+      >{{ t('guest.camera.tryAgain') }}</button>
+    </div>
+
+    <!-- Inline error toast under viewport (non-fatal) -->
+    <p v-if="errorMessage && state !== 'error'" class="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      {{ errorMessage }}
+    </p>
+  </div>
+</template>

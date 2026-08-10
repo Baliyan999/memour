@@ -1,0 +1,324 @@
+@import "tailwindcss";
+
+@theme {
+  /* Warm ivory base, dusty rose-gold accents — identical to the
+   * existing Next.js project's design tokens so the look and feel
+   * carries over 1:1. */
+  --color-background: oklch(96% 0.028 65);
+  --color-foreground: oklch(22% 0.03 50);
+  --color-muted: oklch(95.5% 0.015 75);
+  --color-muted-foreground: oklch(45% 0.025 50);
+  --color-primary: oklch(58% 0.09 35);
+  --color-primary-foreground: oklch(99% 0.005 80);
+  --color-accent: oklch(88% 0.045 70);
+  --color-accent-foreground: oklch(25% 0.04 35);
+  --color-rose: oklch(82% 0.06 20);
+  --color-champagne: oklch(90% 0.05 85);
+  --color-border: oklch(91% 0.015 70);
+  --color-ring: oklch(60% 0.1 35);
+
+  --font-display: "Cormorant Garamond", ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.5rem;
+  --radius-xl: 2rem;
+
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -8px rgb(180 130 100 / 0.18);
+  --shadow-glow: 0 0 0 1px rgb(255 255 255 / 0.4), 0 24px 60px -20px rgb(180 130 100 / 0.45);
+
+  /* Custom breakpoints re-declared in ascending order so the cascade
+   * works correctly. Tailwind v4 emits variants in token-declaration
+   * order, not min-width order, so custom names like 3xl/4xl have to
+   * come AFTER sm/md/lg/xl/2xl explicitly. */
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+  --breakpoint-2xl: 96rem;
+  --breakpoint-3xl: 120rem;
+  --breakpoint-4xl: 160rem;
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+
+  html {
+    scroll-behavior: smooth;
+    /* Anchor jumps need to clear the sticky header. Header grows on
+     * 3xl/4xl viewports — match the offset there. */
+    scroll-padding-top: 5.5rem;
+    @media (min-width: 1920px) { scroll-padding-top: 7rem; }
+    @media (min-width: 2560px) { scroll-padding-top: 8.5rem; }
+    /* Firefox scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: oklch(68% 0.1 35 / 0.55) transparent;
+    background-color: var(--color-background);
+    /* Force always-visible scrollbar on macOS Chrome (which uses
+     * overlay scrollbars by default that ignore ::-webkit-scrollbar
+     * styling). */
+    overflow-y: scroll;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  html::-webkit-scrollbar-track,
+  body::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  html::-webkit-scrollbar-thumb,
+  body::-webkit-scrollbar-thumb,
+  ::-webkit-scrollbar-thumb {
+    background-color: oklch(68% 0.1 35 / 0.55);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+    transition: background-color 200ms ease;
+  }
+  html::-webkit-scrollbar-thumb:hover,
+  body::-webkit-scrollbar-thumb:hover,
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: oklch(58% 0.12 35 / 0.85);
+    background-clip: content-box;
+  }
+  html::-webkit-scrollbar-thumb:active,
+  body::-webkit-scrollbar-thumb:active,
+  ::-webkit-scrollbar-thumb:active {
+    background-color: oklch(52% 0.14 35 / 0.95);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background-color: oklch(70% 0.08 35 / 0.45);
+    border: 1px solid transparent;
+  }
+  .scrollbar-slim::-webkit-scrollbar-thumb:hover {
+    background-color: oklch(60% 0.12 35 / 0.75);
+  }
+  .scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(70% 0.08 35 / 0.45) transparent;
+  }
+
+  body {
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background-color: transparent;
+  }
+
+  /* Subtle paper grain overlay — tactile richness without distraction */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='2' seed='5'/%3E%3CfeColorMatrix values='0 0 0 0 0.3 0 0 0 0 0.2 0 0 0 0 0.1 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 200px;
+  }
+
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1.05;
+  }
+
+  ::selection {
+    background: oklch(85% 0.06 30);
+    color: oklch(20% 0.04 35);
+  }
+}
+
+@utility container-page {
+  width: 100%;
+  margin-inline: auto;
+  max-width: 90rem;
+  padding-inline: 1.25rem;
+  @media (min-width: 1024px) { max-width: 96rem;  padding-inline: 2rem; }
+  @media (min-width: 1280px) { max-width: 100rem; padding-inline: 2.5rem; }
+  @media (min-width: 1536px) { max-width: 108rem; padding-inline: 3rem; }
+  @media (min-width: 1920px) { max-width: 120rem; padding-inline: 4rem; }
+  @media (min-width: 2560px) { max-width: 144rem; padding-inline: 6rem; }
+}
+
+@utility heading-display-xl {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 0.98;
+  font-size: clamp(2.75rem, 6vw + 1rem, 12rem);
+}
+
+@utility heading-display-lg {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  font-size: clamp(2.25rem, 4vw + 0.75rem, 7.5rem);
+}
+
+@utility heading-display-md {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  font-size: clamp(1.75rem, 2.8vw + 0.5rem, 5rem);
+}
+
+@utility text-gradient-gold {
+  background: linear-gradient(120deg, oklch(50% 0.1 35), oklch(70% 0.08 50), oklch(55% 0.09 30));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility surface-card {
+  background:
+    linear-gradient(180deg, oklch(98% 0.018 65 / 0.7), oklch(97% 0.022 60 / 0.45)),
+    var(--color-background);
+  backdrop-filter: blur(8px);
+  border: 1px solid oklch(94% 0.018 65);
+  box-shadow: var(--shadow-soft);
+}
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes drift {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  50%  { transform: translate(8px, -10px) rotate(2deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 oklch(58% 0.09 35 / 0.45); }
+  100% { box-shadow: 0 0 0 24px oklch(58% 0.09 35 / 0); }
+}
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.85); }
+  50%      { opacity: 0.85; transform: scale(1.15); }
+}
+@keyframes orb-drift-a {
+  0%, 100% { transform: translate(0,0); }
+  33%      { transform: translate(60px, -40px); }
+  66%      { transform: translate(-30px, 50px); }
+}
+@keyframes orb-drift-b {
+  0%, 100% { transform: translate(0,0); }
+  50%      { transform: translate(-70px, 50px); }
+}
+@keyframes orb-drift-c {
+  0%, 100% { transform: translate(0,0); }
+  33%      { transform: translate(-50px, -30px); }
+  66%      { transform: translate(40px, 60px); }
+}
+@keyframes orb-drift-d {
+  0%, 100% { transform: translate(0,0); }
+  50%      { transform: translate(70px, -50px); }
+}
+@keyframes conic-spin {
+  from { rotate: 0deg; }
+  to   { rotate: 360deg; }
+}
+@keyframes light-ray-a {
+  0%, 100% { transform: rotate(18deg) translateX(-20%); opacity: 0; }
+  10%       { opacity: 0.7; }
+  90%       { opacity: 0.7; }
+  50%       { transform: rotate(18deg) translateX(40%); }
+}
+@keyframes light-ray-b {
+  0%, 100% { transform: rotate(-22deg) translateX(40%); opacity: 0; }
+  10%       { opacity: 0.6; }
+  90%       { opacity: 0.6; }
+  50%       { transform: rotate(-22deg) translateX(-30%); }
+}
+@keyframes light-ray-c {
+  0%, 100% { transform: rotate(12deg) translateX(-30%); opacity: 0; }
+  10%       { opacity: 0.7; }
+  90%       { opacity: 0.7; }
+  50%       { transform: rotate(12deg) translateX(30%); }
+}
+@keyframes light-ray-d {
+  0%, 100% { transform: rotate(-16deg) translateX(30%); opacity: 0; }
+  10%       { opacity: 0.5; }
+  90%       { opacity: 0.5; }
+  50%       { transform: rotate(-16deg) translateX(-40%); }
+}
+@keyframes particle-rise {
+  0%   { transform: translateY(0) translateX(0); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(-110vh) translateX(40px); opacity: 0; }
+}
+
+@utility animate-float { animation: float-y 6s ease-in-out infinite; }
+@utility animate-drift { animation: drift 12s ease-in-out infinite; }
+@utility animate-pulse-ring { animation: pulse-ring 2.4s ease-out infinite; }
+@utility animate-star-twinkle { animation: star-twinkle 5s ease-in-out infinite; }
+@utility animate-orb-drift-a { animation: orb-drift-a 22s ease-in-out infinite; }
+@utility animate-orb-drift-b { animation: orb-drift-b 28s ease-in-out infinite; }
+@utility animate-orb-drift-c { animation: orb-drift-c 32s ease-in-out infinite; }
+@utility animate-orb-drift-d { animation: orb-drift-d 26s ease-in-out infinite; }
+@utility animate-conic-spin { animation: conic-spin 80s linear infinite; }
+@utility animate-light-ray-a { animation: light-ray-a 18s ease-in-out infinite; }
+@utility animate-light-ray-b { animation: light-ray-b 22s ease-in-out infinite; }
+@utility animate-light-ray-c { animation: light-ray-c 16s ease-in-out infinite; }
+@utility animate-light-ray-d { animation: light-ray-d 20s ease-in-out infinite; }
+@utility animate-particle-rise { animation: particle-rise linear infinite; }
+
+/* Locale switcher swap — old code slides left+fades out, new code
+ * slides in from the right. Keyed on the active locale via Vue's
+ * <Transition mode="out-in" name="locale-swap">. */
+.locale-swap-enter-from {
+  transform: translateX(110%);
+  opacity: 0;
+}
+.locale-swap-enter-to {
+  transform: translateX(0);
+  opacity: 1;
+}
+.locale-swap-leave-from {
+  transform: translateX(0);
+  opacity: 1;
+}
+.locale-swap-leave-to {
+  transform: translateX(-110%);
+  opacity: 0;
+}
+.locale-swap-enter-active,
+.locale-swap-leave-active {
+  transition: transform 260ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
