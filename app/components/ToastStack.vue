@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { motion, AnimatePresence } from 'motion-v'
-import { Check, X, Info } from '@lucide/vue'
+import { Check, Info, X } from '@lucide/vue'
+import { AnimatePresence, motion } from 'motion-v'
 
 /**
  * Global toast container. Mounted once at app.vue. Subscribes to the
@@ -27,14 +27,16 @@ const colorClass = {
           :animate="{ opacity: 1, y: 0, scale: 1 }"
           :exit="{ opacity: 0, y: -8, scale: 0.96 }"
           :transition="{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }"
-          :class="['pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-md border p-3 shadow-(--shadow-soft)', colorClass[t.kind]]"
+          class="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-md border p-3 shadow-(--shadow-soft)" :class="[colorClass[t.kind]]"
         >
           <div class="grid h-5 w-5 shrink-0 place-items-center rounded-full">
             <Check v-if="t.kind === 'success'" class="h-4 w-4" :stroke-width="2.4" />
             <X v-else-if="t.kind === 'error'" class="h-4 w-4" :stroke-width="2.4" />
             <Info v-else class="h-4 w-4" :stroke-width="2" />
           </div>
-          <p class="flex-1 text-sm">{{ t.message }}</p>
+          <p class="flex-1 text-sm">
+            {{ t.message }}
+          </p>
           <button
             type="button"
             aria-label="Закрыть"

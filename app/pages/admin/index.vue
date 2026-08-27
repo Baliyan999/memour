@@ -28,8 +28,8 @@ const { data, refresh, pending } = await useFetch<{
 // QR customizer modal state — clicking «QR PDF» on any event row
 // opens the modal pre-populated with that event's id + couple names
 // + table count (so the layout summary can say "10 tables → 2 pages").
-const qrModalEvent = ref<{ id: string; couple_names: string; table_count: number | null } | null>(null)
-function openQr(ev: { id: string; couple_names: string; table_count?: number | null }) {
+const qrModalEvent = ref<{ id: string, couple_names: string, table_count: number | null } | null>(null)
+function openQr(ev: { id: string, couple_names: string, table_count?: number | null }) {
   qrModalEvent.value = {
     id: ev.id,
     couple_names: ev.couple_names,
@@ -58,11 +58,15 @@ function statusLabel(s: string): string {
 <template>
   <div>
     <div class="mb-8 flex items-end justify-between gap-4">
-      <h1 class="heading-display-md">События</h1>
+      <h1 class="heading-display-md">
+        События
+      </h1>
       <NuxtLink
         :to="localePath('/admin/event/create')"
         class="inline-flex h-10 items-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90"
-      >+ Создать событие</NuxtLink>
+      >
+        + Создать событие
+      </NuxtLink>
     </div>
 
     <ul v-if="pending" class="grid gap-3" aria-busy="true">
@@ -78,8 +82,12 @@ function statusLabel(s: string): string {
     </ul>
 
     <div v-else-if="!data || data.events.length === 0" class="surface-card rounded-(--radius-xl) p-10 text-center">
-      <h2 class="text-xl">Событий ещё нет</h2>
-      <p class="mt-2 text-(--color-muted-foreground)">Создайте первое — оно появится в кабинете пары.</p>
+      <h2 class="text-xl">
+        Событий ещё нет
+      </h2>
+      <p class="mt-2 text-(--color-muted-foreground)">
+        Создайте первое — оно появится в кабинете пары.
+      </p>
     </div>
 
     <ul v-else class="grid gap-3">
@@ -87,10 +95,11 @@ function statusLabel(s: string): string {
         <div class="surface-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-(--radius-xl) p-5">
           <div>
             <div class="flex flex-wrap items-center gap-2">
-              <h2 class="font-display text-lg">{{ ev.couple_names }}</h2>
+              <h2 class="font-display text-lg">
+                {{ ev.couple_names }}
+              </h2>
               <span
-                :class="[
-                  'rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider',
+                class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider" :class="[
                   ev.status === 'active'
                     ? 'bg-green-500/15 text-green-700'
                     : ev.status === 'draft'

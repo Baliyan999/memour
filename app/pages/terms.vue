@@ -14,7 +14,9 @@ useSeoMeta({
   <article class="container-page relative py-16 sm:py-24">
     <div class="mx-auto max-w-3xl">
       <div v-if="locale === 'uz'">
-        <p class="mb-2 text-xs uppercase tracking-[0.3em] text-(--color-muted-foreground)">Memour</p>
+        <p class="mb-2 text-xs uppercase tracking-[0.3em] text-(--color-muted-foreground)">
+          Memour
+        </p>
         <h1 class="heading-display-md italic">
           <span class="text-gradient-gold">Foydalanish shartlari</span>
         </h1>
@@ -50,7 +52,9 @@ useSeoMeta({
       </div>
 
       <div v-else>
-        <p class="mb-2 text-xs uppercase tracking-[0.3em] text-(--color-muted-foreground)">Memour</p>
+        <p class="mb-2 text-xs uppercase tracking-[0.3em] text-(--color-muted-foreground)">
+          Memour
+        </p>
         <h1 class="heading-display-md italic">
           <span class="text-gradient-gold">Условия использования</span>
         </h1>

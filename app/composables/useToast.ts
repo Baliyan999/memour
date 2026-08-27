@@ -23,8 +23,9 @@ function push(kind: Toast['kind'], message: string, ttl = DEFAULT_TTL_MS) {
   const id = nextId++
   state.items.push({ id, kind, message })
   setTimeout(() => {
-    const idx = state.items.findIndex((t) => t.id === id)
-    if (idx >= 0) state.items.splice(idx, 1)
+    const idx = state.items.findIndex(t => t.id === id)
+    if (idx >= 0)
+      state.items.splice(idx, 1)
   }, ttl)
 }
 
@@ -37,8 +38,9 @@ export function useToast() {
       info: (m: string, ttl?: number) => push('info', m, ttl),
     },
     dismiss(id: number) {
-      const idx = state.items.findIndex((t) => t.id === id)
-      if (idx >= 0) state.items.splice(idx, 1)
+      const idx = state.items.findIndex(t => t.id === id)
+      if (idx >= 0)
+        state.items.splice(idx, 1)
     },
   }
 }

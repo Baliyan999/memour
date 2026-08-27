@@ -79,7 +79,9 @@ const navLinks = [
               :to="localePath(link.to)"
               class="text-(--color-muted-foreground) transition-colors hover:text-(--color-foreground)"
               active-class="text-(--color-foreground)"
-            >{{ link.label }}</NuxtLink>
+            >
+              {{ link.label }}
+            </NuxtLink>
           </nav>
         </div>
 
@@ -89,7 +91,9 @@ const navLinks = [
             type="button"
             class="rounded-full border border-(--color-border)/60 bg-white px-3 py-1.5 text-xs hover:bg-(--color-muted)"
             @click="signOut"
-          >Выйти</button>
+          >
+            Выйти
+          </button>
         </div>
         <NuxtLink
           v-else

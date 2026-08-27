@@ -1,6 +1,6 @@
+import type { Database } from '~/types/database.types'
 import { createHash } from 'node:crypto'
 import { serverSupabaseServiceRole } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 
 /**
  * POST /api/payments/click/webhook — Click Pay merchant API endpoint.
@@ -22,9 +22,9 @@ interface ClickPayload {
   click_trans_id: string
   service_id: string
   click_paydoc_id: string
-  merchant_trans_id: string  // our payment.id
-  amount: string             // sums (not tiyin) — Click is special
-  action: string             // '0' or '1'
+  merchant_trans_id: string // our payment.id
+  amount: string // sums (not tiyin) — Click is special
+  action: string // '0' or '1'
   sign_time: string
   sign_string: string
   error?: string
@@ -50,11 +50,12 @@ function clickResponse(
 
 function verifySignature(p: ClickPayload): boolean {
   const secret = process.env.CLICK_SECRET_KEY
-  if (!secret) return false
+  if (!secret)
+    return false
   // PREPARE sign string: click_trans_id+service_id+SECRET_KEY+merchant_trans_id+amount+action+sign_time
   // COMPLETE adds +merchant_prepare_id before sign_time
-  const base =
-    p.action === '0'
+  const base
+    = p.action === '0'
       ? `${p.click_trans_id}${p.service_id}${secret}${p.merchant_trans_id}${p.amount}${p.action}${p.sign_time}`
       : `${p.click_trans_id}${p.service_id}${secret}${p.merchant_trans_id}${p.merchant_prepare_id ?? ''}${p.amount}${p.action}${p.sign_time}`
   const expected = createHash('md5').update(base).digest('hex')
@@ -80,7 +81,7 @@ export default defineEventHandler(async (event) => {
     return clickResponse(p.click_trans_id, p.merchant_trans_id, null, -5, 'Order not found')
   }
 
-  const expectedAmountSums = payment.amount / 100  // tiyin → sums
+  const expectedAmountSums = payment.amount / 100 // tiyin → sums
   if (Number(p.amount) !== expectedAmountSums) {
     return clickResponse(p.click_trans_id, p.merchant_trans_id, null, -2, 'Wrong amount')
   }

@@ -1,15 +1,16 @@
-import PDFDocument from 'pdfkit'
+import type { QRStyle } from '../../../utils/qr-styled'
+import type { Database } from '~/types/database.types'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import PDFDocument from 'pdfkit'
 import {
-  serverSupabaseUser,
   serverSupabaseServiceRole,
+  serverSupabaseUser,
 } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 import {
-  renderStyledQRPng,
   getPreset,
-  type QRStyle,
+
+  renderStyledQRPng,
 } from '../../../utils/qr-styled'
 
 // Two fonts on the card:
@@ -25,11 +26,13 @@ const CORMORANT_ITALIC_PATH = resolve(FONT_DIR, 'CormorantGaramond-Italic.ttf')
 let cachedManrope: Buffer | null = null
 let cachedCormorant: Buffer | null = null
 function getManrope(): Buffer {
-  if (!cachedManrope) cachedManrope = readFileSync(MANROPE_PATH)
+  if (!cachedManrope)
+    cachedManrope = readFileSync(MANROPE_PATH)
   return cachedManrope
 }
 function getCormorant(): Buffer {
-  if (!cachedCormorant) cachedCormorant = readFileSync(CORMORANT_ITALIC_PATH)
+  if (!cachedCormorant)
+    cachedCormorant = readFileSync(CORMORANT_ITALIC_PATH)
   return cachedCormorant
 }
 
@@ -56,30 +59,37 @@ interface Layout {
   decorative: boolean
 }
 const LAYOUTS: Record<string, Layout> = {
-  '2x2':    { cols: 2, rows: 2, margin: 36, cardPadding: 14, decorative: true },
-  '4x2':    { cols: 2, rows: 4, margin: 28, cardPadding: 10, decorative: false },
+  '2x2': { cols: 2, rows: 2, margin: 36, cardPadding: 14, decorative: true },
+  '4x2': { cols: 2, rows: 4, margin: 28, cardPadding: 10, decorative: false },
   'single': { cols: 1, rows: 1, margin: 60, cardPadding: 30, decorative: true },
 }
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) fail(401, 'unauthorized')
+  if (!user)
+    fail(401, 'unauthorized')
   const uid = (user as any).id ?? (user as any).sub
 
   const admin = serverSupabaseServiceRole<Database>(event)
   const { data: adminRow } = await admin
-    .from('admins').select('user_id').eq('user_id', uid).maybeSingle()
-  if (!adminRow) fail(403, 'forbidden')
+    .from('admins')
+    .select('user_id')
+    .eq('user_id', uid)
+    .maybeSingle()
+  if (!adminRow)
+    fail(403, 'forbidden')
 
   const id = getRouterParam(event, 'id')
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) fail(400, 'invalid_id')
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id))
+    fail(400, 'invalid_id')
 
   const { data: ev } = await admin
     .from('events')
     .select('id, couple_names, wedding_date, venue_name, table_count, qr_settings')
     .eq('id', id!)
     .maybeSingle()
-  if (!ev) fail(404, 'event_not_found')
+  if (!ev)
+    fail(404, 'event_not_found')
 
   // Merge: saved settings <- preset defaults <- query overrides
   const saved = ((ev as any).qr_settings ?? {}) as Record<string, any>
@@ -92,28 +102,32 @@ export default defineEventHandler(async (event) => {
   const style: QRStyle = {
     dot: (typeof q.dot === 'string' ? q.dot : (saved.dot ?? preset.style.dot)) as any,
     corner: (typeof q.corner === 'string' ? q.corner : (saved.corner ?? preset.style.corner)) as any,
-    fg: (typeof q.fg === 'string' && /^#[0-9a-fA-F]{6}$/.test(q.fg))
+    fg: (typeof q.fg === 'string' && /^#[0-9a-f]{6}$/i.test(q.fg))
       ? q.fg
       : (saved.fg ?? preset.style.fg),
-    bg: (typeof q.bg === 'string' && /^#[0-9a-fA-F]{6}$/.test(q.bg))
+    bg: (typeof q.bg === 'string' && /^#[0-9a-f]{6}$/i.test(q.bg))
       ? q.bg
       : (saved.bg ?? preset.style.bg),
     gradient: null,
   }
   if (typeof q.gFrom === 'string' && typeof q.gTo === 'string') {
-    const angle = typeof q.gAngle === 'string' ? parseFloat(q.gAngle) : 45
+    const angle = typeof q.gAngle === 'string' ? Number.parseFloat(q.gAngle) : 45
     style.gradient = { from: q.gFrom, to: q.gTo, angle: Number.isFinite(angle) ? angle : 45 }
-  } else if (saved.gradient) {
+  }
+  else if (saved.gradient) {
     style.gradient = saved.gradient
-  } else if (preset.style.gradient) {
+  }
+  else if (preset.style.gradient) {
     style.gradient = preset.style.gradient
   }
 
   // Pull the logo if any.
   if (saved.logo_path) {
     const { data: blob } = await admin.storage
-      .from('branding').download(saved.logo_path)
-    if (blob) style.logo = Buffer.from(await blob.arrayBuffer())
+      .from('branding')
+      .download(saved.logo_path)
+    if (blob)
+      style.logo = Buffer.from(await blob.arrayBuffer())
   }
 
   const config = useRuntimeConfig()
@@ -157,7 +171,8 @@ export default defineEventHandler(async (event) => {
 
   for (let t = 1; t <= tableCount; t++) {
     const indexOnPage = (t - 1) % perPage
-    if (t > 1 && indexOnPage === 0) doc.addPage()
+    if (t > 1 && indexOnPage === 0)
+      doc.addPage()
     const col = indexOnPage % layout.cols
     const row = Math.floor(indexOnPage / layout.cols)
     const x = m + col * (colW + colGap)
@@ -226,7 +241,9 @@ export default defineEventHandler(async (event) => {
       const dateY = namesY + sizeNames + (isSingle ? 6 : 3)
       doc.font('Cormorant').fillColor('#a48068').fontSize(sizeDate)
       doc.text(formatCardDate(ev!.wedding_date), x, dateY, {
-        width: colW, align: 'center', characterSpacing: 0.5,
+        width: colW,
+        align: 'center',
+        characterSpacing: 0.5,
       })
     }
   }
@@ -268,7 +285,8 @@ function formatCardDate(iso: string): string {
       year: 'numeric',
     })
     return out || iso
-  } catch {
+  }
+  catch {
     return iso
   }
 }

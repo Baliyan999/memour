@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { motion, useReducedMotion, useScroll, useSpring, useTransform } from 'motion-v'
+import { ref } from 'vue'
 import { useI18n } from '#imports'
-import { motion, useScroll, useTransform, useReducedMotion, useSpring } from 'motion-v'
 
 /**
  * Stats — honest product-promise numbers (NOT adoption metrics) on a

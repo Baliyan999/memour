@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { reactive, ref } from 'vue'
 
 definePageMeta({ layout: 'admin' })
 
@@ -52,12 +52,14 @@ async function submit() {
     form.partner_phone = ''
     showForm.value = false
     await refresh()
-  } catch (e: any) {
+  }
+  catch (e: any) {
     const code = e?.data?.data?.code ?? e?.data?.code
     error.value = code === 'duplicate_code'
       ? 'Такой код уже существует'
       : 'Не удалось создать код'
-  } finally {
+  }
+  finally {
     pending.value = false
   }
 }
@@ -76,7 +78,9 @@ async function copyShare(code: string) {
 <template>
   <div>
     <div class="mb-8 flex items-end justify-between gap-4">
-      <h1 class="heading-display-md">Рефералы</h1>
+      <h1 class="heading-display-md">
+        Рефералы
+      </h1>
       <button
         type="button"
         class="inline-flex h-10 items-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90"
@@ -127,12 +131,16 @@ async function copyShare(code: string) {
             class="h-11 rounded-md border border-(--color-border) bg-white px-3 text-sm"
           >
         </div>
-        <p v-if="error" class="col-span-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+        <p v-if="error" class="col-span-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {{ error }}
+        </p>
         <button
           type="submit"
           :disabled="pending"
           class="col-span-2 inline-flex h-11 items-center justify-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90 disabled:opacity-60"
-        >{{ pending ? 'Создаём…' : 'Создать' }}</button>
+        >
+          {{ pending ? 'Создаём…' : 'Создать' }}
+        </button>
       </form>
     </div>
 
@@ -141,8 +149,12 @@ async function copyShare(code: string) {
       v-if="!data || data.referrals.length === 0"
       class="surface-card rounded-(--radius-xl) p-10 text-center"
     >
-      <h2 class="text-xl">Реферальных кодов нет</h2>
-      <p class="mt-2 text-(--color-muted-foreground)">Создайте первый — раздавайте партнёрам ссылку с ?ref={code}</p>
+      <h2 class="text-xl">
+        Реферальных кодов нет
+      </h2>
+      <p class="mt-2 text-(--color-muted-foreground)">
+        Создайте первый — раздавайте партнёрам ссылку с ?ref={code}
+      </p>
     </div>
 
     <ul v-else class="grid gap-3">

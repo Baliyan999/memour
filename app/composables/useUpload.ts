@@ -13,7 +13,7 @@ export interface UploadResult<T> {
   ok: boolean
   status: number
   data: T | null
-  error: { code?: string; message?: string } | null
+  error: { code?: string, message?: string } | null
 }
 
 export function uploadWithProgress<T = any>(
@@ -33,16 +33,19 @@ export function uploadWithProgress<T = any>(
 
     xhr.addEventListener('load', () => {
       let json: any = null
-      try { json = xhr.responseText ? JSON.parse(xhr.responseText) : null } catch { /* */ }
+      try { json = xhr.responseText ? JSON.parse(xhr.responseText) : null }
+      catch { /* */ }
       const ok = xhr.status >= 200 && xhr.status < 300
       resolve({
         ok,
         status: xhr.status,
         data: ok ? (json as T) : null,
-        error: ok ? null : {
-          code: json?.data?.code ?? json?.code,
-          message: json?.statusMessage ?? json?.message ?? `HTTP ${xhr.status}`,
-        },
+        error: ok
+          ? null
+          : {
+              code: json?.data?.code ?? json?.code,
+              message: json?.statusMessage ?? json?.message ?? `HTTP ${xhr.status}`,
+            },
       })
     })
 

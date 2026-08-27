@@ -14,15 +14,20 @@ export default defineNitroPlugin(() => {
     'SUPABASE_SERVICE_ROLE_KEY',
   ]
   const recommended = [
-    'ESKIZ_EMAIL', 'ESKIZ_PASSWORD',
-    'TELEGRAM_BOT_TOKEN', 'TELEGRAM_LEAD_CHAT_ID',
+    'ESKIZ_EMAIL',
+    'ESKIZ_PASSWORD',
+    'TELEGRAM_BOT_TOKEN',
+    'TELEGRAM_LEAD_CHAT_ID',
   ]
   const paymentOptional = [
-    'PAYME_MERCHANT_ID', 'PAYME_MERCHANT_KEY',
-    'CLICK_SERVICE_ID', 'CLICK_MERCHANT_ID', 'CLICK_SECRET_KEY',
+    'PAYME_MERCHANT_ID',
+    'PAYME_MERCHANT_KEY',
+    'CLICK_SERVICE_ID',
+    'CLICK_MERCHANT_ID',
+    'CLICK_SECRET_KEY',
   ]
 
-  const missingRequired = required.filter((k) => !process.env[k])
+  const missingRequired = required.filter(k => !process.env[k])
   if (missingRequired.length > 0) {
     console.error('━'.repeat(60))
     console.error('[memour] FATAL: missing required env vars:')
@@ -35,15 +40,15 @@ export default defineNitroPlugin(() => {
     return
   }
 
-  const missingRec = recommended.filter((k) => !process.env[k])
+  const missingRec = recommended.filter(k => !process.env[k])
   if (missingRec.length > 0) {
     console.warn(
-      `[memour] WARN: missing recommended env vars: ${missingRec.join(', ')} ` +
-      `— SMS / Telegram features will degrade gracefully.`,
+      `[memour] WARN: missing recommended env vars: ${missingRec.join(', ')} `
+      + `— SMS / Telegram features will degrade gracefully.`,
     )
   }
 
-  const missingPay = paymentOptional.filter((k) => !process.env[k])
+  const missingPay = paymentOptional.filter(k => !process.env[k])
   if (missingPay.length === paymentOptional.length) {
     console.warn('[memour] INFO: no payment provider configured — checkout runs in dev fallback mode.')
   }

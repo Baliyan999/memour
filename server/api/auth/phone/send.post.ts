@@ -1,6 +1,6 @@
+import type { Database } from '~/types/database.types'
 import { z } from 'zod'
 import { serverSupabaseServiceRole } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 import { sendSms } from '../../../utils/eskiz'
 import { generateCode, hashCode, normalizePhone } from '../../../utils/phone-otp'
 
@@ -27,10 +27,12 @@ function fail(statusCode: number, code: string): never {
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_phone')
+  if (!parsed.success)
+    fail(422, 'invalid_phone')
 
   const phone = normalizePhone(parsed.data.phone)
-  if (!phone) fail(422, 'invalid_phone')
+  if (!phone)
+    fail(422, 'invalid_phone')
 
   const admin = serverSupabaseServiceRole<Database>(event)
 
@@ -44,7 +46,8 @@ export default defineEventHandler(async (event) => {
     .is('consumed_at', null)
     .gte('created_at', since)
     .limit(1)
-  if (recent && recent.length > 0) fail(429, 'too_many_requests')
+  if (recent && recent.length > 0)
+    fail(429, 'too_many_requests')
 
   const code = generateCode()
   const code_hash = hashCode(phone, code)
@@ -84,7 +87,8 @@ export default defineEventHandler(async (event) => {
     console.error('[phone-otp] SMS send failed', send.error)
     // We still return ok=true so user can retry; the code is in DB.
     // But in production we should propagate the failure.
-    if (process.env.NODE_ENV === 'production') fail(502, 'sms_send_failed')
+    if (process.env.NODE_ENV === 'production')
+      fail(502, 'sms_send_failed')
   }
 
   // In test mode (Eskiz won't deliver our actual {code}) we leak the

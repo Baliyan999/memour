@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
-import { useLocalePath } from '#imports'
+import { ArrowRight, Eye, EyeOff, Lock, Mail, MessageSquare, Shield } from '@lucide/vue'
 import { motion } from 'motion-v'
-import { ArrowRight, Mail, Lock, Eye, EyeOff, MessageSquare, Shield } from '@lucide/vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useLocalePath } from '#imports'
 
 definePageMeta({ layout: 'admin' })
 
@@ -41,7 +41,8 @@ const resendIn = ref(0)
 let resendTimer: number | undefined
 
 function setDigitRef(el: any, i: number) {
-  if (el) digitInputs[i] = el as HTMLInputElement
+  if (el)
+    digitInputs[i] = el as HTMLInputElement
 }
 
 function focusDigit(i: number) {
@@ -56,14 +57,16 @@ function resetDigits() {
 watch(
   user,
   async (u) => {
-    if (!u) return
+    if (!u)
+      return
     const uid = (u as any).id ?? (u as any).sub
     const { data } = await supabase
       .from('admins')
       .select('user_id')
       .eq('user_id', uid)
       .maybeSingle()
-    if (data) navigateTo(localePath('/admin'))
+    if (data)
+      navigateTo(localePath('/admin'))
   },
   { immediate: true },
 )
@@ -72,17 +75,21 @@ watch(
 // holding an old emailed magic link can still complete login. New
 // logins go through setSession directly without touching the URL.
 onMounted(async () => {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined')
+    return
   const hash = window.location.hash
-  if (!hash || !hash.includes('access_token=')) return
+  if (!hash || !hash.includes('access_token='))
+    return
   const params = new URLSearchParams(hash.slice(1))
   const access_token = params.get('access_token')
   const refresh_token = params.get('refresh_token')
-  if (!access_token || !refresh_token) return
+  if (!access_token || !refresh_token)
+    return
   try {
     await supabase.auth.setSession({ access_token, refresh_token })
     window.history.replaceState({}, '', window.location.pathname + window.location.search)
-  } catch (e) {
+  }
+  catch (e) {
     console.error('[admin/login] setSession from hash', e)
   }
 })
@@ -108,13 +115,16 @@ function startResendCooldown(seconds: number) {
   clearInterval(resendTimer)
   resendTimer = window.setInterval(() => {
     resendIn.value = Math.max(0, resendIn.value - 1)
-    if (resendIn.value === 0) clearInterval(resendTimer)
+    if (resendIn.value === 0)
+      clearInterval(resendTimer)
   }, 1000) as unknown as number
 }
 
 async function submitCreds() {
-  if (pending.value) return
-  if (!email.value || !password.value) return
+  if (pending.value)
+    return
+  if (!email.value || !password.value)
+    return
   pending.value = true
   error.value = null
   try {
@@ -126,16 +136,20 @@ async function submitCreds() {
     startResendCooldown(30)
     resetDigits()
     focusDigit(0)
-  } catch (e: any) {
+  }
+  catch (e: any) {
     error.value = mapError(e?.data?.data?.code ?? e?.data?.code)
-  } finally {
+  }
+  finally {
     pending.value = false
   }
 }
 
 async function submitCode() {
-  if (pending.value) return
-  if (code.value.length !== 6) return
+  if (pending.value)
+    return
+  if (code.value.length !== 6)
+    return
   pending.value = true
   error.value = null
   try {
@@ -152,12 +166,14 @@ async function submitCode() {
     if (typeof window !== 'undefined') {
       window.location.href = localePath('/admin')
     }
-  } catch (e: any) {
+  }
+  catch (e: any) {
     console.error('[admin/login] verify failed', e)
     error.value = mapError(e?.data?.data?.code ?? e?.data?.code)
     resetDigits()
     focusDigit(0)
-  } finally {
+  }
+  finally {
     pending.value = false
   }
 }
@@ -174,7 +190,8 @@ function onDigitInput(i: number, e: Event) {
   digits.value[i] = raw
   // Reflect cleaned value back to DOM (rejects non-digit input)
   input.value = raw
-  if (raw && i < 5) focusDigit(i + 1)
+  if (raw && i < 5)
+    focusDigit(i + 1)
 }
 
 function onDigitKeydown(i: number, e: KeyboardEvent) {
@@ -182,15 +199,18 @@ function onDigitKeydown(i: number, e: KeyboardEvent) {
     if (digits.value[i]) {
       digits.value[i] = ''
       e.preventDefault()
-    } else if (i > 0) {
+    }
+    else if (i > 0) {
       digits.value[i - 1] = ''
       focusDigit(i - 1)
       e.preventDefault()
     }
-  } else if (e.key === 'ArrowLeft' && i > 0) {
+  }
+  else if (e.key === 'ArrowLeft' && i > 0) {
     focusDigit(i - 1)
     e.preventDefault()
-  } else if (e.key === 'ArrowRight' && i < 5) {
+  }
+  else if (e.key === 'ArrowRight' && i < 5) {
     focusDigit(i + 1)
     e.preventDefault()
   }
@@ -205,7 +225,8 @@ function onDigitPaste(i: number, e: ClipboardEvent) {
 
 function distributeText(text: string, startIdx: number) {
   const cleaned = text.replace(/\D/g, '').slice(0, 6 - startIdx)
-  if (!cleaned) return
+  if (!cleaned)
+    return
   for (let j = 0; j < cleaned.length; j++) {
     digits.value[startIdx + j] = cleaned[j]!
   }
@@ -214,7 +235,8 @@ function distributeText(text: string, startIdx: number) {
 }
 
 async function resend() {
-  if (resendIn.value > 0) return
+  if (resendIn.value > 0)
+    return
   await submitCreds()
 }
 
@@ -223,7 +245,6 @@ function backToCreds() {
   resetDigits()
   error.value = null
 }
-
 </script>
 
 <template>
@@ -252,7 +273,9 @@ function backToCreds() {
                 <Lock class="h-3 w-3" :stroke-width="2.2" />
               </span>
             </div>
-            <p class="mt-4 text-[10px] uppercase tracking-[0.4em] text-(--color-muted-foreground)">Memour · admin</p>
+            <p class="mt-4 text-[10px] uppercase tracking-[0.4em] text-(--color-muted-foreground)">
+              Memour · admin
+            </p>
             <h1 class="mt-2 font-display italic" style="font-size: 2.5rem; line-height: 1; letter-spacing: -0.02em;">
               <span class="text-gradient-gold">{{ step === 'creds' ? 'Вход' : 'Код' }}</span>
             </h1>
@@ -262,7 +285,9 @@ function backToCreds() {
               <span class="h-px w-12 bg-(--color-border)" />
             </div>
             <p class="mt-3 max-w-xs text-center text-sm text-(--color-muted-foreground)">
-              <template v-if="step === 'creds'">Введите email и пароль администратора</template>
+              <template v-if="step === 'creds'">
+                Введите email и пароль администратора
+              </template>
               <template v-else>
                 Код отправлен в Telegram-бот на ваш аккаунт <span class="block text-(--color-foreground) text-xs mt-1">{{ email }}</span>
               </template>
@@ -322,7 +347,9 @@ function backToCreds() {
                 </div>
               </div>
 
-              <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+              <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {{ error }}
+              </p>
 
               <button
                 type="submit"
@@ -367,7 +394,9 @@ function backToCreds() {
                 </div>
               </div>
 
-              <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+              <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {{ error }}
+              </p>
 
               <button
                 type="submit"
@@ -383,13 +412,17 @@ function backToCreds() {
                   type="button"
                   class="text-(--color-muted-foreground) underline decoration-(--color-muted-foreground)/40 underline-offset-2 hover:text-(--color-foreground)"
                   @click="backToCreds"
-                >Назад</button>
+                >
+                  Назад
+                </button>
                 <button
                   type="button"
                   :disabled="resendIn > 0 || pending"
                   class="text-(--color-primary) underline decoration-(--color-primary)/40 underline-offset-2 hover:decoration-(--color-primary) disabled:cursor-not-allowed disabled:opacity-50"
                   @click="resend"
-                >{{ resendIn > 0 ? `Запросить ещё раз (${resendIn}с)` : 'Запросить ещё раз' }}</button>
+                >
+                  {{ resendIn > 0 ? `Запросить ещё раз (${resendIn}с)` : 'Запросить ещё раз' }}
+                </button>
               </div>
             </form>
           </Transition>

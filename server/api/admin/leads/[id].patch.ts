@@ -1,9 +1,9 @@
+import type { Database } from '~/types/database.types'
 import { z } from 'zod'
 import {
-  serverSupabaseUser,
   serverSupabaseServiceRole,
+  serverSupabaseUser,
 } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 
 /**
  * PATCH /api/admin/leads/[id] — update status / notes on a lead.
@@ -22,7 +22,8 @@ const schema = z.object({
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) fail(401, 'unauthorized')
+  if (!user)
+    fail(401, 'unauthorized')
 
   const admin = serverSupabaseServiceRole<Database>(event)
   const { data: adminRow } = await admin
@@ -30,22 +31,29 @@ export default defineEventHandler(async (event) => {
     .select('user_id')
     .eq('user_id', ((user as any).id ?? (user as any).sub))
     .maybeSingle()
-  if (!adminRow) fail(403, 'forbidden')
+  if (!adminRow)
+    fail(403, 'forbidden')
 
   const id = getRouterParam(event, 'id')
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) fail(400, 'invalid_id')
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id))
+    fail(400, 'invalid_id')
 
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success)
+    fail(422, 'invalid_input')
 
   const updates: any = {}
-  if (parsed.data.status !== undefined) updates.status = parsed.data.status
-  if (parsed.data.notes !== undefined) updates.notes = parsed.data.notes
-  if (parsed.data.converted_event_id !== undefined) updates.converted_event_id = parsed.data.converted_event_id
+  if (parsed.data.status !== undefined)
+    updates.status = parsed.data.status
+  if (parsed.data.notes !== undefined)
+    updates.notes = parsed.data.notes
+  if (parsed.data.converted_event_id !== undefined)
+    updates.converted_event_id = parsed.data.converted_event_id
 
   const { error } = await admin.from('leads').update(updates).eq('id', id!)
-  if (error) fail(500, 'update_failed')
+  if (error)
+    fail(500, 'update_failed')
 
   return { ok: true }
 })

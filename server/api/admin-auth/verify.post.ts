@@ -1,10 +1,10 @@
-import { z } from 'zod'
+import type { Database } from '~/types/database.types'
 import { createHash } from 'node:crypto'
+import { z } from 'zod'
 import {
   serverSupabaseClient,
   serverSupabaseServiceRole,
 } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 
 /**
  * POST /api/admin-auth/verify — second (and final) step of admin login.
@@ -51,7 +51,8 @@ function hashCode(email: string, code: string): string {
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success)
+    fail(422, 'invalid_input')
 
   const email = parsed.data.email.trim().toLowerCase()
   const code_hash = hashCode(email, parsed.data.code)
@@ -66,9 +67,12 @@ export default defineEventHandler(async (event) => {
     .is('consumed_at', null)
     .maybeSingle()
 
-  if (!otp) fail(401, 'invalid_code')
-  if (new Date(otp.expires_at).getTime() < Date.now()) fail(410, 'code_expired')
-  if (((otp as any).attempts ?? 0) >= MAX_ATTEMPTS) fail(429, 'too_many_attempts')
+  if (!otp)
+    fail(401, 'invalid_code')
+  if (new Date(otp.expires_at).getTime() < Date.now())
+    fail(410, 'code_expired')
+  if (((otp as any).attempts ?? 0) >= MAX_ATTEMPTS)
+    fail(429, 'too_many_attempts')
 
   // --- 2. Mark consumed before anything else (prevents replay even
   //        if subsequent steps fail) ---
@@ -83,12 +87,14 @@ export default defineEventHandler(async (event) => {
   const anonKey = process.env.NUXT_PUBLIC_SUPABASE_KEY!
   const tokenRes = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+    headers: { 'apikey': anonKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password: parsed.data.password }),
   })
-  if (!tokenRes.ok) fail(401, 'session_failed')
+  if (!tokenRes.ok)
+    fail(401, 'session_failed')
   const tokenJson = (await tokenRes.json()) as any
-  if (!tokenJson?.access_token || !tokenJson?.refresh_token) fail(500, 'session_failed')
+  if (!tokenJson?.access_token || !tokenJson?.refresh_token)
+    fail(500, 'session_failed')
 
   // --- 4. Write session cookies to the response server-side. The
   //        @nuxtjs/supabase server client uses @supabase/ssr's cookie

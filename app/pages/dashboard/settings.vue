@@ -1,8 +1,7 @@
 <script setup lang="ts">
+import { ChevronRight, Globe, LogOut, MessageSquare } from '@lucide/vue'
 import { computed } from 'vue'
-import { useI18n, useSwitchLocalePath, useLocalePath } from '#imports'
-import { motion } from 'motion-v'
-import { Globe, MessageSquare, LogOut, ChevronRight } from '@lucide/vue'
+import { useI18n, useLocalePath, useSwitchLocalePath } from '#imports'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -28,13 +27,15 @@ const email = computed(() => user.value?.email ?? null)
 // Synthetic phone-derived emails like "phone+998901234567@phone.memour.local"
 // shouldn't be shown to the user — display the phone instead.
 const displayEmail = computed(() => {
-  if (!email.value) return null
-  if (/@phone\.memour\.local$/.test(email.value)) return null
+  if (!email.value)
+    return null
+  if (/@phone\.memour\.local$/.test(email.value))
+    return null
   return email.value
 })
 
 const localeOptions = computed(() =>
-  (locales.value as Array<{ code: 'ru' | 'uz'; name: string }>),
+  (locales.value as Array<{ code: 'ru' | 'uz', name: string }>),
 )
 
 const botUsername = 'QRFotografBot'
@@ -47,7 +48,9 @@ async function signOut() {
 
 <template>
   <div class="mx-auto max-w-2xl">
-    <h1 class="heading-display-md mb-6">{{ t('couple.settings.title') }}</h1>
+    <h1 class="heading-display-md mb-6">
+      {{ t('couple.settings.title') }}
+    </h1>
 
     <div class="flex flex-col gap-3">
       <!-- Account -->
@@ -75,8 +78,12 @@ async function signOut() {
               <Globe class="h-5 w-5" :stroke-width="1.6" />
             </div>
             <div>
-              <p class="font-medium">{{ t('couple.settings.languageTitle') }}</p>
-              <p class="text-xs text-(--color-muted-foreground)">{{ t('couple.settings.languageHint') }}</p>
+              <p class="font-medium">
+                {{ t('couple.settings.languageTitle') }}
+              </p>
+              <p class="text-xs text-(--color-muted-foreground)">
+                {{ t('couple.settings.languageHint') }}
+              </p>
             </div>
           </div>
           <div class="flex items-center gap-1 rounded-full border border-(--color-border) bg-white p-0.5">
@@ -84,13 +91,14 @@ async function signOut() {
               v-for="l in localeOptions"
               :key="l.code"
               :to="switchLocalePath(l.code)"
-              :class="[
-                'rounded-full px-3 py-1 text-xs transition-colors',
+              class="rounded-full px-3 py-1 text-xs transition-colors" :class="[
                 locale === l.code
                   ? 'bg-(--color-primary) text-(--color-primary-foreground)'
                   : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
               ]"
-            >{{ l.code.toUpperCase() }}</NuxtLink>
+            >
+              {{ l.code.toUpperCase() }}
+            </NuxtLink>
           </div>
         </div>
       </div>
@@ -127,8 +135,12 @@ async function signOut() {
             <LogOut class="h-5 w-5" :stroke-width="1.6" />
           </div>
           <div>
-            <p class="font-medium">{{ t('couple.settings.signOutTitle') }}</p>
-            <p class="text-xs text-(--color-muted-foreground)">{{ t('couple.settings.signOutHint') }}</p>
+            <p class="font-medium">
+              {{ t('couple.settings.signOutTitle') }}
+            </p>
+            <p class="text-xs text-(--color-muted-foreground)">
+              {{ t('couple.settings.signOutHint') }}
+            </p>
           </div>
         </div>
         <ChevronRight class="h-5 w-5 text-(--color-muted-foreground) transition-transform group-hover:translate-x-1" />

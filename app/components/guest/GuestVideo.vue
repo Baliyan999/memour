@@ -1,15 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onBeforeUnmount } from 'vue'
-import { Video, RefreshCw, Check, X, Square, Circle, Loader2, Maximize2, Minimize2 } from '@lucide/vue'
+import { Check, Circle, Loader2, Maximize2, Minimize2, RefreshCw, Square, Video, X } from '@lucide/vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from '#imports'
-
-const { t, te } = useI18n()
-const haptic = useHaptic()
-const { isFull, toggle: toggleFullscreen } = useFullscreen()
-const viewportEl = ref<HTMLElement | null>(null)
-function tapFullscreen() {
-  if (viewportEl.value) toggleFullscreen(viewportEl.value)
-}
 
 /**
  * GuestVideo — record a short clip (3-15 sec) through MediaRecorder
@@ -26,19 +18,26 @@ const props = defineProps<{
   guestTable: number
   geofenceEnabled: boolean
 }>()
-
 const emit = defineEmits<{
   (
     e: 'uploaded',
     media: {
       id: string
       uploaded_at: string
-      counts?: { photo_count: number; video_count: number; voice_count: number }
+      counts?: { photo_count: number, video_count: number, voice_count: number }
     },
   ): void
   (e: 'quota_exceeded'): void
   (e: 'wrong_table'): void
 }>()
+const { t, te } = useI18n()
+const haptic = useHaptic()
+const { isFull, toggle: toggleFullscreen } = useFullscreen()
+const viewportEl = ref<HTMLElement | null>(null)
+function tapFullscreen() {
+  if (viewportEl.value)
+    toggleFullscreen(viewportEl.value)
+}
 
 const MIN_MS = 3000
 const MAX_MS = 15000
@@ -69,7 +68,8 @@ function pickMime(): string {
     'video/mp4',
   ]
   for (const m of candidates) {
-    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) return m
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m))
+      return m
   }
   return 'video/webm'
 }
@@ -77,7 +77,8 @@ function pickMime(): string {
 async function startCamera() {
   error.value = null
   try {
-    if (stream.value) stream.value.getTracks().forEach((t) => t.stop())
+    if (stream.value)
+      stream.value.getTracks().forEach(t => t.stop())
     const s = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: facing.value }, width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: true,
@@ -90,7 +91,8 @@ async function startCamera() {
       videoEl.value.muted = true
       await videoEl.value.play().catch(() => {})
     }
-  } catch (e: any) {
+  }
+  catch (e: any) {
     state.value = 'error'
     error.value = e?.name === 'NotAllowedError' ? 'permission_denied' : 'camera_unavailable'
   }
@@ -102,18 +104,21 @@ function flip() {
 }
 
 function startRecording() {
-  if (!stream.value) return
+  if (!stream.value)
+    return
   haptic.tap()
   chunks.value = []
   lastMime.value = pickMime()
   const rec = new MediaRecorder(stream.value, { mimeType: lastMime.value })
   rec.ondataavailable = (e) => {
-    if (e.data && e.data.size > 0) chunks.value.push(e.data)
+    if (e.data && e.data.size > 0)
+      chunks.value.push(e.data)
   }
   rec.onstop = () => {
     const blob = new Blob(chunks.value, { type: lastMime.value })
     lastBlob.value = blob
-    if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+    if (previewUrl.value)
+      URL.revokeObjectURL(previewUrl.value)
     previewUrl.value = URL.createObjectURL(blob)
     state.value = 'review'
   }
@@ -125,20 +130,23 @@ function startRecording() {
     elapsedMs.value = Date.now() - startedAt
   }, 80) as unknown as number
   // Auto-stop at MAX_MS
-  timeoutId = window.setTimeout(() => stopRecording(), MAX_MS) as unknown as number
+  timeoutId = window.setTimeout(stopRecording, MAX_MS) as unknown as number
 }
 
 function stopRecording() {
   haptic.tap()
-  if (timer) clearInterval(timer)
-  if (timeoutId) clearTimeout(timeoutId)
+  if (timer)
+    clearInterval(timer)
+  if (timeoutId)
+    clearTimeout(timeoutId)
   if (recorder.value && recorder.value.state !== 'inactive') {
     recorder.value.stop()
   }
 }
 
 function retake() {
-  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  if (previewUrl.value)
+    URL.revokeObjectURL(previewUrl.value)
   previewUrl.value = null
   lastBlob.value = null
   elapsedMs.value = 0
@@ -146,10 +154,11 @@ function retake() {
 }
 
 async function getLocation(): Promise<GeolocationCoordinates | null> {
-  if (!props.geofenceEnabled || typeof navigator === 'undefined' || !('geolocation' in navigator)) return null
+  if (!props.geofenceEnabled || typeof navigator === 'undefined' || !('geolocation' in navigator))
+    return null
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve(pos.coords),
+      pos => resolve(pos.coords),
       () => resolve(null),
       { timeout: 4000, enableHighAccuracy: false },
     )
@@ -157,7 +166,8 @@ async function getLocation(): Promise<GeolocationCoordinates | null> {
 }
 
 async function send() {
-  if (!lastBlob.value) return
+  if (!lastBlob.value)
+    return
   if (elapsedMs.value < MIN_MS) {
     error.value = 'too_short'
     haptic.error()
@@ -176,7 +186,8 @@ async function send() {
     fd.append('media_type', 'video')
     fd.append('duration_ms', String(elapsedMs.value))
     fd.append('file', new File([lastBlob.value], `clip.${ext}`, { type: lastMime.value }))
-    if (props.guestName) fd.append('guest_name', props.guestName)
+    if (props.guestName)
+      fd.append('guest_name', props.guestName)
     if (coords) {
       fd.append('guest_lat', String(coords.latitude))
       fd.append('guest_lng', String(coords.longitude))
@@ -185,7 +196,7 @@ async function send() {
       ok: boolean
       photo_id: string
       uploaded_at: string
-      counts: { photo_count: number; video_count: number; voice_count: number }
+      counts: { photo_count: number, video_count: number, voice_count: number }
     }>(
       '/api/guest/upload',
       { method: 'POST', body: fd },
@@ -198,29 +209,38 @@ async function send() {
     })
     retake()
     state.value = 'live'
-  } catch (e: any) {
+  }
+  catch (e: any) {
     state.value = 'review'
     haptic.error()
     const code = e?.data?.data?.code ?? e?.data?.code ?? 'upload_failed'
     error.value = code
-    if (code === 'quota_exceeded') emit('quota_exceeded')
-    if (code === 'wrong_table') emit('wrong_table')
+    if (code === 'quota_exceeded')
+      emit('quota_exceeded')
+    if (code === 'wrong_table')
+      emit('wrong_table')
   }
 }
 
 onBeforeUnmount(() => {
-  if (timer) clearInterval(timer)
-  if (timeoutId) clearTimeout(timeoutId)
-  if (recorder.value && recorder.value.state !== 'inactive') recorder.value.stop()
-  if (stream.value) stream.value.getTracks().forEach((t) => t.stop())
-  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  if (timer)
+    clearInterval(timer)
+  if (timeoutId)
+    clearTimeout(timeoutId)
+  if (recorder.value && recorder.value.state !== 'inactive')
+    recorder.value.stop()
+  if (stream.value)
+    stream.value.getTracks().forEach(t => t.stop())
+  if (previewUrl.value)
+    URL.revokeObjectURL(previewUrl.value)
 })
 
 const recordProgress = computed(() => Math.min(100, (elapsedMs.value / MAX_MS) * 100))
 const seconds = computed(() => (elapsedMs.value / 1000).toFixed(1))
 
 const errorMessage = computed(() => {
-  if (!error.value) return null
+  if (!error.value)
+    return null
   const code = error.value
   // too_short carries a duration parameter; resolve it through the
   // pluralised key with the seconds we care about.
@@ -230,11 +250,14 @@ const errorMessage = computed(() => {
   // Kind-specific override first (e.g. unsupported_mime_video), then
   // the generic code, then a fallback.
   const kindKey = `guest.errors.${code}_video`
-  if (te(kindKey)) return t(kindKey)
+  if (te(kindKey))
+    return t(kindKey)
   const baseKey = `guest.errors.${code}`
-  if (te(baseKey)) return t(baseKey)
+  if (te(baseKey))
+    return t(baseKey)
   // Permission denied for video needs cam+mic copy, not photo-only.
-  if (code === 'permission_denied') return t('guest.errors.permission_denied_mic')
+  if (code === 'permission_denied')
+    return t('guest.errors.permission_denied_mic')
   return t('guest.camera.genericError')
 })
 </script>
@@ -270,10 +293,9 @@ const errorMessage = computed(() => {
          the bottom on shorter phones; same fullscreen toggle for
          the rare moment a guest wants to compose a wider shot. -->
     <div
-      ref="viewportEl"
       v-else-if="state !== 'error'"
-      :class="[
-        'relative overflow-hidden bg-black transition-[border-radius] duration-200',
+      ref="viewportEl"
+      class="relative overflow-hidden bg-black transition-[border-radius] duration-200" :class="[
         isFull
           ? 'fixed inset-0 z-50 rounded-none border-0'
           : 'flex-1 min-h-0 rounded-(--radius-xl) border border-(--color-border)/60',
@@ -386,17 +408,23 @@ const errorMessage = computed(() => {
 
     <!-- Error -->
     <div v-else class="surface-card rounded-(--radius-xl) p-6 text-center">
-      <p class="font-medium text-red-700">{{ errorMessage }}</p>
+      <p class="font-medium text-red-700">
+        {{ errorMessage }}
+      </p>
       <button
         type="button"
         class="mt-4 inline-flex h-11 items-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-white hover:opacity-90"
         @click="startCamera"
-      >{{ t('guest.camera.tryAgain') }}</button>
+      >
+        {{ t('guest.camera.tryAgain') }}
+      </button>
     </div>
 
     <p
       v-if="errorMessage && state !== 'error'"
       class="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-    >{{ errorMessage }}</p>
+    >
+      {{ errorMessage }}
+    </p>
   </div>
 </template>

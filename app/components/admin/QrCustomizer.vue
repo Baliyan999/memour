@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { motion, AnimatePresence } from 'motion-v'
-import { Download, X, Save, Trash2, Upload } from '@lucide/vue'
+import { Download, Save, Trash2, Upload, X } from '@lucide/vue'
+import { AnimatePresence, motion } from 'motion-v'
+import { computed, reactive, ref, watch } from 'vue'
 
 /**
  * Admin QR customizer modal — picks a style preset OR drills into
@@ -83,24 +83,32 @@ function close() {
 watch(
   () => props.open,
   async (v) => {
-    if (!v) return
+    if (!v)
+      return
     try {
       const res = await $fetch<{ settings: any }>(
         `/api/admin/qr-settings/${props.eventId}`,
       )
       const s = res.settings ?? {}
-      if (s.style) state.style = s.style
-      if (s.layout) state.layout = s.layout
-      if (s.dot) state.dot = s.dot
-      if (s.corner) state.corner = s.corner
-      if (s.fg) state.fg = s.fg
-      if (s.bg) state.bg = s.bg
+      if (s.style)
+        state.style = s.style
+      if (s.layout)
+        state.layout = s.layout
+      if (s.dot)
+        state.dot = s.dot
+      if (s.corner)
+        state.corner = s.corner
+      if (s.fg)
+        state.fg = s.fg
+      if (s.bg)
+        state.bg = s.bg
       if (s.gradient) {
         state.useGradient = true
         state.gFrom = s.gradient.from
         state.gTo = s.gradient.to
         state.gAngle = s.gradient.angle ?? 45
-      } else {
+      }
+      else {
         state.useGradient = false
       }
       existingLogoPath.value = s.logo_path ?? null
@@ -112,7 +120,8 @@ watch(
       mode.value = (s.fg && s.fg !== '#3a2010') || s.gradient || (s.dot && s.dot !== 'square')
         ? 'custom'
         : 'preset'
-    } catch {
+    }
+    catch {
       // first time — defaults are fine
     }
   },
@@ -123,7 +132,8 @@ const previewUrl = computed(() => {
   params.set('text', `https://memour.uz/uz/e/${props.eventId}?t=1`)
   if (mode.value === 'preset') {
     params.set('style', state.style)
-  } else {
+  }
+  else {
     params.set('dot', state.dot)
     params.set('corner', state.corner)
     params.set('fg', state.fg)
@@ -144,19 +154,24 @@ const perPage = computed(() => ({
 }[state.layout] ?? 4))
 const totalPages = computed(() => {
   const total = props.tableCount ?? 0
-  if (!total) return 0
+  if (!total)
+    return 0
   return Math.ceil(total / perPage.value)
 })
 const pageSummary = computed(() => {
-  if (!props.tableCount) return ''
+  if (!props.tableCount)
+    return ''
   const last = props.tableCount % perPage.value
-  if (last === 0 || totalPages.value === 1) return ''
+  if (last === 0 || totalPages.value === 1)
+    return ''
   return `Последняя страница: ${last} QR`
 })
 
 const downloadUrl = computed(() => {
   const params = new URLSearchParams()
-  if (mode.value === 'preset') params.set('style', state.style)
+  if (mode.value === 'preset') {
+    params.set('style', state.style)
+  }
   else {
     params.set('dot', state.dot)
     params.set('corner', state.corner)
@@ -174,15 +189,18 @@ const downloadUrl = computed(() => {
 
 function onLogoChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
+  if (!file)
+    return
   logoFile.value = file
   logoRemove.value = false
-  if (logoPreview.value?.startsWith('blob:')) URL.revokeObjectURL(logoPreview.value)
+  if (logoPreview.value?.startsWith('blob:'))
+    URL.revokeObjectURL(logoPreview.value)
   logoPreview.value = URL.createObjectURL(file)
 }
 
 function removeLogo() {
-  if (logoPreview.value?.startsWith('blob:')) URL.revokeObjectURL(logoPreview.value)
+  if (logoPreview.value?.startsWith('blob:'))
+    URL.revokeObjectURL(logoPreview.value)
   logoPreview.value = null
   logoFile.value = null
   logoRemove.value = !!existingLogoPath.value
@@ -202,14 +220,17 @@ async function save() {
       settings.bg = state.bg
       if (state.useGradient) {
         settings.gradient = { from: state.gFrom, to: state.gTo, angle: state.gAngle }
-      } else {
+      }
+      else {
         settings.gradient = null
       }
     }
     const fd = new FormData()
     fd.append('settings', JSON.stringify(settings))
-    if (logoFile.value) fd.append('logo', logoFile.value)
-    if (logoRemove.value) fd.append('logo_remove', '1')
+    if (logoFile.value)
+      fd.append('logo', logoFile.value)
+    if (logoRemove.value)
+      fd.append('logo_remove', '1')
     await $fetch(`/api/admin/qr-settings/${props.eventId}`, {
       method: 'POST',
       body: fd,
@@ -217,9 +238,11 @@ async function save() {
     toast.success('Настройки QR сохранены')
     logoFile.value = null
     logoRemove.value = false
-  } catch (e: any) {
+  }
+  catch (e: any) {
     toast.error('Не удалось сохранить настройки')
-  } finally {
+  }
+  finally {
     saving.value = false
   }
 }
@@ -258,8 +281,12 @@ async function save() {
           <div class="grid grid-cols-1 md:grid-cols-[1fr_1.4fr]">
             <!-- Preview -->
             <div class="border-b border-(--color-border) bg-(--color-muted)/20 p-8 md:border-b-0 md:border-r">
-              <p class="text-[10px] uppercase tracking-[0.3em] text-(--color-muted-foreground)">Превью</p>
-              <p class="mt-1 font-display text-lg italic">{{ couple }}</p>
+              <p class="text-[10px] uppercase tracking-[0.3em] text-(--color-muted-foreground)">
+                Превью
+              </p>
+              <p class="mt-1 font-display text-lg italic">
+                {{ couple }}
+              </p>
               <div class="relative mt-5 grid place-items-center rounded-(--radius-xl) bg-white p-5 shadow-sm">
                 <img :src="previewUrl" alt="preview" class="h-auto w-full max-w-[260px]">
                 <!-- Logo overlay simulation (centered on top of SVG) -->
@@ -279,7 +306,9 @@ async function save() {
             <!-- Options -->
             <div class="flex max-h-[80vh] flex-col gap-6 overflow-y-auto p-6 sm:p-8">
               <div>
-                <h2 class="heading-display-md" style="font-size: 1.5rem;">QR PDF</h2>
+                <h2 class="heading-display-md" style="font-size: 1.5rem;">
+                  QR PDF
+                </h2>
                 <p class="mt-1 text-sm text-(--color-muted-foreground)">
                   Настройки сохраняются на это событие
                 </p>
@@ -288,30 +317,32 @@ async function save() {
               <!-- Mode tabs -->
               <div class="flex gap-1 rounded-full border border-(--color-border) bg-white p-0.5">
                 <button
-                  v-for="m in ['preset','custom'] as Mode[]"
+                  v-for="m in ['preset', 'custom'] as Mode[]"
                   :key="m"
                   type="button"
-                  :class="[
-                    'flex-1 rounded-full px-3 py-1.5 text-xs transition-colors',
+                  class="flex-1 rounded-full px-3 py-1.5 text-xs transition-colors" :class="[
                     mode === m
                       ? 'bg-(--color-primary) text-(--color-primary-foreground)'
                       : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
                   ]"
                   @click="mode = m"
-                >{{ m === 'preset' ? 'Готовые стили' : 'Свой стиль' }}</button>
+                >
+                  {{ m === 'preset' ? 'Готовые стили' : 'Свой стиль' }}
+                </button>
               </div>
 
               <!-- Preset mode -->
               <template v-if="mode === 'preset'">
                 <div>
-                  <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Стиль кода</p>
+                  <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">
+                    Стиль кода
+                  </p>
                   <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
                     <button
                       v-for="p in PRESETS"
                       :key="p.id"
                       type="button"
-                      :class="[
-                        'flex flex-col items-center gap-1.5 rounded-md border bg-white p-2 transition-all',
+                      class="flex flex-col items-center gap-1.5 rounded-md border bg-white p-2 transition-all" :class="[
                         state.style === p.id
                           ? 'border-(--color-primary) ring-2 ring-(--color-primary)/40'
                           : 'border-(--color-border) hover:border-(--color-primary)/40',
@@ -338,7 +369,9 @@ async function save() {
                       v-model="state.dot"
                       class="h-10 rounded-md border border-(--color-border) bg-white px-3 text-sm"
                     >
-                      <option v-for="d in DOTS" :key="d.id" :value="d.id">{{ d.label }}</option>
+                      <option v-for="d in DOTS" :key="d.id" :value="d.id">
+                        {{ d.label }}
+                      </option>
                     </select>
                   </div>
                   <div class="flex flex-col gap-1">
@@ -347,7 +380,9 @@ async function save() {
                       v-model="state.corner"
                       class="h-10 rounded-md border border-(--color-border) bg-white px-3 text-sm"
                     >
-                      <option v-for="c in CORNERS" :key="c.id" :value="c.id">{{ c.label }}</option>
+                      <option v-for="c in CORNERS" :key="c.id" :value="c.id">
+                        {{ c.label }}
+                      </option>
                     </select>
                   </div>
                 </div>
@@ -393,7 +428,9 @@ async function save() {
 
               <!-- Logo -->
               <div>
-                <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Логотип в центре (опционально)</p>
+                <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">
+                  Логотип в центре (опционально)
+                </p>
                 <div class="flex items-center gap-3">
                   <label class="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-(--color-border) bg-white px-4 text-sm hover:bg-(--color-muted)">
                     <Upload class="h-4 w-4" :stroke-width="1.6" />
@@ -417,20 +454,23 @@ async function save() {
 
               <!-- Layout -->
               <div>
-                <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Раскладка PDF</p>
+                <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">
+                  Раскладка PDF
+                </p>
                 <p v-if="tableCount" class="mb-2 text-[11px] text-(--color-muted-foreground)">
                   У события {{ tableCount }} {{ tableCount === 1 ? 'стол' : tableCount < 5 ? 'стола' : 'столов' }} —
                   получится <strong class="text-(--color-foreground)">{{ totalPages }}</strong>
                   {{ totalPages === 1 ? 'страница' : totalPages < 5 ? 'страницы' : 'страниц' }} A4.
-                  <template v-if="pageSummary"> {{ pageSummary }}.</template>
+                  <template v-if="pageSummary">
+                    {{ pageSummary }}.
+                  </template>
                 </p>
                 <div class="grid gap-2">
                   <button
                     v-for="l in LAYOUTS"
                     :key="l.id"
                     type="button"
-                    :class="[
-                      'flex items-center justify-between rounded-md border bg-white px-4 py-3 text-left transition-colors',
+                    class="flex items-center justify-between rounded-md border bg-white px-4 py-3 text-left transition-colors" :class="[
                       state.layout === l.id
                         ? 'border-(--color-primary) ring-2 ring-(--color-primary)/40'
                         : 'border-(--color-border) hover:border-(--color-primary)/40',
@@ -438,12 +478,15 @@ async function save() {
                     @click="state.layout = l.id"
                   >
                     <div>
-                      <p class="text-sm font-medium">{{ l.label }}</p>
-                      <p class="text-xs text-(--color-muted-foreground)">{{ l.desc }}</p>
+                      <p class="text-sm font-medium">
+                        {{ l.label }}
+                      </p>
+                      <p class="text-xs text-(--color-muted-foreground)">
+                        {{ l.desc }}
+                      </p>
                     </div>
                     <span
-                      :class="[
-                        'grid h-5 w-5 place-items-center rounded-full border-2',
+                      class="grid h-5 w-5 place-items-center rounded-full border-2" :class="[
                         state.layout === l.id
                           ? 'border-(--color-primary) bg-(--color-primary)'
                           : 'border-(--color-border)',

@@ -35,9 +35,12 @@ export interface QRStyle {
 const FINDER_SIZE = 7
 
 function isFinder(x: number, y: number, n: number): boolean {
-  if (x < FINDER_SIZE && y < FINDER_SIZE) return true
-  if (x >= n - FINDER_SIZE && y < FINDER_SIZE) return true
-  if (x < FINDER_SIZE && y >= n - FINDER_SIZE) return true
+  if (x < FINDER_SIZE && y < FINDER_SIZE)
+    return true
+  if (x >= n - FINDER_SIZE && y < FINDER_SIZE)
+    return true
+  if (x < FINDER_SIZE && y >= n - FINDER_SIZE)
+    return true
   return false
 }
 
@@ -87,18 +90,18 @@ function finderPath(
   switch (shape) {
     case 'square':
       return (
-        `<rect x="${cx}" y="${cy}" width="${size}" height="${size}" fill="${fill}"/>` +
-        `<rect x="${cx + cellSize}" y="${cy + cellSize}" width="${size - 2 * cellSize}" height="${size - 2 * cellSize}" fill="${bg}"/>` +
-        `<rect x="${cx + 2 * cellSize}" y="${cy + 2 * cellSize}" width="${size - 4 * cellSize}" height="${size - 4 * cellSize}" fill="${fill}"/>`
+        `<rect x="${cx}" y="${cy}" width="${size}" height="${size}" fill="${fill}"/>`
+        + `<rect x="${cx + cellSize}" y="${cy + cellSize}" width="${size - 2 * cellSize}" height="${size - 2 * cellSize}" fill="${bg}"/>`
+        + `<rect x="${cx + 2 * cellSize}" y="${cy + 2 * cellSize}" width="${size - 4 * cellSize}" height="${size - 4 * cellSize}" fill="${fill}"/>`
       )
     case 'rounded': {
       const r1 = size * 0.22
       const r2 = (size - 2 * cellSize) * 0.22
       const r3 = (size - 4 * cellSize) * 0.22
       return (
-        `<rect x="${cx}" y="${cy}" width="${size}" height="${size}" rx="${r1}" fill="${fill}"/>` +
-        `<rect x="${cx + cellSize}" y="${cy + cellSize}" width="${size - 2 * cellSize}" height="${size - 2 * cellSize}" rx="${r2}" fill="${bg}"/>` +
-        `<rect x="${cx + 2 * cellSize}" y="${cy + 2 * cellSize}" width="${size - 4 * cellSize}" height="${size - 4 * cellSize}" rx="${r3}" fill="${fill}"/>`
+        `<rect x="${cx}" y="${cy}" width="${size}" height="${size}" rx="${r1}" fill="${fill}"/>`
+        + `<rect x="${cx + cellSize}" y="${cy + cellSize}" width="${size - 2 * cellSize}" height="${size - 2 * cellSize}" rx="${r2}" fill="${bg}"/>`
+        + `<rect x="${cx + 2 * cellSize}" y="${cy + 2 * cellSize}" width="${size - 4 * cellSize}" height="${size - 4 * cellSize}" rx="${r3}" fill="${fill}"/>`
       )
     }
     case 'circle': {
@@ -108,42 +111,42 @@ function finderPath(
       const ccx = cx + r1
       const ccy = cy + r1
       return (
-        `<circle cx="${ccx}" cy="${ccy}" r="${r1}" fill="${fill}"/>` +
-        `<circle cx="${ccx}" cy="${ccy}" r="${r2}" fill="${bg}"/>` +
-        `<circle cx="${ccx}" cy="${ccy}" r="${r3}" fill="${fill}"/>`
+        `<circle cx="${ccx}" cy="${ccy}" r="${r1}" fill="${fill}"/>`
+        + `<circle cx="${ccx}" cy="${ccy}" r="${r2}" fill="${bg}"/>`
+        + `<circle cx="${ccx}" cy="${ccy}" r="${r3}" fill="${fill}"/>`
       )
     }
     case 'leaf': {
       const r = size * 0.3
-      const outerD =
-        `M ${cx} ${cy} L ${cx + size - r} ${cy} ` +
-        `A ${r} ${r} 0 0 1 ${cx + size} ${cy + r} ` +
-        `L ${cx + size} ${cy + size - r} ` +
-        `A ${r} ${r} 0 0 1 ${cx + size - r} ${cy + size} ` +
-        `L ${cx + r} ${cy + size} ` +
-        `A ${r} ${r} 0 0 1 ${cx} ${cy + size - r} Z`
+      const outerD
+        = `M ${cx} ${cy} L ${cx + size - r} ${cy} `
+          + `A ${r} ${r} 0 0 1 ${cx + size} ${cy + r} `
+          + `L ${cx + size} ${cy + size - r} `
+          + `A ${r} ${r} 0 0 1 ${cx + size - r} ${cy + size} `
+          + `L ${cx + r} ${cy + size} `
+          + `A ${r} ${r} 0 0 1 ${cx} ${cy + size - r} Z`
       const innerR = (size - 2 * cellSize) * 0.3
-      const ix = cx + cellSize, iy = cy + cellSize, iw = size - 2 * cellSize
-      const innerD =
-        `M ${ix} ${iy} L ${ix + iw - innerR} ${iy} ` +
-        `A ${innerR} ${innerR} 0 0 1 ${ix + iw} ${iy + innerR} ` +
-        `L ${ix + iw} ${iy + iw - innerR} ` +
-        `A ${innerR} ${innerR} 0 0 1 ${ix + iw - innerR} ${iy + iw} ` +
-        `L ${ix + innerR} ${iy + iw} ` +
-        `A ${innerR} ${innerR} 0 0 1 ${ix} ${iy + iw - innerR} Z`
+      const ix = cx + cellSize; const iy = cy + cellSize; const iw = size - 2 * cellSize
+      const innerD
+        = `M ${ix} ${iy} L ${ix + iw - innerR} ${iy} `
+          + `A ${innerR} ${innerR} 0 0 1 ${ix + iw} ${iy + innerR} `
+          + `L ${ix + iw} ${iy + iw - innerR} `
+          + `A ${innerR} ${innerR} 0 0 1 ${ix + iw - innerR} ${iy + iw} `
+          + `L ${ix + innerR} ${iy + iw} `
+          + `A ${innerR} ${innerR} 0 0 1 ${ix} ${iy + iw - innerR} Z`
       const dotR = (size - 4 * cellSize) * 0.3
-      const dx = cx + 2 * cellSize, dy = cy + 2 * cellSize, dw = size - 4 * cellSize
-      const dotD =
-        `M ${dx} ${dy} L ${dx + dw - dotR} ${dy} ` +
-        `A ${dotR} ${dotR} 0 0 1 ${dx + dw} ${dy + dotR} ` +
-        `L ${dx + dw} ${dy + dw - dotR} ` +
-        `A ${dotR} ${dotR} 0 0 1 ${dx + dw - dotR} ${dy + dw} ` +
-        `L ${dx + dotR} ${dy + dw} ` +
-        `A ${dotR} ${dotR} 0 0 1 ${dx} ${dy + dw - dotR} Z`
+      const dx = cx + 2 * cellSize; const dy = cy + 2 * cellSize; const dw = size - 4 * cellSize
+      const dotD
+        = `M ${dx} ${dy} L ${dx + dw - dotR} ${dy} `
+          + `A ${dotR} ${dotR} 0 0 1 ${dx + dw} ${dy + dotR} `
+          + `L ${dx + dw} ${dy + dw - dotR} `
+          + `A ${dotR} ${dotR} 0 0 1 ${dx + dw - dotR} ${dy + dw} `
+          + `L ${dx + dotR} ${dy + dw} `
+          + `A ${dotR} ${dotR} 0 0 1 ${dx} ${dy + dw - dotR} Z`
       return (
-        `<path d="${outerD}" fill="${fill}"/>` +
-        `<path d="${innerD}" fill="${bg}"/>` +
-        `<path d="${dotD}" fill="${fill}"/>`
+        `<path d="${outerD}" fill="${fill}"/>`
+        + `<path d="${innerD}" fill="${bg}"/>`
+        + `<path d="${dotD}" fill="${fill}"/>`
       )
     }
   }
@@ -162,7 +165,8 @@ export function renderStyledQRSVG(text: string, style: QRStyle, pxSize: number):
   let logoCells = 0
   if (hasLogo) {
     logoCells = Math.floor(n * 0.22)
-    if (logoCells % 2 === 0) logoCells += 1
+    if (logoCells % 2 === 0)
+      logoCells += 1
   }
 
   // Build the fill — either solid `fg` or a gradient ref.
@@ -175,10 +179,10 @@ export function renderStyledQRSVG(text: string, style: QRStyle, pxSize: number):
     const y1 = 50 - Math.sin(a) * 50
     const x2 = 50 + Math.cos(a) * 50
     const y2 = 50 + Math.sin(a) * 50
-    defs = `<defs><linearGradient id="${id}" x1="${x1}%" y1="${y1}%" x2="${x2}%" y2="${y2}%">` +
-      `<stop offset="0%" stop-color="${style.gradient.from}"/>` +
-      `<stop offset="100%" stop-color="${style.gradient.to}"/>` +
-      `</linearGradient></defs>`
+    defs = `<defs><linearGradient id="${id}" x1="${x1}%" y1="${y1}%" x2="${x2}%" y2="${y2}%">`
+      + `<stop offset="0%" stop-color="${style.gradient.from}"/>`
+      + `<stop offset="100%" stop-color="${style.gradient.to}"/>`
+      + `</linearGradient></defs>`
     fill = `url(#${id})`
   }
 
@@ -189,9 +193,12 @@ export function renderStyledQRSVG(text: string, style: QRStyle, pxSize: number):
   // Data cells
   for (let y = 0; y < n; y++) {
     for (let x = 0; x < n; x++) {
-      if (!modules.get(x, y)) continue
-      if (isFinder(x, y, n)) continue
-      if (hasLogo && isUnderLogo(x, y, n, logoCells)) continue
+      if (!modules.get(x, y))
+        continue
+      if (isFinder(x, y, n))
+        continue
+      if (hasLogo && isUnderLogo(x, y, n, logoCells))
+        continue
       svg += dotPath(style.dot, x * cellSize, y * cellSize, cellSize, fill)
     }
   }
@@ -220,7 +227,8 @@ export async function renderStyledQRPng(
     const n = (qr.modules as any).size
     const cellSize = pxSize / n
     let logoCells = Math.floor(n * 0.22)
-    if (logoCells % 2 === 0) logoCells += 1
+    if (logoCells % 2 === 0)
+      logoCells += 1
     const logoPx = Math.round(logoCells * cellSize * 0.85) // little inner padding
     const logoBuf = await sharp(style.logo)
       .resize(logoPx, logoPx, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
@@ -253,12 +261,15 @@ export const QR_PRESETS: QRPreset[] = [
     id: 'gradient-gold',
     label: 'Градиент',
     style: {
-      dot: 'rounded', corner: 'rounded', fg: '#3a2010', bg: '#fbf6f0',
+      dot: 'rounded',
+      corner: 'rounded',
+      fg: '#3a2010',
+      bg: '#fbf6f0',
       gradient: { from: '#9c7440', to: '#b85c5c', angle: 45 },
     },
   },
 ]
 
 export function getPreset(id?: string | null): QRPreset {
-  return QR_PRESETS.find((p) => p.id === id) ?? QR_PRESETS[0]!
+  return QR_PRESETS.find(p => p.id === id) ?? QR_PRESETS[0]!
 }

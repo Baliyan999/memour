@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { computed, reactive, ref } from 'vue'
 
 definePageMeta({ layout: 'admin' })
 
@@ -26,7 +26,7 @@ interface AdminRow {
 
 const { data, refresh, pending } = await useFetch<{
   admins: AdminRow[]
-  me: { user_id: string; role: string }
+  me: { user_id: string, role: string }
 }>('/api/admin/admins')
 
 const isSuper = computed(() => data.value?.me.role === 'super')
@@ -60,15 +60,21 @@ async function invite() {
     form.telegram_chat_id = ''
     showForm.value = false
     await refresh()
-  } catch (e: any) {
+  }
+  catch (e: any) {
     const code = e?.data?.data?.code ?? e?.data?.code
-    error.value =
-      code === 'not_super' ? 'Только главный админ может добавлять'
-      : code === 'invalid_input' ? 'Проверьте поля. Chat ID — только цифры, пароль ≥ 6 символов'
-      : code === 'create_failed' ? 'Не удалось создать аккаунт'
-      : code === 'update_failed' ? 'Не удалось обновить пароль существующего аккаунта'
-      : 'Ошибка при добавлении'
-  } finally {
+    error.value
+      = code === 'not_super'
+        ? 'Только главный админ может добавлять'
+        : code === 'invalid_input'
+          ? 'Проверьте поля. Chat ID — только цифры, пароль ≥ 6 символов'
+          : code === 'create_failed'
+            ? 'Не удалось создать аккаунт'
+            : code === 'update_failed'
+              ? 'Не удалось обновить пароль существующего аккаунта'
+              : 'Ошибка при добавлении'
+  }
+  finally {
     submitting.value = false
   }
 }
@@ -81,12 +87,14 @@ async function remove(row: AdminRow) {
     cancelLabel: 'Отмена',
     tone: 'danger',
   })
-  if (!ok) return
+  if (!ok)
+    return
   try {
     await $fetch(`/api/admin/admins/${row.user_id}`, { method: 'DELETE' })
     toast.success('Удалён')
     await refresh()
-  } catch (e: any) {
+  }
+  catch (e: any) {
     const code = e?.data?.data?.code ?? e?.data?.code
     toast.error(code === 'cannot_remove_self' ? 'Нельзя удалить себя' : 'Ошибка удаления')
   }
@@ -100,16 +108,22 @@ function fmtDate(d: string) {
 <template>
   <div>
     <div class="mb-6 flex items-end justify-between gap-4">
-      <h1 class="heading-display-md">Команда</h1>
+      <h1 class="heading-display-md">
+        Команда
+      </h1>
       <button
         v-if="isSuper"
         type="button"
         class="inline-flex h-10 items-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90"
         @click="showForm = !showForm"
-      >{{ showForm ? 'Отмена' : '+ Добавить админа' }}</button>
+      >
+        {{ showForm ? 'Отмена' : '+ Добавить админа' }}
+      </button>
     </div>
 
-    <p v-if="error" class="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+    <p v-if="error" class="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      {{ error }}
+    </p>
 
     <div v-if="showForm" class="mb-6 surface-card rounded-(--radius-xl) p-6">
       <form class="flex flex-col gap-4" @submit.prevent="invite">
@@ -152,7 +166,9 @@ function fmtDate(d: string) {
               type="button"
               class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-(--color-muted-foreground) hover:text-(--color-foreground)"
               @click="showPwd = !showPwd"
-            >{{ showPwd ? 'скрыть' : 'показать' }}</button>
+            >
+              {{ showPwd ? 'скрыть' : 'показать' }}
+            </button>
           </div>
         </div>
 
@@ -168,7 +184,9 @@ function fmtDate(d: string) {
           type="submit"
           :disabled="submitting"
           class="inline-flex h-11 items-center justify-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90 disabled:opacity-60"
-        >{{ submitting ? 'Добавляем…' : 'Добавить' }}</button>
+        >
+          {{ submitting ? 'Добавляем…' : 'Добавить' }}
+        </button>
       </form>
     </div>
 
@@ -185,10 +203,11 @@ function fmtDate(d: string) {
         <div class="surface-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-(--radius-xl) p-5">
           <div>
             <div class="flex flex-wrap items-center gap-2">
-              <p class="font-medium">{{ row.email ?? '—' }}</p>
+              <p class="font-medium">
+                {{ row.email ?? '—' }}
+              </p>
               <span
-                :class="[
-                  'rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider',
+                class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider" :class="[
                   row.role === 'super'
                     ? 'bg-amber-100 text-amber-700'
                     : 'bg-(--color-muted) text-(--color-muted-foreground)',
@@ -208,13 +227,17 @@ function fmtDate(d: string) {
             type="button"
             class="inline-flex h-8 items-center rounded-full border border-red-200 bg-white px-3 text-xs text-red-700 hover:bg-red-50"
             @click="remove(row)"
-          >Удалить</button>
+          >
+            Удалить
+          </button>
         </div>
       </li>
     </ul>
 
     <div v-else class="surface-card rounded-(--radius-xl) p-10 text-center">
-      <p class="text-(--color-muted-foreground)">Админов нет</p>
+      <p class="text-(--color-muted-foreground)">
+        Админов нет
+      </p>
     </div>
   </div>
 </template>

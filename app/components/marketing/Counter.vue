@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount } from 'vue'
 import { useIntersectionObserver } from '@vueuse/core'
+import { onBeforeUnmount, ref } from 'vue'
 
 /**
  * Counter — RAF-based tween from 0 to `to` once the element enters the
@@ -19,15 +19,17 @@ const n = ref(0)
 let rafId = 0
 
 const { stop } = useIntersectionObserver(el, ([entry]) => {
-  if (!entry?.isIntersecting) return
+  if (!entry?.isIntersecting)
+    return
   stop()
   const startedAt = performance.now()
   const duration = 1600
   const tick = (now: number) => {
     const t = Math.min(1, (now - startedAt) / duration)
-    const eased = 1 - Math.pow(1 - t, 3)
+    const eased = 1 - (1 - t) ** 3
     n.value = Math.round(props.to * eased)
-    if (t < 1) rafId = requestAnimationFrame(tick)
+    if (t < 1)
+      rafId = requestAnimationFrame(tick)
   }
   rafId = requestAnimationFrame(tick)
 }, { threshold: 0.5 })

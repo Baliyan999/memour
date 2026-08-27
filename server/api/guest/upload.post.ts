@@ -1,11 +1,12 @@
-import { z } from 'zod'
+import type { GuestMediaKind } from '../../utils/guest-quota'
+import type { Database } from '~/types/database.types'
 import { randomUUID } from 'node:crypto'
 import sharp from 'sharp'
+import { z } from 'zod'
 import { serverSupabaseServiceRole } from '#supabase/server'
-import type { Database } from '~/types/database.types'
-import { notifyEventUpload } from '../../utils/telegram'
+import { counterColumn, DEVICE_LIMITS } from '../../utils/guest-quota'
 import { checkRateLimit } from '../../utils/rate-limit'
-import { DEVICE_LIMITS, counterColumn, type GuestMediaKind } from '../../utils/guest-quota'
+import { notifyEventUpload } from '../../utils/telegram'
 
 /**
  * POST /api/guest/upload — accepts a single photo blob from an
@@ -32,7 +33,7 @@ import { DEVICE_LIMITS, counterColumn, type GuestMediaKind } from '../../utils/g
 const WINDOW_HOURS = 18 // upload window before+after wedding
 
 // Per-media limits. Voice clips are smallest, then photos, then video.
-const LIMITS: Record<'photo' | 'video' | 'voice', { maxBytes: number; mimes: Set<string>; ext: Record<string, string> }> = {
+const LIMITS: Record<'photo' | 'video' | 'voice', { maxBytes: number, mimes: Set<string>, ext: Record<string, string> }> = {
   photo: {
     maxBytes: 6 * 1024 * 1024,
     mimes: new Set(['image/jpeg', 'image/png', 'image/webp']),
@@ -72,9 +73,9 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   const toRad = (d: number) => (d * Math.PI) / 180
   const dLat = toRad(lat2 - lat1)
   const dLng = toRad(lng2 - lng1)
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  const a
+    = Math.sin(dLat / 2) ** 2
+      + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
   return 2 * R * Math.asin(Math.sqrt(a))
 }
 
@@ -83,14 +84,16 @@ export default defineEventHandler(async (event) => {
   // spammer can't disable uploads across all events at once.
   const ip = getRequestIP(event, { xForwardedFor: true }) ?? 'unknown'
   const form = await readMultipartFormData(event)
-  if (!form) fail(400, 'missing_body')
+  if (!form)
+    fail(400, 'missing_body')
 
   const fields = new Map<string, string>()
-  let file: { filename?: string; type?: string; data: Buffer } | null = null
+  let file: { filename?: string, type?: string, data: Buffer } | null = null
   for (const part of form) {
     if (part.name === 'file' && part.data) {
       file = { filename: part.filename, type: part.type, data: part.data }
-    } else if (part.name && part.data) {
+    }
+    else if (part.name && part.data) {
       fields.set(part.name, part.data.toString('utf8'))
     }
   }
@@ -111,8 +114,10 @@ export default defineEventHandler(async (event) => {
     guest_lng: z.coerce.number().min(-180).max(180).optional(),
   })
   const parsed = schema.safeParse(Object.fromEntries(fields))
-  if (!parsed.success) fail(422, 'invalid_input')
-  if (!file) fail(400, 'missing_file')
+  if (!parsed.success)
+    fail(422, 'invalid_input')
+  if (!file)
+    fail(400, 'missing_file')
 
   const limits = LIMITS[parsed.data.media_type]
   const mime = baseMime(file!.type)
@@ -122,7 +127,8 @@ export default defineEventHandler(async (event) => {
     )
     fail(415, 'unsupported_mime')
   }
-  if (file!.data.length > limits.maxBytes) fail(413, 'file_too_large')
+  if (file!.data.length > limits.maxBytes)
+    fail(413, 'file_too_large')
 
   const input = parsed.data
 
@@ -138,8 +144,10 @@ export default defineEventHandler(async (event) => {
     .select('id, couple_names, status, wedding_date, venue_lat, venue_lng, geofence_radius')
     .eq('id', input.event_id)
     .maybeSingle()
-  if (!ev) fail(404, 'event_not_found')
-  if (ev!.status !== 'active') fail(403, 'event_not_active')
+  if (!ev)
+    fail(404, 'event_not_found')
+  if (ev!.status !== 'active')
+    fail(403, 'event_not_active')
 
   // Wedding-day window check. We allow `wedding_date ± WINDOW_HOURS`.
   // Stored as date (YYYY-MM-DD); treat as local midnight of UZ
@@ -147,13 +155,15 @@ export default defineEventHandler(async (event) => {
   const wedding = new Date(`${ev!.wedding_date}T00:00:00+05:00`)
   const now = Date.now()
   const diffHours = Math.abs(now - wedding.getTime()) / 3_600_000
-  if (diffHours > WINDOW_HOURS) fail(403, 'outside_window')
+  if (diffHours > WINDOW_HOURS)
+    fail(403, 'outside_window')
 
   // Geofence: only enforced if the event has venue coords. If guest
   // didn't share their location, we accept (we can't measure).
   if (ev!.venue_lat != null && ev!.venue_lng != null && input.guest_lat != null && input.guest_lng != null) {
     const dist = haversine(ev!.venue_lat, ev!.venue_lng, input.guest_lat, input.guest_lng)
-    if (dist > (ev!.geofence_radius ?? 120)) fail(403, 'outside_geofence')
+    if (dist > (ev!.geofence_radius ?? 120))
+      fail(403, 'outside_geofence')
   }
 
   // --- Device binding + per-device quota ---
@@ -187,9 +197,11 @@ export default defineEventHandler(async (event) => {
   // `mime` was already normalized above (codec suffix stripped).
   const ext = limits.ext[mime] ?? 'bin'
   const photoId = randomUUID()
-  const folder = parsed.data.media_type === 'voice' ? 'voice'
-    : parsed.data.media_type === 'video' ? 'video'
-    : 'photos'
+  const folder = parsed.data.media_type === 'voice'
+    ? 'voice'
+    : parsed.data.media_type === 'video'
+      ? 'video'
+      : 'photos'
   const storagePath = `${ev!.id}/${folder}/${photoId}.${ext}`
 
   // For photos: strip EXIF (privacy — guests may not realize their
@@ -222,7 +234,8 @@ export default defineEventHandler(async (event) => {
         console.error('[guest/upload] thumbnail upload failed', thumbErr)
         thumbnailPath = null // keep going; original still uploads
       }
-    } catch (e) {
+    }
+    catch (e) {
       console.error('[guest/upload] sharp processing failed', e)
       // Fall back to storing the raw bytes if sharp chokes
     }
@@ -314,4 +327,3 @@ export default defineEventHandler(async (event) => {
     limits: DEVICE_LIMITS,
   }
 })
-

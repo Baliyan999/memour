@@ -1,9 +1,9 @@
+import type { Database } from '~/types/database.types'
 import { z } from 'zod'
 import {
-  serverSupabaseUser,
   serverSupabaseServiceRole,
+  serverSupabaseUser,
 } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 import { getTierPriceTiyin } from '../../utils/pricing'
 
 /**
@@ -35,11 +35,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const user = await serverSupabaseUser(event)
-  if (!user) fail(401, 'unauthorized')
+  if (!user)
+    fail(401, 'unauthorized')
 
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success)
+    fail(422, 'invalid_input')
 
   const admin = serverSupabaseServiceRole<Database>(event)
 
@@ -48,9 +50,12 @@ export default defineEventHandler(async (event) => {
     .select('id, couple_names, plan_tier, owner_id, status')
     .eq('id', parsed.data.event_id)
     .maybeSingle()
-  if (!ev) fail(404, 'event_not_found')
-  if (ev!.owner_id !== ((user as any).id ?? (user as any).sub)) fail(403, 'forbidden')
-  if (ev!.status === 'active') fail(409, 'already_paid')
+  if (!ev)
+    fail(404, 'event_not_found')
+  if (ev!.owner_id !== ((user as any).id ?? (user as any).sub))
+    fail(403, 'forbidden')
+  if (ev!.status === 'active')
+    fail(409, 'already_paid')
 
   const amount = getTierPriceTiyin(ev!.plan_tier ?? 'basic')
 
@@ -67,7 +72,8 @@ export default defineEventHandler(async (event) => {
     } as any)
     .select('id')
     .single()
-  if (insErr || !payment) fail(500, 'storage_error')
+  if (insErr || !payment)
+    fail(500, 'storage_error')
 
   const config = useRuntimeConfig()
   const returnUrl = `${config.public.siteUrl}/uz/dashboard/event/${ev!.id}`
@@ -104,13 +110,13 @@ export default defineEventHandler(async (event) => {
     }
     // Click pay URL: https://my.click.uz/services/pay?service_id=...&merchant_id=...&amount=...&transaction_param=...&return_url=...
     const amountUzs = amount / 100
-    const url =
-      `https://my.click.uz/services/pay?` +
-      `service_id=${serviceId}` +
-      `&merchant_id=${merchantId}` +
-      `&amount=${amountUzs}` +
-      `&transaction_param=${payment.id}` +
-      `&return_url=${encodeURIComponent(returnUrl)}`
+    const url
+      = `https://my.click.uz/services/pay?`
+        + `service_id=${serviceId}`
+        + `&merchant_id=${merchantId}`
+        + `&amount=${amountUzs}`
+        + `&transaction_param=${payment.id}`
+        + `&return_url=${encodeURIComponent(returnUrl)}`
     return { url, payment_id: payment.id }
   }
 

@@ -1,15 +1,8 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount, watch, computed } from 'vue'
+import { Camera, Check, Maximize2, Minimize2, RefreshCw, X } from '@lucide/vue'
 import imageCompression from 'browser-image-compression'
-import { Camera, RefreshCw, Check, X, Upload, Loader2, Maximize2, Minimize2 } from '@lucide/vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from '#imports'
-
-const haptic = useHaptic()
-const { isFull, toggle: toggleFullscreen } = useFullscreen()
-const viewportEl = ref<HTMLElement | null>(null)
-function tapFullscreen() {
-  if (viewportEl.value) toggleFullscreen(viewportEl.value)
-}
 
 /**
  * GuestCamera — captures photos with the device camera and uploads
@@ -29,19 +22,25 @@ const props = defineProps<{
   guestTable: number
   geofenceEnabled: boolean
 }>()
-
 const emit = defineEmits<{
   (
     e: 'uploaded',
     photo: {
       id: string
       uploaded_at: string
-      counts?: { photo_count: number; video_count: number; voice_count: number }
+      counts?: { photo_count: number, video_count: number, voice_count: number }
     },
   ): void
   (e: 'quota_exceeded'): void
   (e: 'wrong_table'): void
 }>()
+const haptic = useHaptic()
+const { isFull, toggle: toggleFullscreen } = useFullscreen()
+const viewportEl = ref<HTMLElement | null>(null)
+function tapFullscreen() {
+  if (viewportEl.value)
+    toggleFullscreen(viewportEl.value)
+}
 
 type State = 'idle' | 'live' | 'capturing' | 'review' | 'uploading' | 'error'
 const state = ref<State>('idle')
@@ -59,7 +58,7 @@ async function startCamera() {
   error.value = null
   try {
     if (stream.value) {
-      stream.value.getTracks().forEach((t) => t.stop())
+      stream.value.getTracks().forEach(t => t.stop())
       stream.value = null
     }
     const s = await navigator.mediaDevices.getUserMedia({
@@ -73,7 +72,8 @@ async function startCamera() {
       videoEl.value.srcObject = s
       await videoEl.value.play().catch(() => {})
     }
-  } catch (e: any) {
+  }
+  catch (e: any) {
     state.value = 'error'
     error.value = e?.message === 'Permission denied' || e?.name === 'NotAllowedError'
       ? 'permission_denied'
@@ -87,7 +87,8 @@ function flipCamera() {
 }
 
 async function capture() {
-  if (!videoEl.value || !canvasEl.value || !stream.value) return
+  if (!videoEl.value || !canvasEl.value || !stream.value)
+    return
   haptic.tap()
   state.value = 'capturing'
   const video = videoEl.value
@@ -99,16 +100,18 @@ async function capture() {
   const ctx = canvas.getContext('2d')!
   ctx.drawImage(video, 0, 0, w, h)
   const blob: Blob = await new Promise((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', 0.92)
+    canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', 0.92)
   })
   lastBlob.value = blob
-  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  if (previewUrl.value)
+    URL.revokeObjectURL(previewUrl.value)
   previewUrl.value = URL.createObjectURL(blob)
   state.value = 'review'
 }
 
 function retake() {
-  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  if (previewUrl.value)
+    URL.revokeObjectURL(previewUrl.value)
   previewUrl.value = null
   lastBlob.value = null
   state.value = 'live'
@@ -120,7 +123,7 @@ async function getLocation(): Promise<GeolocationCoordinates | null> {
   }
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve(pos.coords),
+      pos => resolve(pos.coords),
       () => resolve(null),
       { timeout: 4000, enableHighAccuracy: false },
     )
@@ -128,7 +131,8 @@ async function getLocation(): Promise<GeolocationCoordinates | null> {
 }
 
 async function send() {
-  if (!lastBlob.value) return
+  if (!lastBlob.value)
+    return
   haptic.tap()
   state.value = 'uploading'
   uploadPercent.value = 0
@@ -148,7 +152,8 @@ async function send() {
     fd.append('device_id', props.deviceId)
     fd.append('guest_table', String(props.guestTable))
     fd.append('file', compressed, 'photo.jpg')
-    if (props.guestName) fd.append('guest_name', props.guestName)
+    if (props.guestName)
+      fd.append('guest_name', props.guestName)
     if (coords) {
       fd.append('guest_lat', String(coords.latitude))
       fd.append('guest_lng', String(coords.longitude))
@@ -158,7 +163,7 @@ async function send() {
       ok: boolean
       photo_id: string
       uploaded_at: string
-      counts: { photo_count: number; video_count: number; voice_count: number }
+      counts: { photo_count: number, video_count: number, voice_count: number }
     }>(
       '/api/guest/upload',
       fd,
@@ -175,17 +180,21 @@ async function send() {
       uploaded_at: res.data.uploaded_at,
       counts: res.data.counts,
     })
-    if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+    if (previewUrl.value)
+      URL.revokeObjectURL(previewUrl.value)
     previewUrl.value = null
     lastBlob.value = null
     state.value = 'live'
-  } catch (e: any) {
+  }
+  catch (e: any) {
     state.value = 'review'
     haptic.error()
     const code = e?.code ?? e?.data?.data?.code ?? 'upload_failed'
     error.value = code
-    if (code === 'quota_exceeded') emit('quota_exceeded')
-    if (code === 'wrong_table') emit('wrong_table')
+    if (code === 'quota_exceeded')
+      emit('quota_exceeded')
+    if (code === 'wrong_table')
+      emit('wrong_table')
   }
 }
 
@@ -195,8 +204,10 @@ watch(
 )
 
 onBeforeUnmount(() => {
-  if (stream.value) stream.value.getTracks().forEach((t) => t.stop())
-  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  if (stream.value)
+    stream.value.getTracks().forEach(t => t.stop())
+  if (previewUrl.value)
+    URL.revokeObjectURL(previewUrl.value)
 })
 
 // Map server codes → i18n keys under guest.errors.*. Some codes need
@@ -204,12 +215,15 @@ onBeforeUnmount(() => {
 // the human-readable text differs.
 const { t, te } = useI18n()
 const errorMessage = computed(() => {
-  if (!error.value) return null
+  if (!error.value)
+    return null
   const code = error.value
   const kindKey = `guest.errors.${code}_photo`
-  if (te(kindKey)) return t(kindKey)
+  if (te(kindKey))
+    return t(kindKey)
   const baseKey = `guest.errors.${code}`
-  if (te(baseKey)) return t(baseKey)
+  if (te(baseKey))
+    return t(baseKey)
   return t('guest.camera.genericError')
 })
 </script>
@@ -252,10 +266,9 @@ const errorMessage = computed(() => {
          z-50` — covers header + dock + the browser URL bar without
          needing the (flaky on iOS) native Fullscreen API. -->
     <div
-      ref="viewportEl"
       v-else-if="state !== 'error'"
-      :class="[
-        'relative overflow-hidden bg-black transition-[border-radius] duration-200',
+      ref="viewportEl"
+      class="relative overflow-hidden bg-black transition-[border-radius] duration-200" :class="[
         isFull
           ? 'fixed inset-0 z-50 rounded-none border-0'
           : 'flex-1 min-h-0 rounded-(--radius-xl) border border-(--color-border)/60',
@@ -318,7 +331,9 @@ const errorMessage = computed(() => {
           </svg>
           <span class="absolute inset-0 grid place-items-center font-mono text-base">{{ uploadPercent }}%</span>
         </div>
-        <p class="mt-3 text-sm">{{ t('guest.camera.uploadingShort') }}</p>
+        <p class="mt-3 text-sm">
+          {{ t('guest.camera.uploadingShort') }}
+        </p>
       </div>
 
       <!-- Bottom controls bar -->
@@ -374,12 +389,16 @@ const errorMessage = computed(() => {
 
     <!-- ERROR state -->
     <div v-else class="surface-card rounded-(--radius-xl) p-6 text-center">
-      <p class="font-medium text-red-700">{{ errorMessage }}</p>
+      <p class="font-medium text-red-700">
+        {{ errorMessage }}
+      </p>
       <button
         type="button"
         class="mt-4 inline-flex h-11 items-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-white hover:opacity-90"
         @click="startCamera"
-      >{{ t('guest.camera.tryAgain') }}</button>
+      >
+        {{ t('guest.camera.tryAgain') }}
+      </button>
     </div>
 
     <!-- Inline error toast under viewport (non-fatal) -->

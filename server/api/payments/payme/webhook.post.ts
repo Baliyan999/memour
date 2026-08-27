@@ -1,5 +1,5 @@
-import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { serverSupabaseServiceRole } from '#supabase/server'
 
 /**
  * POST /api/payments/payme/webhook — Payme JSON-RPC 2.0 endpoint.
@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
     setResponseStatus(event, 200)
     return err(null, -32504, 'Insufficient privilege')
   }
-  const expected = 'Basic ' + Buffer.from(`Paycom:${merchantKey}`).toString('base64')
+  const expected = `Basic ${Buffer.from(`Paycom:${merchantKey}`).toString('base64')}`
   if (authHeader !== expected) {
     setResponseStatus(event, 200)
     return err(null, -32504, 'Insufficient privilege')
@@ -58,25 +58,30 @@ export default defineEventHandler(async (event) => {
 
   switch (rpc.method) {
     case 'CheckPerformTransaction': {
-      if (!eventId) return err(rpc.id, -31050, 'Missing event_id', 'event_id')
+      if (!eventId)
+        return err(rpc.id, -31050, 'Missing event_id', 'event_id')
       const { data: ev } = await admin
         .from('events')
         .select('id, status')
         .eq('id', eventId)
         .maybeSingle()
-      if (!ev) return err(rpc.id, -31050, 'Event not found', 'event_id')
-      if (ev.status === 'active') return err(rpc.id, -31099, 'Already paid')
+      if (!ev)
+        return err(rpc.id, -31050, 'Event not found', 'event_id')
+      if (ev.status === 'active')
+        return err(rpc.id, -31099, 'Already paid')
       return ok(rpc.id, { allow: true })
     }
 
     case 'CreateTransaction': {
-      if (!paymentId) return err(rpc.id, -31050, 'Missing payment_id', 'payment_id')
+      if (!paymentId)
+        return err(rpc.id, -31050, 'Missing payment_id', 'payment_id')
       const { data: payment } = await admin
         .from('payments')
         .select('id, status, amount, metadata')
         .eq('id', paymentId)
         .maybeSingle()
-      if (!payment) return err(rpc.id, -31050, 'Payment not found', 'payment_id')
+      if (!payment)
+        return err(rpc.id, -31050, 'Payment not found', 'payment_id')
       if (payment.amount !== Number(rpc.params.amount)) {
         return err(rpc.id, -31001, 'Wrong amount')
       }
@@ -103,7 +108,8 @@ export default defineEventHandler(async (event) => {
         .select('id, status, event_id, metadata')
         .eq('provider_transaction_id', txId)
         .maybeSingle()
-      if (!payment) return err(rpc.id, -31003, 'Transaction not found')
+      if (!payment)
+        return err(rpc.id, -31003, 'Transaction not found')
       const now = Date.now()
       if (payment.status !== 'paid') {
         await admin
@@ -128,7 +134,8 @@ export default defineEventHandler(async (event) => {
         .select('id, status, metadata')
         .eq('provider_transaction_id', txId)
         .maybeSingle()
-      if (!payment) return err(rpc.id, -31003, 'Transaction not found')
+      if (!payment)
+        return err(rpc.id, -31003, 'Transaction not found')
       const now = Date.now()
       await admin
         .from('payments')
@@ -147,12 +154,15 @@ export default defineEventHandler(async (event) => {
         .select('id, status, metadata')
         .eq('provider_transaction_id', txId)
         .maybeSingle()
-      if (!payment) return err(rpc.id, -31003, 'Transaction not found')
+      if (!payment)
+        return err(rpc.id, -31003, 'Transaction not found')
       const md = (payment.metadata as any) ?? {}
-      const state =
-        payment.status === 'paid' ? 2 :
-        payment.status === 'cancelled' ? (md.payme_perform_time ? -2 : -1) :
-        1
+      const state
+        = payment.status === 'paid'
+          ? 2
+          : payment.status === 'cancelled'
+            ? (md.payme_perform_time ? -2 : -1)
+            : 1
       return ok(rpc.id, {
         create_time: md.payme_create_time ?? 0,
         perform_time: md.payme_perform_time ?? 0,

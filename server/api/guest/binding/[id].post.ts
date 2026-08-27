@@ -1,6 +1,6 @@
+import type { Database } from '~/types/database.types'
 import { z } from 'zod'
 import { serverSupabaseServiceRole } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 
 /**
  * POST /api/guest/binding/[id]
@@ -40,11 +40,13 @@ function fail(statusCode: number, code: string): never {
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) fail(400, 'invalid_id')
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id))
+    fail(400, 'invalid_id')
 
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success)
+    fail(422, 'invalid_input')
 
   const admin = serverSupabaseServiceRole<Database>(event)
 
@@ -53,8 +55,10 @@ export default defineEventHandler(async (event) => {
     .select('id, status')
     .eq('id', id!)
     .maybeSingle()
-  if (!ev) fail(404, 'event_not_found')
-  if (ev!.status !== 'active') fail(403, 'event_not_active')
+  if (!ev)
+    fail(404, 'event_not_found')
+  if (ev!.status !== 'active')
+    fail(403, 'event_not_active')
 
   // Existing binding takes priority over the new (event, table)
   // pair from the URL — we never silently overwrite the table the

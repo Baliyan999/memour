@@ -7,7 +7,11 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.2.11",
@@ -16,6 +20,7 @@
     "@nuxtjs/google-fonts": "^3.2.0",
     "@nuxtjs/i18n": "^10.3.0",
     "@nuxtjs/supabase": "^2.0.8",
+    "@sentry/nuxt": "^8.26.0",
     "@tailwindcss/vite": "^4.3.0",
     "@vuepic/vue-datepicker": "^12.1.0",
     "@vueuse/core": "^14.3.0",
@@ -35,10 +40,16 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@antfu/eslint-config": "^9.3.0",
     "@types/archiver": "^7.0.0",
     "@types/pdfkit": "^0.17.6",
     "@types/qrcode": "^1.5.6",
+    "eslint": "^10.8.1",
     "typescript": "6.0.3",
     "vue-tsc": "3.3.9"
+  },
+  "resolutions": {
+    "chokidar": "3.6.0",
+    "semver": "7.6.3"
   }
 }

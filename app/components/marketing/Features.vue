@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { motion, useReducedMotion } from 'motion-v'
 import { computed } from 'vue'
 import { useI18n } from '#imports'
-import { motion, useReducedMotion } from 'motion-v'
 
 /**
  * Features — "Что внутри". Asymmetric bento with 6 cards. Each carries
@@ -17,7 +17,7 @@ const reduce = useReducedMotion()
 type CardKey = 'slideshow' | 'video' | 'voice' | 'swipe' | 'geofence' | 'telegram'
 
 const ORDER: CardKey[] = ['slideshow', 'video', 'voice', 'swipe', 'geofence', 'telegram']
-const META: Record<CardKey, { hue: number; span: string }> = {
+const META: Record<CardKey, { hue: number, span: string }> = {
   slideshow: { hue: 25, span: 'sm:col-span-2 lg:col-span-2 lg:row-span-2' },
   video: { hue: 55, span: '' },
   voice: { hue: 75, span: '' },
@@ -68,7 +68,9 @@ const titleWords = computed(() => titleText.value.split(' '))
             :viewport="{ once: true, amount: 0.4 }"
             :transition="{ duration: 0.85, delay: i * 0.07, ease: [0.16, 1, 0.3, 1] }"
             class="mr-[0.25em] inline-block"
-          >{{ w }}</motion.span>
+          >
+            {{ w }}
+          </motion.span>
         </h2>
         <motion.p
           :initial="{ opacity: 0, y: 12 }"
@@ -98,8 +100,7 @@ const titleWords = computed(() => titleText.value.split(' '))
           :while-in-view="reduce ? { opacity: 1 } : { opacity: 1, y: 0 }"
           :viewport="{ once: true, amount: 0.15 }"
           :transition="{ duration: 0.7, delay: reduce ? 0 : card.index * 0.07, ease: [0.16, 1, 0.3, 1] }"
-          :class="[
-            'group relative isolate flex h-[520px] w-[82%] shrink-0 snap-center flex-col overflow-hidden rounded-(--radius-xl) border border-(--color-border)/60 bg-white/80 backdrop-blur-sm transition-[border-color] duration-500 hover:border-(--color-primary)/40 sm:h-auto sm:w-auto sm:shrink',
+          class="group relative isolate flex h-[520px] w-[82%] shrink-0 snap-center flex-col overflow-hidden rounded-(--radius-xl) border border-(--color-border)/60 bg-white/80 backdrop-blur-sm transition-[border-color] duration-500 hover:border-(--color-primary)/40 sm:h-auto sm:w-auto sm:shrink" :class="[
             card.span,
           ]"
           :style="{ boxShadow: 'var(--shadow-soft)' }"
@@ -131,8 +132,7 @@ const titleWords = computed(() => titleText.value.split(' '))
                after the fixed mockup stage, keeping all cards' visible
                heights identical in the carousel. -->
           <div
-            :class="[
-              'relative flex-1 border-t border-(--color-border)/60 bg-white/70 backdrop-blur-sm',
+            class="relative flex-1 border-t border-(--color-border)/60 bg-white/70 backdrop-blur-sm" :class="[
               card.key === 'slideshow' ? 'p-6 sm:p-7' : 'p-5 sm:p-6',
             ]"
           >
@@ -153,15 +153,18 @@ const titleWords = computed(() => titleText.value.split(' '))
                   ? 'text-2xl text-(--color-foreground) sm:text-3xl 3xl:text-4xl 4xl:text-5xl'
                   : 'text-lg text-(--color-foreground) sm:text-xl 3xl:text-2xl 4xl:text-3xl'
               "
-            >{{ card.title }}</h3>
+            >
+              {{ card.title }}
+            </h3>
             <p
-              :class="[
-                'mt-1.5 text-pretty leading-relaxed text-(--color-muted-foreground)',
+              class="mt-1.5 text-pretty leading-relaxed text-(--color-muted-foreground)" :class="[
                 card.key === 'slideshow'
                   ? 'text-sm sm:text-base 3xl:text-lg 4xl:text-xl'
                   : 'text-[13px] sm:text-sm 3xl:text-base 4xl:text-lg',
               ]"
-            >{{ card.desc }}</p>
+            >
+              {{ card.desc }}
+            </p>
           </div>
         </motion.li>
       </ul>

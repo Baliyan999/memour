@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import type { Database } from '~/types/database.types'
+import { onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n, useLocalePath } from '#imports'
-import type { Database } from '~/types/database.types'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -25,7 +25,8 @@ const { data: ev } = await useAsyncData(`event-branding-${id}`, async () => {
     .select('id, couple_names, branding(*)')
     .eq('id', id)
     .single()
-  if (error) throw error
+  if (error)
+    throw error
   return data
 })
 
@@ -48,13 +49,15 @@ onMounted(() => {
     form.groom_name = b.groom_name ?? ''
     form.accent_color = b.accent_color ?? '#a67c52'
     form.greeting_text = b.greeting_text ?? ''
-    if (b.cover_photo) coverPreviewUrl.value = b.cover_photo
+    if (b.cover_photo)
+      coverPreviewUrl.value = b.cover_photo
   }
 })
 
 function onCoverChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
+  if (!file)
+    return
   coverFile.value = file
   if (coverPreviewUrl.value && coverPreviewUrl.value.startsWith('blob:')) {
     URL.revokeObjectURL(coverPreviewUrl.value)
@@ -72,23 +75,27 @@ async function save() {
     fd.append('groom_name', form.groom_name)
     fd.append('accent_color', form.accent_color)
     fd.append('greeting_text', form.greeting_text)
-    if (coverFile.value) fd.append('cover_photo', coverFile.value)
-    const res = await $fetch<{ ok: boolean; cover_photo: string | null }>(
+    if (coverFile.value)
+      fd.append('cover_photo', coverFile.value)
+    const res = await $fetch<{ ok: boolean, cover_photo: string | null }>(
       `/api/couple/branding/${id}`,
       { method: 'POST', body: fd },
     )
     saved.value = true
-    if (res.cover_photo) coverPreviewUrl.value = res.cover_photo
+    if (res.cover_photo)
+      coverPreviewUrl.value = res.cover_photo
     coverFile.value = null
-  } catch (e: any) {
+  }
+  catch (e: any) {
     const code = e?.data?.data?.code ?? e?.data?.code
-    error.value =
-      code === 'file_too_large'
+    error.value
+      = code === 'file_too_large'
         ? t('couple.branding.tooLarge')
         : code === 'unsupported_mime'
           ? t('couple.branding.unsupportedFormat')
           : t('couple.branding.saveFailed')
-  } finally {
+  }
+  finally {
     pending.value = false
   }
 }
@@ -105,7 +112,9 @@ async function save() {
       </svg>
       {{ t('couple.event.back') }}
     </NuxtLink>
-    <h1 class="heading-display-md mb-1">{{ t('couple.branding.title') }}</h1>
+    <h1 class="heading-display-md mb-1">
+      {{ t('couple.branding.title') }}
+    </h1>
     <p class="mb-6 text-(--color-muted-foreground)">
       {{ t('couple.branding.desc') }}
     </p>

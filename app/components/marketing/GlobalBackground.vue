@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { motion, useScroll, useTransform, useReducedMotion, useMotionValue, useSpring } from 'motion-v'
 import { useMouse, useWindowSize } from '@vueuse/core'
+import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from 'motion-v'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 /**
  * GlobalBackground — single fixed-position canvas behind every page.
@@ -32,7 +32,8 @@ function tick() {
   raf = requestAnimationFrame(tick)
 }
 onMounted(() => {
-  if (!reduce.value) raf = requestAnimationFrame(tick)
+  if (!reduce.value)
+    raf = requestAnimationFrame(tick)
 })
 onBeforeUnmount(() => cancelAnimationFrame(raf))
 
@@ -57,41 +58,70 @@ const veilY = useTransform(scrollYProgress, [0, 1], ['0%', '100%'])
 
 // Deterministic star positions — keys ensure SSR/CSR match.
 const STARS_SHALLOW = [
-  { x: 8, y: 12, size: 3, delay: 0.0 }, { x: 18, y: 28, size: 2, delay: 1.4 },
-  { x: 32, y: 8, size: 4, delay: 2.6 }, { x: 46, y: 22, size: 3, delay: 3.8 },
-  { x: 58, y: 14, size: 2, delay: 5.1 }, { x: 72, y: 26, size: 3, delay: 0.9 },
-  { x: 86, y: 10, size: 4, delay: 2.2 }, { x: 94, y: 32, size: 2, delay: 3.5 },
-  { x: 12, y: 48, size: 3, delay: 4.7 }, { x: 28, y: 56, size: 2, delay: 1.2 },
-  { x: 44, y: 44, size: 4, delay: 2.9 }, { x: 62, y: 52, size: 3, delay: 4.4 },
-  { x: 78, y: 58, size: 2, delay: 0.6 }, { x: 90, y: 48, size: 3, delay: 1.8 },
-  { x: 6, y: 72, size: 4, delay: 3.1 }, { x: 20, y: 78, size: 2, delay: 4.6 },
-  { x: 38, y: 82, size: 3, delay: 0.3 }, { x: 54, y: 76, size: 4, delay: 2.4 },
-  { x: 68, y: 84, size: 2, delay: 3.9 }, { x: 82, y: 72, size: 3, delay: 5.2 },
+  { x: 8, y: 12, size: 3, delay: 0.0 },
+  { x: 18, y: 28, size: 2, delay: 1.4 },
+  { x: 32, y: 8, size: 4, delay: 2.6 },
+  { x: 46, y: 22, size: 3, delay: 3.8 },
+  { x: 58, y: 14, size: 2, delay: 5.1 },
+  { x: 72, y: 26, size: 3, delay: 0.9 },
+  { x: 86, y: 10, size: 4, delay: 2.2 },
+  { x: 94, y: 32, size: 2, delay: 3.5 },
+  { x: 12, y: 48, size: 3, delay: 4.7 },
+  { x: 28, y: 56, size: 2, delay: 1.2 },
+  { x: 44, y: 44, size: 4, delay: 2.9 },
+  { x: 62, y: 52, size: 3, delay: 4.4 },
+  { x: 78, y: 58, size: 2, delay: 0.6 },
+  { x: 90, y: 48, size: 3, delay: 1.8 },
+  { x: 6, y: 72, size: 4, delay: 3.1 },
+  { x: 20, y: 78, size: 2, delay: 4.6 },
+  { x: 38, y: 82, size: 3, delay: 0.3 },
+  { x: 54, y: 76, size: 4, delay: 2.4 },
+  { x: 68, y: 84, size: 2, delay: 3.9 },
+  { x: 82, y: 72, size: 3, delay: 5.2 },
 ]
 const STARS_DEEP = [
-  { x: 14, y: 18, size: 5, delay: 1.1 }, { x: 36, y: 36, size: 6, delay: 3.2 },
-  { x: 64, y: 16, size: 5, delay: 0.4 }, { x: 88, y: 40, size: 6, delay: 2.7 },
-  { x: 22, y: 60, size: 5, delay: 4.5 }, { x: 48, y: 68, size: 6, delay: 1.6 },
-  { x: 74, y: 64, size: 5, delay: 3.0 }, { x: 10, y: 88, size: 6, delay: 0.8 },
-  { x: 32, y: 92, size: 5, delay: 2.1 }, { x: 56, y: 88, size: 6, delay: 4.0 },
-  { x: 78, y: 90, size: 5, delay: 5.5 }, { x: 94, y: 76, size: 6, delay: 1.9 },
-  { x: 4, y: 32, size: 5, delay: 3.6 }, { x: 42, y: 4, size: 6, delay: 4.8 },
+  { x: 14, y: 18, size: 5, delay: 1.1 },
+  { x: 36, y: 36, size: 6, delay: 3.2 },
+  { x: 64, y: 16, size: 5, delay: 0.4 },
+  { x: 88, y: 40, size: 6, delay: 2.7 },
+  { x: 22, y: 60, size: 5, delay: 4.5 },
+  { x: 48, y: 68, size: 6, delay: 1.6 },
+  { x: 74, y: 64, size: 5, delay: 3.0 },
+  { x: 10, y: 88, size: 6, delay: 0.8 },
+  { x: 32, y: 92, size: 5, delay: 2.1 },
+  { x: 56, y: 88, size: 6, delay: 4.0 },
+  { x: 78, y: 90, size: 5, delay: 5.5 },
+  { x: 94, y: 76, size: 6, delay: 1.9 },
+  { x: 4, y: 32, size: 5, delay: 3.6 },
+  { x: 42, y: 4, size: 6, delay: 4.8 },
   { x: 70, y: 38, size: 5, delay: 0.2 },
 ]
 
 const PARTICLES = [
-  { x: 5, size: 3, duration: 24, delay: 0 }, { x: 12, size: 2, duration: 32, delay: 4 },
-  { x: 20, size: 4, duration: 28, delay: 9 }, { x: 28, size: 2, duration: 36, delay: 14 },
-  { x: 35, size: 3, duration: 22, delay: 2 }, { x: 42, size: 5, duration: 30, delay: 11 },
-  { x: 48, size: 2, duration: 26, delay: 18 }, { x: 54, size: 3, duration: 34, delay: 5 },
-  { x: 61, size: 4, duration: 28, delay: 16 }, { x: 68, size: 2, duration: 22, delay: 8 },
-  { x: 74, size: 3, duration: 32, delay: 3 }, { x: 80, size: 5, duration: 26, delay: 13 },
-  { x: 86, size: 2, duration: 30, delay: 6 }, { x: 92, size: 3, duration: 24, delay: 19 },
-  { x: 16, size: 2, duration: 38, delay: 21 }, { x: 38, size: 4, duration: 28, delay: 7 },
-  { x: 58, size: 2, duration: 34, delay: 15 }, { x: 78, size: 4, duration: 26, delay: 1 },
-  { x: 8, size: 3, duration: 36, delay: 17 }, { x: 32, size: 2, duration: 30, delay: 10 },
-  { x: 50, size: 4, duration: 22, delay: 12 }, { x: 70, size: 3, duration: 32, delay: 20 },
-  { x: 88, size: 4, duration: 28, delay: 6 }, { x: 24, size: 5, duration: 34, delay: 23 },
+  { x: 5, size: 3, duration: 24, delay: 0 },
+  { x: 12, size: 2, duration: 32, delay: 4 },
+  { x: 20, size: 4, duration: 28, delay: 9 },
+  { x: 28, size: 2, duration: 36, delay: 14 },
+  { x: 35, size: 3, duration: 22, delay: 2 },
+  { x: 42, size: 5, duration: 30, delay: 11 },
+  { x: 48, size: 2, duration: 26, delay: 18 },
+  { x: 54, size: 3, duration: 34, delay: 5 },
+  { x: 61, size: 4, duration: 28, delay: 16 },
+  { x: 68, size: 2, duration: 22, delay: 8 },
+  { x: 74, size: 3, duration: 32, delay: 3 },
+  { x: 80, size: 5, duration: 26, delay: 13 },
+  { x: 86, size: 2, duration: 30, delay: 6 },
+  { x: 92, size: 3, duration: 24, delay: 19 },
+  { x: 16, size: 2, duration: 38, delay: 21 },
+  { x: 38, size: 4, duration: 28, delay: 7 },
+  { x: 58, size: 2, duration: 34, delay: 15 },
+  { x: 78, size: 4, duration: 26, delay: 1 },
+  { x: 8, size: 3, duration: 36, delay: 17 },
+  { x: 32, size: 2, duration: 30, delay: 10 },
+  { x: 50, size: 4, duration: 22, delay: 12 },
+  { x: 70, size: 3, duration: 32, delay: 20 },
+  { x: 88, size: 4, duration: 28, delay: 6 },
+  { x: 24, size: 5, duration: 34, delay: 23 },
 ]
 
 const LIGHT_RAYS = [
@@ -147,7 +177,7 @@ const LIGHT_RAYS = [
         <div
           v-for="(r, i) in LIGHT_RAYS"
           :key="i"
-          :class="['pointer-events-none absolute left-[-20%] h-[60px] w-[140%] will-change-transform', r.cls]"
+          class="pointer-events-none absolute left-[-20%] h-[60px] w-[140%] will-change-transform" :class="[r.cls]"
           :style="{
             top: r.top,
             transform: `rotate(${r.rot}deg)`,
@@ -181,7 +211,7 @@ const LIGHT_RAYS = [
         v-if="!reduce"
         class="absolute inset-0 will-change-transform"
         :style="{
-          backgroundImage:
+          'backgroundImage':
             'radial-gradient(circle 1100px at var(--vx) var(--vy), oklch(80% 0.15 35 / 0.45), transparent 60%)',
           '--vx': veilX,
           '--vy': veilY,

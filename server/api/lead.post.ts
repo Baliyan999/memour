@@ -1,6 +1,6 @@
+import type { Database } from '~/types/database.types'
 import { z } from 'zod'
 import { serverSupabaseServiceRole } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 
 /**
  * POST /api/lead — landing page contact form submission. Validates,
@@ -66,7 +66,8 @@ export default defineEventHandler(async (event) => {
         .from('referral_attributions')
         .insert({ referral_id: ref.id, lead_id: lead.id })
         .then(({ error: aErr }) => {
-          if (aErr) console.error('[lead] attribution insert', aErr)
+          if (aErr)
+            console.error('[lead] attribution insert', aErr)
         })
     }
   }
@@ -81,15 +82,16 @@ export default defineEventHandler(async (event) => {
 async function notifyTelegram(lead: LeadInput) {
   const token = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_LEAD_CHAT_ID
-  if (!token || !chatId) return
+  if (!token || !chatId)
+    return
 
-  const text =
-    `🎉 Новая заявка\n` +
-    `Имя: ${lead.name}\n` +
-    `Тел: ${lead.phone}\n` +
-    (lead.wedding_date ? `Дата: ${lead.wedding_date}\n` : '') +
-    (lead.guests_estimate ? `Гостей: ${lead.guests_estimate}\n` : '') +
-    (lead.source ? `Источник: ${lead.source}` : '')
+  const text
+    = `🎉 Новая заявка\n`
+      + `Имя: ${lead.name}\n`
+      + `Тел: ${lead.phone}\n${
+        lead.wedding_date ? `Дата: ${lead.wedding_date}\n` : ''
+      }${lead.guests_estimate ? `Гостей: ${lead.guests_estimate}\n` : ''
+      }${lead.source ? `Источник: ${lead.source}` : ''}`
 
   await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',

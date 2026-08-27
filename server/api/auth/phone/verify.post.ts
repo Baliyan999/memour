@@ -1,6 +1,6 @@
+import type { Database } from '~/types/database.types'
 import { z } from 'zod'
 import { serverSupabaseServiceRole } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 import { hashCode, normalizePhone } from '../../../utils/phone-otp'
 
 /**
@@ -39,10 +39,12 @@ function fail(statusCode: number, code: string): never {
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success)
+    fail(422, 'invalid_input')
 
   const phone = normalizePhone(parsed.data.phone)
-  if (!phone) fail(422, 'invalid_phone')
+  if (!phone)
+    fail(422, 'invalid_phone')
 
   const code_hash = hashCode(phone, parsed.data.code)
   const admin = serverSupabaseServiceRole<Database>(event)
@@ -55,9 +57,12 @@ export default defineEventHandler(async (event) => {
     .is('consumed_at', null)
     .maybeSingle()
 
-  if (!otp) fail(401, 'invalid_code')
-  if (new Date(otp.expires_at).getTime() < Date.now()) fail(410, 'code_expired')
-  if ((otp.attempts ?? 0) >= MAX_ATTEMPTS) fail(429, 'too_many_attempts')
+  if (!otp)
+    fail(401, 'invalid_code')
+  if (new Date(otp.expires_at).getTime() < Date.now())
+    fail(410, 'code_expired')
+  if ((otp.attempts ?? 0) >= MAX_ATTEMPTS)
+    fail(429, 'too_many_attempts')
 
   // One-shot: mark consumed.
   await admin
@@ -83,15 +88,19 @@ export default defineEventHandler(async (event) => {
   })
   if (created?.user) {
     userId = created.user.id
-  } else if (createErr) {
-    const alreadyExists =
-      /already.*registered|already.*exists|duplicate/i.test(createErr.message)
-    if (!alreadyExists) fail(500, 'user_create_failed')
+  }
+  else if (createErr) {
+    const alreadyExists
+      = /already.*registered|already.*exists|duplicate/i.test(createErr.message)
+    if (!alreadyExists)
+      fail(500, 'user_create_failed')
     const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000, page: 1 })
-    const found = list?.users.find((u) => u.email === syntheticEmail)
-    if (!found) fail(500, 'user_lookup_failed')
+    const found = list?.users.find(u => u.email === syntheticEmail)
+    if (!found)
+      fail(500, 'user_lookup_failed')
     userId = found!.id
-  } else {
+  }
+  else {
     fail(500, 'user_create_failed')
   }
 
@@ -111,7 +120,8 @@ export default defineEventHandler(async (event) => {
       .update({ owner_id: userId })
       .eq('owner_phone', phone)
       .is('owner_id', null)
-  } catch (e) {
+  }
+  catch (e) {
     console.warn('[phone-otp] event claim failed', e)
   }
 

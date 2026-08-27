@@ -1,7 +1,7 @@
-import { z } from 'zod'
-import { createHash, randomInt } from 'node:crypto'
-import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { createHash, randomInt } from 'node:crypto'
+import { z } from 'zod'
+import { serverSupabaseServiceRole } from '#supabase/server'
 import { sendTelegram } from '../../utils/telegram'
 
 /**
@@ -38,7 +38,8 @@ function hashCode(email: string, code: string): string {
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(400, 'bad_credentials')
+  if (!parsed.success)
+    fail(400, 'bad_credentials')
 
   const email = parsed.data.email.trim().toLowerCase()
   const password = parsed.data.password
@@ -54,10 +55,12 @@ export default defineEventHandler(async (event) => {
     },
     body: JSON.stringify({ email, password }),
   })
-  if (!tokenRes.ok) fail(401, 'bad_credentials')
+  if (!tokenRes.ok)
+    fail(401, 'bad_credentials')
   const tokenJson = (await tokenRes.json()) as any
   const userId: string | undefined = tokenJson?.user?.id
-  if (!userId) fail(401, 'bad_credentials')
+  if (!userId)
+    fail(401, 'bad_credentials')
 
   // --- 2. Confirm admin row + read chat_id ---
   const admin = serverSupabaseServiceRole<Database>(event)
@@ -66,9 +69,11 @@ export default defineEventHandler(async (event) => {
     .select('user_id, telegram_chat_id, role')
     .eq('user_id', userId)
     .maybeSingle()
-  if (!adminRow) fail(403, 'not_admin')
+  if (!adminRow)
+    fail(403, 'not_admin')
   const chatId = (adminRow as any).telegram_chat_id as string | null
-  if (!chatId) fail(409, 'no_chat_id')
+  if (!chatId)
+    fail(409, 'no_chat_id')
 
   // --- 3. Rate limit + generate code ---
   const since = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString()
@@ -79,7 +84,8 @@ export default defineEventHandler(async (event) => {
     .is('consumed_at', null)
     .gte('created_at', since)
     .limit(1)
-  if (recent && recent.length > 0) fail(429, 'too_many_requests')
+  if (recent && recent.length > 0)
+    fail(429, 'too_many_requests')
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0')
   const code_hash = hashCode(email, code)
@@ -96,13 +102,14 @@ export default defineEventHandler(async (event) => {
   }
 
   // --- 4. Send via Telegram ---
-  const text =
-    `🔐 Memour admin\n` +
-    `Код входа: <b>${code}</b>\n` +
-    `Действителен 10 минут. Если это были не вы — игнорируйте.`
+  const text
+    = `🔐 Memour admin\n`
+      + `Код входа: <b>${code}</b>\n`
+      + `Действителен 10 минут. Если это были не вы — игнорируйте.`
   try {
     await sendTelegram(text, chatId)
-  } catch (e) {
+  }
+  catch (e) {
     console.error('[admin-auth] tg send failed', e)
     fail(502, 'telegram_failed')
   }

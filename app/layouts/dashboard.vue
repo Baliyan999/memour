@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useI18n, useLocalePath } from '#imports'
 import { ArrowLeft } from '@lucide/vue'
+import { useI18n, useLocalePath } from '#imports'
 
 /**
  * Dashboard layout — couple-facing chrome around the protected pages.
@@ -40,7 +40,7 @@ async function signOut() {
             <NuxtLink
               :to="localePath('/dashboard/settings')"
               class="grid h-9 w-9 place-items-center rounded-full border border-(--color-border)/60 bg-white/80 text-(--color-muted-foreground) transition-colors hover:bg-white hover:text-(--color-foreground)"
-              :aria-label="'Настройки'"
+              aria-label="Настройки"
             >
               <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3" />

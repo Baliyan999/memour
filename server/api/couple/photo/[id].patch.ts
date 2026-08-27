@@ -1,9 +1,9 @@
+import type { Database } from '~/types/database.types'
 import { z } from 'zod'
 import {
-  serverSupabaseUser,
   serverSupabaseServiceRole,
+  serverSupabaseUser,
 } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 
 /**
  * PATCH /api/couple/photo/[id] — toggle is_hidden / is_highlight on
@@ -25,14 +25,17 @@ const schema = z.object({
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) fail(401, 'unauthorized')
+  if (!user)
+    fail(401, 'unauthorized')
 
   const id = getRouterParam(event, 'id')
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) fail(400, 'invalid_id')
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id))
+    fail(400, 'invalid_id')
 
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success)
+    fail(422, 'invalid_input')
   if (parsed.data.is_hidden === undefined && parsed.data.is_highlight === undefined) {
     fail(422, 'nothing_to_update')
   }
@@ -45,18 +48,23 @@ export default defineEventHandler(async (event) => {
     .select('id, event_id, events!inner(owner_id)')
     .eq('id', id!)
     .maybeSingle()
-  if (!photo) fail(404, 'photo_not_found')
-  if (photo.events.owner_id !== ((user as any).id ?? (user as any).sub)) fail(403, 'forbidden')
+  if (!photo)
+    fail(404, 'photo_not_found')
+  if (photo.events.owner_id !== ((user as any).id ?? (user as any).sub))
+    fail(403, 'forbidden')
 
-  const updates: { is_hidden?: boolean; is_highlight?: boolean } = {}
-  if (parsed.data.is_hidden !== undefined) updates.is_hidden = parsed.data.is_hidden
-  if (parsed.data.is_highlight !== undefined) updates.is_highlight = parsed.data.is_highlight
+  const updates: { is_hidden?: boolean, is_highlight?: boolean } = {}
+  if (parsed.data.is_hidden !== undefined)
+    updates.is_hidden = parsed.data.is_hidden
+  if (parsed.data.is_highlight !== undefined)
+    updates.is_highlight = parsed.data.is_highlight
 
   const { error } = await admin
     .from('photos')
     .update(updates)
     .eq('id', id!)
-  if (error) fail(500, 'update_failed')
+  if (error)
+    fail(500, 'update_failed')
 
   return { ok: true }
 })

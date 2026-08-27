@@ -41,7 +41,8 @@ export function useConfirm() {
     state,
     decide(ok: boolean) {
       const c = state.current
-      if (!c) return
+      if (!c)
+        return
       state.current = null
       c.resolve(ok)
     },

@@ -1,9 +1,9 @@
+import type { Database } from '~/types/database.types'
 import { z } from 'zod'
 import {
-  serverSupabaseUser,
   serverSupabaseServiceRole,
+  serverSupabaseUser,
 } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 
 /**
  * PATCH /api/couple/event/[id]/status — couple changes event status.
@@ -25,14 +25,17 @@ const schema = z.object({
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) fail(401, 'unauthorized')
+  if (!user)
+    fail(401, 'unauthorized')
 
   const id = getRouterParam(event, 'id')
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) fail(400, 'invalid_id')
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id))
+    fail(400, 'invalid_id')
 
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success)
+    fail(422, 'invalid_input')
 
   const admin = serverSupabaseServiceRole<Database>(event)
 
@@ -41,14 +44,17 @@ export default defineEventHandler(async (event) => {
     .select('id, status, owner_id')
     .eq('id', id!)
     .maybeSingle()
-  if (!ev) fail(404, 'event_not_found')
-  if (ev!.owner_id !== ((user as any).id ?? (user as any).sub)) fail(403, 'forbidden')
+  if (!ev)
+    fail(404, 'event_not_found')
+  if (ev!.owner_id !== ((user as any).id ?? (user as any).sub))
+    fail(403, 'forbidden')
 
   // Validate transition.
-  const allowed =
-    (ev!.status === 'draft' && parsed.data.status === 'active') ||
-    (ev!.status === 'active' && parsed.data.status === 'archived')
-  if (!allowed) fail(409, 'invalid_transition')
+  const allowed
+    = (ev!.status === 'draft' && parsed.data.status === 'active')
+      || (ev!.status === 'active' && parsed.data.status === 'archived')
+  if (!allowed)
+    fail(409, 'invalid_transition')
 
   // Draft → active requires at least one paid payment.
   if (ev!.status === 'draft' && parsed.data.status === 'active') {
@@ -58,14 +64,16 @@ export default defineEventHandler(async (event) => {
       .eq('event_id', ev!.id)
       .eq('status', 'paid')
       .limit(1)
-    if (!payments || payments.length === 0) fail(402, 'payment_required')
+    if (!payments || payments.length === 0)
+      fail(402, 'payment_required')
   }
 
   const { error } = await admin
     .from('events')
     .update({ status: parsed.data.status })
     .eq('id', ev!.id)
-  if (error) fail(500, 'update_failed')
+  if (error)
+    fail(500, 'update_failed')
 
   return { ok: true }
 })

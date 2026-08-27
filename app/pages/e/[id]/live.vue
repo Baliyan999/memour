@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute } from 'vue-router'
-import { motion, AnimatePresence } from 'motion-v'
 import type { Database } from '~/types/database.types'
+import { AnimatePresence, motion } from 'motion-v'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 definePageMeta({ layout: 'guest' })
 
@@ -43,14 +43,16 @@ const { data: initial } = await useFetch<{
 if (initial.value) {
   queue.value = initial.value.photos
   eventName.value = initial.value.event.couple_names
-  if (queue.value.length > 0) featured.value = queue.value[0]!
+  if (queue.value.length > 0)
+    featured.value = queue.value[0]!
 }
 
 const photoUrl = (id: string) => `/api/photo/${id}`
 
 let rotateTimer: number | undefined
 function rotateFeatured() {
-  if (queue.value.length === 0) return
+  if (queue.value.length === 0)
+    return
   // Rotate by picking a random recent photo to keep variety even
   // when uploads slow down.
   const pool = queue.value.slice(0, 12)
@@ -73,7 +75,8 @@ onMounted(() => {
       },
       (payload) => {
         const row = payload.new as any
-        if (row.is_hidden) return
+        if (row.is_hidden)
+          return
         const item: PhotoItem = {
           id: row.id,
           uploaded_at: row.uploaded_at,
@@ -85,7 +88,8 @@ onMounted(() => {
         featured.value = item
         // Reset the rotation timer so the new photo gets full
         // attention before we start cycling again.
-        if (rotateTimer) clearInterval(rotateTimer)
+        if (rotateTimer)
+          clearInterval(rotateTimer)
         rotateTimer = window.setInterval(rotateFeatured, 7_000) as unknown as number
       },
     )
@@ -96,8 +100,10 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  if (rotateTimer) clearInterval(rotateTimer)
-  if (channel) supabase.removeChannel(channel)
+  if (rotateTimer)
+    clearInterval(rotateTimer)
+  if (channel)
+    supabase.removeChannel(channel)
 })
 
 useSeoMeta({
@@ -106,7 +112,7 @@ useSeoMeta({
 
 // Pseudo-random offsets per photo for the background mosaic so it
 // feels organic instead of grid-aligned. Computed once per id.
-const mosaicStyle = (id: string, i: number) => {
+function mosaicStyle(id: string, i: number) {
   // Deterministic from photo id so positions don't jump on every
   // rerender; gives each photo a stable home in the mosaic.
   const seed = id.charCodeAt(0) + id.charCodeAt(5) + i
@@ -136,7 +142,7 @@ const mosaicStyle = (id: string, i: number) => {
         >
           <img
             :src="`${photoUrl(p.id)}?t=thumb`"
-            :alt="''"
+            alt=""
             class="h-full w-full object-cover"
             loading="lazy"
           >
@@ -166,29 +172,41 @@ const mosaicStyle = (id: string, i: number) => {
           <div class="overflow-hidden rounded-lg bg-white p-3 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.6)]">
             <img
               :src="photoUrl(featured.id)"
-              :alt="''"
+              alt=""
               class="block max-h-[72vh] w-full rounded-md object-cover"
               loading="eager"
             >
             <div class="px-2 pt-3 text-center">
               <p class="font-display italic text-(--color-foreground)" style="font-size: 1.1rem">
-                <template v-if="featured.guest_name">от {{ featured.guest_name }}</template>
-                <template v-else>гость</template>
-                <template v-if="featured.guest_table"> · стол {{ featured.guest_table }}</template>
+                <template v-if="featured.guest_name">
+                  от {{ featured.guest_name }}
+                </template>
+                <template v-else>
+                  гость
+                </template>
+                <template v-if="featured.guest_table">
+                  · стол {{ featured.guest_table }}
+                </template>
               </p>
             </div>
           </div>
         </motion.div>
-        <div v-else class="text-center text-white/60" key="empty">
-          <p class="font-display text-3xl italic">Ждём первый кадр…</p>
+        <div v-else key="empty" class="text-center text-white/60">
+          <p class="font-display text-3xl italic">
+            Ждём первый кадр…
+          </p>
         </div>
       </AnimatePresence>
     </div>
 
     <!-- Corner brand -->
     <div class="absolute right-6 top-6 z-20 text-right text-white/80">
-      <p class="text-[10px] uppercase tracking-[0.4em]">Memour Live</p>
-      <p v-if="eventName" class="font-display text-xl italic">{{ eventName }}</p>
+      <p class="text-[10px] uppercase tracking-[0.4em]">
+        Memour Live
+      </p>
+      <p v-if="eventName" class="font-display text-xl italic">
+        {{ eventName }}
+      </p>
     </div>
 
     <!-- Photo count badge -->

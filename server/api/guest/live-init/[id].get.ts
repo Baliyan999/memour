@@ -1,5 +1,5 @@
-import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { serverSupabaseServiceRole } from '#supabase/server'
 
 /**
  * GET /api/guest/live-init/[id] — initial bootstrap data for the live
@@ -14,7 +14,8 @@ function fail(statusCode: number, code: string): never {
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) fail(400, 'invalid_id')
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id))
+    fail(400, 'invalid_id')
 
   const admin = serverSupabaseServiceRole<Database>(event)
 
@@ -23,7 +24,8 @@ export default defineEventHandler(async (event) => {
     .select('id, couple_names, status')
     .eq('id', id!)
     .maybeSingle()
-  if (!ev) fail(404, 'event_not_found')
+  if (!ev)
+    fail(404, 'event_not_found')
 
   const { data: photos } = await admin
     .from('photos')

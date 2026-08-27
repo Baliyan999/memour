@@ -1,22 +1,22 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { useI18n } from '#imports'
+import { Calendar, ChevronLeft, ChevronRight } from '@lucide/vue'
 import {
+  addDays,
   addMonths,
-  startOfMonth,
-  startOfWeek,
   endOfMonth,
   endOfWeek,
   format,
+  isAfter,
+  isBefore,
   isSameDay,
   isSameMonth,
-  isBefore,
-  isAfter,
   startOfDay,
-  addDays,
+  startOfMonth,
+  startOfWeek,
 } from 'date-fns'
 import { ru, uz } from 'date-fns/locale'
-import { Calendar, ChevronLeft, ChevronRight } from '@lucide/vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from '#imports'
 
 /**
  * DatePicker — locale-aware popup calendar matching the brand. Mirrors
@@ -45,7 +45,7 @@ const cursor = ref(startOfMonth(selected.value ?? today))
 
 const triggerEl = ref<HTMLButtonElement | null>(null)
 const popupEl = ref<HTMLDivElement | null>(null)
-const pos = ref<{ top: number; left: number; placement: 'above' | 'below' } | null>(null)
+const pos = ref<{ top: number, left: number, placement: 'above' | 'below' } | null>(null)
 
 const mounted = ref(false)
 onMounted(() => { mounted.value = true })
@@ -61,7 +61,8 @@ function emitSelected(d: Date | null) {
 }
 
 const triggerLabel = computed(() => {
-  if (!selected.value) return locale.value === 'uz' ? 'KK.OO.YYYY' : 'ДД.ММ.ГГГГ'
+  if (!selected.value)
+    return locale.value === 'uz' ? 'KK.OO.YYYY' : 'ДД.ММ.ГГГГ'
   return format(selected.value, 'dd.MM.yyyy')
 })
 
@@ -84,8 +85,7 @@ const weekDayLabels = computed(() => {
   // Mon..Sun, two-letter, lowercased — matches the original layout.
   const base = startOfWeek(new Date(), { weekStartsOn: 1 })
   return Array.from({ length: 7 }, (_, i) =>
-    format(addDays(base, i), 'EEEEEE', { locale: dfLocale.value }),
-  )
+    format(addDays(base, i), 'EEEEEE', { locale: dfLocale.value }))
 })
 
 const monthCaption = computed(() =>
@@ -97,7 +97,8 @@ function isDisabled(d: Date) {
 }
 
 function pickDay(d: Date) {
-  if (isDisabled(d)) return
+  if (isDisabled(d))
+    return
   emitSelected(d)
   open.value = false
 }
@@ -115,7 +116,8 @@ function nextMonthFn() {
 // top doesn't have enough room.
 function measure() {
   const trigger = triggerEl.value
-  if (!trigger) return
+  if (!trigger)
+    return
   const rect = trigger.getBoundingClientRect()
   const popupHeight = 320
   const spaceAbove = rect.top
@@ -129,14 +131,21 @@ function measure() {
 }
 
 watch(open, async (v) => {
-  if (!v) return
+  if (!v)
+    return
   cursor.value = startOfMonth(selected.value ?? today)
   await nextTick()
   measure()
 })
 
-function onScroll() { if (open.value) measure() }
-function onResize() { if (open.value) measure() }
+function onScroll() {
+  if (open.value)
+    measure()
+}
+function onResize() {
+  if (open.value)
+    measure()
+}
 
 onMounted(() => {
   window.addEventListener('scroll', onScroll, true)
@@ -152,14 +161,18 @@ onBeforeUnmount(() => {
 })
 
 function onPointer(e: PointerEvent) {
-  if (!open.value) return
+  if (!open.value)
+    return
   const t = e.target as Node
-  if (triggerEl.value?.contains(t)) return
-  if (popupEl.value?.contains(t)) return
+  if (triggerEl.value?.contains(t))
+    return
+  if (popupEl.value?.contains(t))
+    return
   open.value = false
 }
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') open.value = false
+  if (e.key === 'Escape')
+    open.value = false
 }
 </script>
 
@@ -236,8 +249,7 @@ function onKey(e: KeyboardEvent) {
               :key="d.toISOString()"
               type="button"
               :disabled="isDisabled(d)"
-              :class="[
-                'h-7 w-7 rounded-md text-[12px] transition-colors',
+              class="h-7 w-7 rounded-md text-[12px] transition-colors" :class="[
                 isSameMonth(d, cursor) ? '' : 'opacity-40',
                 isDisabled(d) ? 'cursor-not-allowed opacity-30' : 'hover:bg-(--color-accent)/50',
                 selected && isSameDay(d, selected)
@@ -247,7 +259,9 @@ function onKey(e: KeyboardEvent) {
                     : 'text-(--color-foreground)',
               ]"
               @click="pickDay(d)"
-            >{{ d.getDate() }}</button>
+            >
+              {{ d.getDate() }}
+            </button>
           </div>
         </div>
       </Transition>

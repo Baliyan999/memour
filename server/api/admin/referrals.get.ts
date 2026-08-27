@@ -1,8 +1,8 @@
-import {
-  serverSupabaseUser,
-  serverSupabaseServiceRole,
-} from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import {
+  serverSupabaseServiceRole,
+  serverSupabaseUser,
+} from '#supabase/server'
 
 /**
  * GET /api/admin/referrals — list referral codes with attribution
@@ -15,7 +15,8 @@ function fail(statusCode: number, code: string): never {
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) fail(401, 'unauthorized')
+  if (!user)
+    fail(401, 'unauthorized')
 
   const admin = serverSupabaseServiceRole<Database>(event)
   const { data: adminRow } = await admin
@@ -23,7 +24,8 @@ export default defineEventHandler(async (event) => {
     .select('user_id')
     .eq('user_id', ((user as any).id ?? (user as any).sub))
     .maybeSingle()
-  if (!adminRow) fail(403, 'forbidden')
+  if (!adminRow)
+    fail(403, 'forbidden')
 
   const { data: refs } = await admin
     .from('referrals')

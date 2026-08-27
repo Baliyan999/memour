@@ -1,5 +1,5 @@
-import { serverSupabaseUser } from '#supabase/server'
 import type { H3Event } from 'h3'
+import { serverSupabaseUser } from '#supabase/server'
 
 /**
  * Returns the auth user's ID. @nuxtjs/supabase v2 returns the
@@ -11,6 +11,7 @@ import type { H3Event } from 'h3'
  */
 export async function userId(event: H3Event): Promise<string | null> {
   const u = (await serverSupabaseUser(event)) as any
-  if (!u) return null
+  if (!u)
+    return null
   return u.id ?? u.sub ?? null
 }

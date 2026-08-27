@@ -13,7 +13,7 @@
  * approved via Eskiz' "Мои тексты" moderation, we can swap in the
  * production message verbatim.
  */
-let cachedToken: { value: string; obtainedAt: number } | null = null
+let cachedToken: { value: string, obtainedAt: number } | null = null
 
 async function login(): Promise<string> {
   const base = process.env.ESKIZ_BASE_URL || 'https://notify.eskiz.uz/api'
@@ -31,7 +31,8 @@ async function login(): Promise<string> {
   }
   const json: any = await res.json()
   const token = json?.data?.token
-  if (!token) throw new Error('Eskiz auth: no token in response')
+  if (!token)
+    throw new Error('Eskiz auth: no token in response')
   cachedToken = { value: token, obtainedAt: Date.now() }
   return token
 }

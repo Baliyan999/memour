@@ -1,4 +1,4 @@
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 /**
  * Opt-in fullscreen for the camera viewport.
@@ -29,10 +29,12 @@ export function useFullscreen() {
       const anyEl = el as any
       if (anyEl.requestFullscreen) {
         await anyEl.requestFullscreen()
-      } else if (anyEl.webkitRequestFullscreen) {
+      }
+      else if (anyEl.webkitRequestFullscreen) {
         anyEl.webkitRequestFullscreen()
       }
-    } catch {
+    }
+    catch {
       // Native API failed (most common on iOS Safari). The CSS path
       // already kicked in via `isFull = true`, so we're done.
     }
@@ -44,16 +46,19 @@ export function useFullscreen() {
       const anyDoc = document as any
       if (anyDoc.fullscreenElement && anyDoc.exitFullscreen) {
         await anyDoc.exitFullscreen()
-      } else if (anyDoc.webkitFullscreenElement && anyDoc.webkitExitFullscreen) {
+      }
+      else if (anyDoc.webkitFullscreenElement && anyDoc.webkitExitFullscreen) {
         anyDoc.webkitExitFullscreen()
       }
-    } catch {
+    }
+    catch {
       // ignore — flag is already false
     }
   }
 
   function toggle(el: HTMLElement) {
-    if (isFull.value) void exit()
+    if (isFull.value)
+      void exit()
     else void enter(el)
   }
 
@@ -68,15 +73,18 @@ export function useFullscreen() {
   }
 
   onMounted(() => {
-    if (typeof document === 'undefined') return
+    if (typeof document === 'undefined')
+      return
     document.addEventListener('fullscreenchange', onFsChange)
     document.addEventListener('webkitfullscreenchange', onFsChange)
   })
   onBeforeUnmount(() => {
-    if (typeof document === 'undefined') return
+    if (typeof document === 'undefined')
+      return
     document.removeEventListener('fullscreenchange', onFsChange)
     document.removeEventListener('webkitfullscreenchange', onFsChange)
-    if (isFull.value && target) void exit()
+    if (isFull.value && target)
+      void exit()
   })
 
   return { isFull, enter, exit, toggle }

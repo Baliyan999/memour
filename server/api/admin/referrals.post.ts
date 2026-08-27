@@ -1,9 +1,9 @@
+import type { Database } from '~/types/database.types'
 import { z } from 'zod'
 import {
-  serverSupabaseUser,
   serverSupabaseServiceRole,
+  serverSupabaseUser,
 } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 
 /**
  * POST /api/admin/referrals — create a referral code.
@@ -22,7 +22,8 @@ const schema = z.object({
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) fail(401, 'unauthorized')
+  if (!user)
+    fail(401, 'unauthorized')
 
   const admin = serverSupabaseServiceRole<Database>(event)
   const { data: adminRow } = await admin
@@ -30,11 +31,13 @@ export default defineEventHandler(async (event) => {
     .select('user_id')
     .eq('user_id', ((user as any).id ?? (user as any).sub))
     .maybeSingle()
-  if (!adminRow) fail(403, 'forbidden')
+  if (!adminRow)
+    fail(403, 'forbidden')
 
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success)
+    fail(422, 'invalid_input')
 
   const { data: created, error } = await admin
     .from('referrals')
@@ -47,7 +50,8 @@ export default defineEventHandler(async (event) => {
     .select()
     .single()
   if (error) {
-    if (/duplicate/i.test(error.message)) fail(409, 'duplicate_code')
+    if (/duplicate/i.test(error.message))
+      fail(409, 'duplicate_code')
     fail(500, 'insert_failed')
   }
 

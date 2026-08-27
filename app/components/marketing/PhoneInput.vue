@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 /**
  * PhoneInput — masked Uzbekistan number. The "+998 " prefix is always
@@ -24,11 +24,15 @@ function format(d: string): string {
   // Always render the +998 prefix, even when the user hasn't typed
   // anything yet. The trailing space gives the caret a place to land
   // and visually separates the prefix from the user's input.
-  if (d.length === 0) return '+998 '
-  let s = '+998 ' + d.slice(0, 2)
-  if (d.length > 2) s += ' ' + d.slice(2, 5)
-  if (d.length > 5) s += ' ' + d.slice(5, 7)
-  if (d.length > 7) s += ' ' + d.slice(7, 9)
+  if (d.length === 0)
+    return '+998 '
+  let s = `+998 ${d.slice(0, 2)}`
+  if (d.length > 2)
+    s += ` ${d.slice(2, 5)}`
+  if (d.length > 5)
+    s += ` ${d.slice(5, 7)}`
+  if (d.length > 7)
+    s += ` ${d.slice(7, 9)}`
   return s
 }
 
@@ -63,18 +67,22 @@ function onInput(e: Event) {
     // Keep the caret pinned to the end of the user-entered portion
     // (rather than jumping to position 0 after the .value assignment).
     const caret = formatted.length
-    try { target.setSelectionRange(caret, caret) } catch { /* noop */ }
+    try { target.setSelectionRange(caret, caret) }
+    catch { /* noop */ }
   }
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key !== 'Backspace' && e.key !== 'Delete') return
+  if (e.key !== 'Backspace' && e.key !== 'Delete')
+    return
   const input = e.currentTarget as HTMLInputElement
   const start = input.selectionStart ?? 0
   const end = input.selectionEnd ?? 0
   // Block deletion of the "+998 " prefix (positions 0..4).
-  if (e.key === 'Backspace' && start <= 5 && end <= 5) e.preventDefault()
-  if (e.key === 'Delete' && start < 5) e.preventDefault()
+  if (e.key === 'Backspace' && start <= 5 && end <= 5)
+    e.preventDefault()
+  if (e.key === 'Delete' && start < 5)
+    e.preventDefault()
 }
 </script>
 

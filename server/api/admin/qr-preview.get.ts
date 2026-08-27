@@ -1,12 +1,13 @@
-import {
-  serverSupabaseUser,
-  serverSupabaseServiceRole,
-} from '#supabase/server'
+import type { QRStyle } from '../../utils/qr-styled'
 import type { Database } from '~/types/database.types'
 import {
-  renderStyledQRSVG,
+  serverSupabaseServiceRole,
+  serverSupabaseUser,
+} from '#supabase/server'
+import {
   getPreset,
-  type QRStyle,
+
+  renderStyledQRSVG,
 } from '../../utils/qr-styled'
 
 /**
@@ -26,27 +27,33 @@ import {
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) throw createError({ statusCode: 401 })
+  if (!user)
+    throw createError({ statusCode: 401 })
   const uid = (user as any).id ?? (user as any).sub
   const admin = serverSupabaseServiceRole<Database>(event)
   const { data: adminRow } = await admin
-    .from('admins').select('user_id').eq('user_id', uid).maybeSingle()
-  if (!adminRow) throw createError({ statusCode: 403 })
+    .from('admins')
+    .select('user_id')
+    .eq('user_id', uid)
+    .maybeSingle()
+  if (!adminRow)
+    throw createError({ statusCode: 403 })
 
   const q = getQuery(event)
   const preset = getPreset(typeof q.style === 'string' ? q.style : null)
   const style: QRStyle = {
     dot: (typeof q.dot === 'string' ? q.dot : preset.style.dot) as any,
     corner: (typeof q.corner === 'string' ? q.corner : preset.style.corner) as any,
-    fg: typeof q.fg === 'string' && /^#[0-9a-fA-F]{6}$/.test(q.fg) ? q.fg : preset.style.fg,
-    bg: typeof q.bg === 'string' && /^#[0-9a-fA-F]{6}$/.test(q.bg) ? q.bg : preset.style.bg,
+    fg: typeof q.fg === 'string' && /^#[0-9a-f]{6}$/i.test(q.fg) ? q.fg : preset.style.fg,
+    bg: typeof q.bg === 'string' && /^#[0-9a-f]{6}$/i.test(q.bg) ? q.bg : preset.style.bg,
     gradient: null,
   }
   if (typeof q.gFrom === 'string' && typeof q.gTo === 'string'
-    && /^#[0-9a-fA-F]{6}$/.test(q.gFrom) && /^#[0-9a-fA-F]{6}$/.test(q.gTo)) {
-    const angle = typeof q.gAngle === 'string' ? parseFloat(q.gAngle) : 45
+    && /^#[0-9a-f]{6}$/i.test(q.gFrom) && /^#[0-9a-f]{6}$/i.test(q.gTo)) {
+    const angle = typeof q.gAngle === 'string' ? Number.parseFloat(q.gAngle) : 45
     style.gradient = { from: q.gFrom, to: q.gTo, angle: Number.isFinite(angle) ? angle : 45 }
-  } else if (preset.style.gradient) {
+  }
+  else if (preset.style.gradient) {
     style.gradient = preset.style.gradient
   }
 

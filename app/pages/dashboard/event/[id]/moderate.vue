@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import type { Database } from '~/types/database.types'
+import { Heart, Star, Undo2, X } from '@lucide/vue'
+import { motion, useMotionValue, useTransform } from 'motion-v'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n, useLocalePath } from '#imports'
-import { motion, useMotionValue, useTransform } from 'motion-v'
-import { X, Heart, Star, Undo2 } from '@lucide/vue'
-import type { Database } from '~/types/database.types'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -53,7 +53,7 @@ const { data: pageData } = await useAsyncData(`moderate-${id}`, async () => {
 })
 
 const queue = ref<PhotoCard[]>(pageData.value?.photos ?? [])
-const lastAction = ref<{ photo: PhotoCard; decision: 'kept' | 'hidden' | 'highlighted' } | null>(null)
+const lastAction = ref<{ photo: PhotoCard, decision: 'kept' | 'hidden' | 'highlighted' } | null>(null)
 const processed = ref(0)
 
 const current = computed(() => queue.value[0] ?? null)
@@ -74,7 +74,8 @@ const keepTagOpacity = useTransform(x, [0, 40, 160], [0, 0.2, 1])
 const decisionInFlight = ref(false)
 
 async function commit(decision: 'kept' | 'hidden' | 'highlighted') {
-  if (decisionInFlight.value || !current.value) return
+  if (decisionInFlight.value || !current.value)
+    return
   decisionInFlight.value = true
   const card = current.value
   try {
@@ -91,24 +92,29 @@ async function commit(decision: 'kept' | 'hidden' | 'highlighted') {
     processed.value += 1
     // Reset drag offset for the new top card.
     x.set(0)
-  } finally {
+  }
+  finally {
     decisionInFlight.value = false
   }
 }
 
 function onDragEnd(_: unknown, info: { offset: { x: number } }) {
-  if (info.offset.x < -140) commit('hidden')
-  else if (info.offset.x > 140) commit('kept')
+  if (info.offset.x < -140)
+    commit('hidden')
+  else if (info.offset.x > 140)
+    commit('kept')
   else x.set(0) // snap back
 }
 
 async function undo() {
-  if (!lastAction.value) return
+  if (!lastAction.value)
+    return
   const { photo, decision } = lastAction.value
   // Revert server-side
   if (decision === 'hidden') {
     await $fetch(`/api/couple/photo/${photo.id}`, { method: 'PATCH', body: { is_hidden: false } })
-  } else if (decision === 'highlighted') {
+  }
+  else if (decision === 'highlighted') {
     await $fetch(`/api/couple/photo/${photo.id}`, { method: 'PATCH', body: { is_highlight: photo.is_highlight } })
   }
   queue.value = [photo, ...queue.value]
@@ -120,13 +126,19 @@ async function undo() {
 // Keyboard shortcuts: ←/→/space for power-users on laptop.
 onMounted(() => {
   const handler = (e: KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement) return
-    if (e.key === 'ArrowLeft') commit('hidden')
-    else if (e.key === 'ArrowRight') commit('kept')
+    if (e.target instanceof HTMLInputElement)
+      return
+    if (e.key === 'ArrowLeft') {
+      commit('hidden')
+    }
+    else if (e.key === 'ArrowRight') {
+      commit('kept')
+    }
     else if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault()
       commit('highlighted')
-    } else if ((e.key === 'z' || e.key === 'Z') && (e.metaKey || e.ctrlKey)) {
+    }
+    else if ((e.key === 'z' || e.key === 'Z') && (e.metaKey || e.ctrlKey)) {
       e.preventDefault()
       undo()
     }
@@ -150,14 +162,20 @@ onMounted(() => {
 
     <div class="mb-6 flex items-end justify-between gap-4">
       <div>
-        <h1 class="heading-display-md">{{ t('couple.moderate.title') }}</h1>
+        <h1 class="heading-display-md">
+          {{ t('couple.moderate.title') }}
+        </h1>
         <p class="mt-1 text-sm text-(--color-muted-foreground)">
           {{ t('couple.moderate.desc') }}
         </p>
       </div>
       <div class="text-right">
-        <p class="font-display text-2xl">{{ processed }} / {{ total }}</p>
-        <p class="text-[10px] uppercase tracking-widest text-(--color-muted-foreground)">{{ t('couple.moderate.processed') }}</p>
+        <p class="font-display text-2xl">
+          {{ processed }} / {{ total }}
+        </p>
+        <p class="text-[10px] uppercase tracking-widest text-(--color-muted-foreground)">
+          {{ t('couple.moderate.processed') }}
+        </p>
       </div>
     </div>
 
@@ -171,8 +189,12 @@ onMounted(() => {
 
     <!-- Empty state -->
     <div v-if="total === 0" class="surface-card rounded-(--radius-xl) p-10 text-center">
-      <h2 class="text-xl">{{ t('couple.moderate.emptyTitle') }}</h2>
-      <p class="mt-2 text-(--color-muted-foreground)">{{ t('couple.moderate.emptyDesc') }}</p>
+      <h2 class="text-xl">
+        {{ t('couple.moderate.emptyTitle') }}
+      </h2>
+      <p class="mt-2 text-(--color-muted-foreground)">
+        {{ t('couple.moderate.emptyDesc') }}
+      </p>
     </div>
 
     <!-- All done -->
@@ -182,8 +204,12 @@ onMounted(() => {
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </div>
-      <h2 class="text-xl">{{ t('couple.moderate.doneTitle') }}</h2>
-      <p class="mt-2 text-(--color-muted-foreground)">{{ t('couple.moderate.doneDesc') }}</p>
+      <h2 class="text-xl">
+        {{ t('couple.moderate.doneTitle') }}
+      </h2>
+      <p class="mt-2 text-(--color-muted-foreground)">
+        {{ t('couple.moderate.doneDesc') }}
+      </p>
       <button
         v-if="lastAction"
         type="button"
@@ -213,7 +239,7 @@ onMounted(() => {
       <!-- Top card -->
       <motion.div
         :key="current.id"
-        :drag="'x'"
+        drag="x"
         :drag-elastic="0.7"
         :drag-constraints="{ left: -300, right: 300 }"
         :style="{ x, rotate, opacity }"
@@ -232,11 +258,15 @@ onMounted(() => {
           <motion.div
             :style="{ opacity: hideTagOpacity }"
             class="absolute left-4 top-4 rotate-[-12deg] rounded-md border-4 border-red-500 px-4 py-2 font-display text-2xl font-semibold text-red-500"
-          >{{ t('couple.moderate.tagHide') }}</motion.div>
+          >
+            {{ t('couple.moderate.tagHide') }}
+          </motion.div>
           <motion.div
             :style="{ opacity: keepTagOpacity }"
             class="absolute right-4 top-4 rotate-[12deg] rounded-md border-4 border-emerald-500 px-4 py-2 font-display text-2xl font-semibold text-emerald-500"
-          >{{ t('couple.moderate.tagKeep') }}</motion.div>
+          >
+            {{ t('couple.moderate.tagKeep') }}
+          </motion.div>
 
           <!-- Highlight star indicator if already highlighted -->
           <div

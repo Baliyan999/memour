@@ -22,6 +22,7 @@ export function normalizePhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, '')
   // Accept inputs starting with 998 or with the user portion only.
   const full = digits.startsWith('998') ? digits : `998${digits}`
-  if (full.length !== 12) return null
+  if (full.length !== 12)
+    return null
   return `+${full}`
 }

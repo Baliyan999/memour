@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import type { Database } from '~/types/database.types'
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n, useLocalePath } from '#imports'
-import type { Database } from '~/types/database.types'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -26,7 +26,8 @@ const { data: ev, error: evErr } = await useAsyncData(`event-${id}`, async () =>
     .select('*, branding(*)')
     .eq('id', id)
     .single()
-  if (error) throw error
+  if (error)
+    throw error
   return data
 })
 
@@ -43,7 +44,8 @@ const { data: photos } = await useAsyncData(`photos-${id}`, async () => {
     .eq('event_id', id)
     .order('uploaded_at', { ascending: false })
     .limit(500)
-  if (error) throw error
+  if (error)
+    throw error
   return data ?? []
 })
 
@@ -51,26 +53,30 @@ type FilterKey = 'visible' | 'highlights' | 'hidden' | 'by_table'
 const filter = ref<FilterKey>('visible')
 const tableFilter = ref<number | null>(null)
 
-const visibleCount = computed(() => (photos.value ?? []).filter((p) => !p.is_hidden).length)
-const highlightCount = computed(() => (photos.value ?? []).filter((p) => p.is_highlight && !p.is_hidden).length)
-const hiddenCount = computed(() => (photos.value ?? []).filter((p) => p.is_hidden).length)
+const visibleCount = computed(() => (photos.value ?? []).filter(p => !p.is_hidden).length)
+const highlightCount = computed(() => (photos.value ?? []).filter(p => p.is_highlight && !p.is_hidden).length)
+const hiddenCount = computed(() => (photos.value ?? []).filter(p => p.is_hidden).length)
 
 // Distinct tables present in the photo set — for the table filter.
 const tables = computed(() => {
   const set = new Set<number>()
   for (const p of photos.value ?? []) {
-    if (p.guest_table) set.add(p.guest_table)
+    if (p.guest_table)
+      set.add(p.guest_table)
   }
   return Array.from(set).sort((a, b) => a - b)
 })
 
 const filteredPhotos = computed(() => {
   const list = photos.value ?? []
-  if (filter.value === 'visible') return list.filter((p) => !p.is_hidden)
-  if (filter.value === 'highlights') return list.filter((p) => p.is_highlight && !p.is_hidden)
-  if (filter.value === 'hidden') return list.filter((p) => p.is_hidden)
+  if (filter.value === 'visible')
+    return list.filter(p => !p.is_hidden)
+  if (filter.value === 'highlights')
+    return list.filter(p => p.is_highlight && !p.is_hidden)
+  if (filter.value === 'hidden')
+    return list.filter(p => p.is_hidden)
   if (filter.value === 'by_table' && tableFilter.value) {
-    return list.filter((p) => p.guest_table === tableFilter.value)
+    return list.filter(p => p.guest_table === tableFilter.value)
   }
   return list
 })
@@ -92,8 +98,10 @@ const { toast } = useToast()
 
 const archivePending = ref(false)
 async function archiveEvent() {
-  if (!ev.value) return
-  if (typeof window !== 'undefined' && !window.confirm(t('couple.event.confirmArchive'))) return
+  if (!ev.value)
+    return
+  if (typeof window !== 'undefined' && !window.confirm(t('couple.event.confirmArchive')))
+    return
   archivePending.value = true
   try {
     await $fetch(`/api/couple/event/${ev.value.id}/status`, {
@@ -102,15 +110,18 @@ async function archiveEvent() {
     })
     toast.success(t('couple.event.archivedToast'))
     window.location.reload()
-  } catch (e: any) {
+  }
+  catch (e: any) {
     toast.error(t('couple.event.archiveError'))
-  } finally {
+  }
+  finally {
     archivePending.value = false
   }
 }
 
 async function copyGuestUrl() {
-  if (typeof navigator === 'undefined') return
+  if (typeof navigator === 'undefined')
+    return
   await navigator.clipboard.writeText(guestUrl.value)
   toast.success(t('couple.event.linkCopied'))
 }
@@ -122,7 +133,7 @@ async function startCheckout(provider: 'payme' | 'click') {
   payPending.value = true
   payError.value = null
   try {
-    const res = await $fetch<{ url: string; payment_id: string; dev?: boolean }>(
+    const res = await $fetch<{ url: string, payment_id: string, dev?: boolean }>(
       `/api/checkout/${provider}`,
       { method: 'POST', body: { event_id: id } },
     )
@@ -132,14 +143,19 @@ async function startCheckout(provider: 'payme' | 'click') {
       window.location.reload()
       return
     }
-    if (typeof window !== 'undefined') window.location.href = res.url
-  } catch (e: any) {
+    if (typeof window !== 'undefined')
+      window.location.href = res.url
+  }
+  catch (e: any) {
     const code = e?.data?.data?.code ?? e?.data?.code
-    payError.value =
-      code === 'already_paid' ? t('couple.event.alreadyPaid') :
-      code === 'forbidden' ? t('couple.event.noAccess') :
-      t('couple.event.payFailed')
-  } finally {
+    payError.value
+      = code === 'already_paid'
+        ? t('couple.event.alreadyPaid')
+        : code === 'forbidden'
+          ? t('couple.event.noAccess')
+          : t('couple.event.payFailed')
+  }
+  finally {
     payPending.value = false
   }
 }
@@ -160,7 +176,9 @@ async function startCheckout(provider: 'payme' | 'click') {
       </NuxtLink>
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 class="heading-display-md">{{ ev!.couple_names }}</h1>
+          <h1 class="heading-display-md">
+            {{ ev!.couple_names }}
+          </h1>
           <p class="mt-1 text-(--color-muted-foreground)">
             {{ fmtDate(ev!.wedding_date) }}<span v-if="ev!.venue_name"> · {{ ev!.venue_name }}</span>
           </p>
@@ -242,8 +260,12 @@ async function startCheckout(provider: 'payme' | 'click') {
       class="mb-6 flex flex-col gap-4 rounded-(--radius-xl) border border-(--color-primary)/20 bg-gradient-to-br from-(--color-accent)/30 to-(--color-rose)/15 p-6 sm:flex-row sm:items-center sm:justify-between"
     >
       <div>
-        <p class="text-[10px] uppercase tracking-[0.3em] text-(--color-muted-foreground)">{{ t('couple.event.activationEyebrow') }}</p>
-        <h2 class="mt-1 font-display text-2xl italic">{{ t('couple.event.activationTitle') }}</h2>
+        <p class="text-[10px] uppercase tracking-[0.3em] text-(--color-muted-foreground)">
+          {{ t('couple.event.activationEyebrow') }}
+        </p>
+        <h2 class="mt-1 font-display text-2xl italic">
+          {{ t('couple.event.activationTitle') }}
+        </h2>
         <p class="mt-2 text-sm text-(--color-muted-foreground)">
           {{ t('couple.event.activationDescPrefix') }} <strong class="font-medium text-(--color-foreground) capitalize">{{ ev!.plan_tier }}</strong>
           · {{ t('couple.event.activationDescSuffix') }}
@@ -255,36 +277,56 @@ async function startCheckout(provider: 'payme' | 'click') {
           :disabled="payPending"
           class="inline-flex h-11 items-center justify-center rounded-md bg-(--color-primary) px-6 text-sm font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) hover:opacity-90 disabled:opacity-60"
           @click="startCheckout('payme')"
-        >{{ t('couple.event.payPayme') }}</button>
+        >
+          {{ t('couple.event.payPayme') }}
+        </button>
         <button
           type="button"
           :disabled="payPending"
           class="inline-flex h-11 items-center justify-center rounded-md border border-(--color-border) bg-white px-6 text-sm font-medium hover:bg-(--color-muted) disabled:opacity-60"
           @click="startCheckout('click')"
-        >{{ t('couple.event.payClick') }}</button>
-        <p v-if="payError" class="text-xs text-red-600">{{ payError }}</p>
+        >
+          {{ t('couple.event.payClick') }}
+        </button>
+        <p v-if="payError" class="text-xs text-red-600">
+          {{ payError }}
+        </p>
       </div>
     </div>
 
     <!-- Stats -->
     <div class="mb-8 grid grid-cols-3 gap-4">
       <div class="surface-card rounded-(--radius-xl) p-5">
-        <p class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('couple.event.statPhotos') }}</p>
-        <p class="mt-1 font-display text-3xl">{{ photos?.length ?? 0 }}</p>
+        <p class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">
+          {{ t('couple.event.statPhotos') }}
+        </p>
+        <p class="mt-1 font-display text-3xl">
+          {{ photos?.length ?? 0 }}
+        </p>
       </div>
       <div class="surface-card rounded-(--radius-xl) p-5">
-        <p class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('couple.event.statTables') }}</p>
-        <p class="mt-1 font-display text-3xl">{{ ev!.table_count ?? 0 }}</p>
+        <p class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">
+          {{ t('couple.event.statTables') }}
+        </p>
+        <p class="mt-1 font-display text-3xl">
+          {{ ev!.table_count ?? 0 }}
+        </p>
       </div>
       <div class="surface-card rounded-(--radius-xl) p-5">
-        <p class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('couple.event.statStatus') }}</p>
-        <p class="mt-1 font-display text-3xl capitalize">{{ ev!.status }}</p>
+        <p class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">
+          {{ t('couple.event.statStatus') }}
+        </p>
+        <p class="mt-1 font-display text-3xl capitalize">
+          {{ ev!.status }}
+        </p>
       </div>
     </div>
 
     <!-- Empty / photos grid -->
     <div v-if="!photos || photos.length === 0" class="surface-card rounded-(--radius-xl) p-10 text-center">
-      <h2 class="text-xl">{{ t('couple.event.noPhotosYet') }}</h2>
+      <h2 class="text-xl">
+        {{ t('couple.event.noPhotosYet') }}
+      </h2>
       <p class="mt-2 text-(--color-muted-foreground)">
         {{ t('couple.event.noPhotosDesc') }}
       </p>
@@ -298,21 +340,20 @@ async function startCheckout(provider: 'payme' | 'click') {
       <div class="mb-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          :class="[
-            'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors',
+          class="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors" :class="[
             filter === 'visible'
               ? 'border-(--color-primary) bg-(--color-primary) text-(--color-primary-foreground)'
               : 'border-(--color-border) bg-white text-(--color-muted-foreground) hover:text-(--color-foreground)',
           ]"
           @click="filter = 'visible'; tableFilter = null"
-        >{{ t('couple.event.filterAll') }}
-          <span class="rounded-full bg-white/30 px-1.5 text-[10px]" v-if="filter === 'visible'">{{ visibleCount }}</span>
-          <span class="text-[10px] text-(--color-muted-foreground)" v-else>{{ visibleCount }}</span>
+        >
+          {{ t('couple.event.filterAll') }}
+          <span v-if="filter === 'visible'" class="rounded-full bg-white/30 px-1.5 text-[10px]">{{ visibleCount }}</span>
+          <span v-else class="text-[10px] text-(--color-muted-foreground)">{{ visibleCount }}</span>
         </button>
         <button
           type="button"
-          :class="[
-            'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors',
+          class="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors" :class="[
             filter === 'highlights'
               ? 'border-amber-400 bg-amber-400 text-white'
               : 'border-(--color-border) bg-white text-(--color-muted-foreground) hover:text-(--color-foreground)',
@@ -326,27 +367,31 @@ async function startCheckout(provider: 'payme' | 'click') {
         <button
           v-if="hiddenCount > 0"
           type="button"
-          :class="[
-            'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors',
+          class="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors" :class="[
             filter === 'hidden'
               ? 'border-(--color-muted-foreground) bg-(--color-muted-foreground) text-white'
               : 'border-(--color-border) bg-white text-(--color-muted-foreground) hover:text-(--color-foreground)',
           ]"
           @click="filter = 'hidden'; tableFilter = null"
-        >{{ t('couple.event.filterHidden') }} <span class="text-[10px]">{{ hiddenCount }}</span></button>
+        >
+          {{ t('couple.event.filterHidden') }} <span class="text-[10px]">{{ hiddenCount }}</span>
+        </button>
 
         <div v-if="tables.length > 0" class="ml-2 flex items-center gap-1">
           <span class="text-xs text-(--color-muted-foreground)">{{ t('couple.event.filterByTable') }}:</span>
           <select
             v-model.number="tableFilter"
-            :class="[
-              'h-8 rounded-full border bg-white px-3 text-xs',
+            class="h-8 rounded-full border bg-white px-3 text-xs" :class="[
               filter === 'by_table' ? 'border-(--color-primary)' : 'border-(--color-border)',
             ]"
             @change="filter = tableFilter ? 'by_table' : 'visible'"
           >
-            <option :value="null">{{ t('couple.event.filterAllOption') }}</option>
-            <option v-for="tbl in tables" :key="tbl" :value="tbl">{{ tbl }}</option>
+            <option :value="null">
+              {{ t('couple.event.filterAllOption') }}
+            </option>
+            <option v-for="tbl in tables" :key="tbl" :value="tbl">
+              {{ tbl }}
+            </option>
           </select>
         </div>
       </div>

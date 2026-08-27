@@ -17,7 +17,8 @@ const buckets = new Map<string, Bucket>()
 // so the map doesn't grow unbounded across long-running processes.
 let lastPrune = Date.now()
 function pruneIfNeeded(now: number, windowMs: number) {
-  if (now - lastPrune < windowMs) return
+  if (now - lastPrune < windowMs)
+    return
   lastPrune = now
   const cutoff = now - windowMs * 2
   for (const [key, bucket] of buckets) {

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useI18n } from '#imports'
-import { useRoute } from 'vue-router'
-import { motion, AnimatePresence } from 'motion-v'
 import { Heart } from '@lucide/vue'
+import { AnimatePresence, motion } from 'motion-v'
+import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { useI18n } from '#imports'
 
 /**
  * LeadForm — RU/UZ-localized contact form. Sends a server call to
@@ -34,7 +34,7 @@ async function onSubmit() {
   error.value = null
   pending.value = true
   try {
-    const res = await $fetch<{ ok: boolean; error?: string }>('/api/lead', {
+    const res = await $fetch<{ ok: boolean, error?: string }>('/api/lead', {
       method: 'POST',
       body: {
         name: name.value,
@@ -47,12 +47,15 @@ async function onSubmit() {
     })
     if (res.ok) {
       success.value = true
-    } else {
+    }
+    else {
       error.value = res.error ?? 'Error'
     }
-  } catch (e: any) {
+  }
+  catch (e: any) {
     error.value = e?.data?.error ?? e?.message ?? 'Network error'
-  } finally {
+  }
+  finally {
     pending.value = false
   }
 }
@@ -86,8 +89,12 @@ async function onSubmit() {
           >
             <Heart class="h-7 w-7" />
           </motion.div>
-          <h3 class="text-3xl">{{ t('lead.successTitle') }}</h3>
-          <p class="mt-3 text-(--color-muted-foreground)">{{ t('lead.successDesc') }}</p>
+          <h3 class="text-3xl">
+            {{ t('lead.successTitle') }}
+          </h3>
+          <p class="mt-3 text-(--color-muted-foreground)">
+            {{ t('lead.successDesc') }}
+          </p>
         </motion.div>
 
         <motion.form
@@ -100,8 +107,12 @@ async function onSubmit() {
           @submit.prevent="onSubmit"
         >
           <div class="text-center">
-            <h3 class="heading-display-md">{{ t('lead.title') }}</h3>
-            <p class="mt-2 text-sm text-(--color-muted-foreground)">{{ t('lead.subtitle') }}</p>
+            <h3 class="heading-display-md">
+              {{ t('lead.title') }}
+            </h3>
+            <p class="mt-2 text-sm text-(--color-muted-foreground)">
+              {{ t('lead.subtitle') }}
+            </p>
           </div>
 
           <div class="flex flex-col gap-1.5">
@@ -149,7 +160,9 @@ async function onSubmit() {
             </div>
           </div>
 
-          <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+          <p v-if="error" class="text-sm text-red-600">
+            {{ error }}
+          </p>
 
           <button
             type="submit"
@@ -158,7 +171,9 @@ async function onSubmit() {
           >
             {{ pending ? t('lead.submitting') : t('lead.submit') }}
           </button>
-          <p class="text-center text-[11px] text-(--color-muted-foreground)">{{ t('lead.contactNote') }}</p>
+          <p class="text-center text-[11px] text-(--color-muted-foreground)">
+            {{ t('lead.contactNote') }}
+          </p>
         </motion.form>
       </AnimatePresence>
     </div>

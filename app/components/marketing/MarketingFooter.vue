@@ -27,7 +27,9 @@ const year = new Date().getFullYear()
         >
         Memour
       </div>
-      <p class="max-w-md 3xl:max-w-lg 4xl:max-w-xl">{{ t('footer.tagline') }}</p>
+      <p class="max-w-md 3xl:max-w-lg 4xl:max-w-xl">
+        {{ t('footer.tagline') }}
+      </p>
       <nav class="flex items-center gap-4 text-xs 3xl:text-sm 4xl:text-base">
         <NuxtLink :to="localePath('/privacy')" class="hover:text-(--color-foreground)">
           {{ locale === 'uz' ? 'Maxfiylik' : 'Конфиденциальность' }}
@@ -39,7 +41,9 @@ const year = new Date().getFullYear()
         <span aria-hidden="true">·</span>
         <a href="mailto:hello@memour.uz" class="hover:text-(--color-foreground)">hello@memour.uz</a>
       </nav>
-      <p class="text-xs 3xl:text-sm 4xl:text-base">© {{ year }} · {{ t('footer.rights') }}</p>
+      <p class="text-xs 3xl:text-sm 4xl:text-base">
+        © {{ year }} · {{ t('footer.rights') }}
+      </p>
     </div>
   </footer>
 </template>

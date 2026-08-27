@@ -17,8 +17,10 @@ export function useDeviceId() {
   const id = useState<string>('memour-device-id', () => '')
 
   function ensure() {
-    if (typeof window === 'undefined') return
-    if (id.value) return
+    if (typeof window === 'undefined')
+      return
+    if (id.value)
+      return
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved && /^[0-9a-f-]{36}$/i.test(saved)) {
@@ -28,7 +30,8 @@ export function useDeviceId() {
       const fresh = crypto.randomUUID()
       localStorage.setItem(STORAGE_KEY, fresh)
       id.value = fresh
-    } catch {
+    }
+    catch {
       // localStorage might be blocked (private mode, iframe with
       // restricted storage). Fall back to an in-memory id valid for
       // the duration of this page session.
@@ -36,7 +39,8 @@ export function useDeviceId() {
     }
   }
 
-  if (typeof window !== 'undefined') ensure()
+  if (typeof window !== 'undefined')
+    ensure()
 
   return { id, ensure }
 }

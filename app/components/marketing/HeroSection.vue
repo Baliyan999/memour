@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { ArrowRight } from '@lucide/vue'
+import { motion, useReducedMotion, useScroll, useTransform } from 'motion-v'
 import { computed, ref } from 'vue'
 import { useI18n } from '#imports'
-import { motion, useScroll, useTransform, useReducedMotion } from 'motion-v'
-import { ArrowRight } from '@lucide/vue'
 // MarketingOrnaments auto-imported by Nuxt
 
 /**
@@ -90,7 +90,9 @@ const accentIndex = computed(() => Math.floor(titleWords.value.length / 2))
               v-if="i === accentIndex"
               class="italic font-medium text-(--color-primary)"
             >{{ w }}</span>
-            <template v-else>{{ w }}</template>
+            <template v-else>
+              {{ w }}
+            </template>
           </motion.span>
         </h1>
 
@@ -141,8 +143,8 @@ const accentIndex = computed(() => Math.floor(titleWords.value.length / 2))
         </motion.div>
 
         <motion.ul
-          :initial="'hidden'"
-          :animate="'visible'"
+          initial="hidden"
+          animate="visible"
           :variants="{
             hidden: {},
             visible: { transition: { delayChildren: 1.5, staggerChildren: 0.12 } },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n, useLocalePath, useSwitchLocalePath } from '#imports'
 
 /**
@@ -43,8 +43,8 @@ const navItems = computed(() => [
 // The "other" locale = the one the user will switch to when clicking
 // the pill. Currently displayed is locale.value (active).
 const otherLocale = computed(() => {
-  const all = (locales.value as Array<{ code: 'ru' | 'uz' }>).map((l) => l.code)
-  return all.find((c) => c !== locale.value) ?? 'uz'
+  const all = (locales.value as Array<{ code: 'ru' | 'uz' }>).map(l => l.code)
+  return all.find(c => c !== locale.value) ?? 'uz'
 })
 </script>
 
@@ -52,8 +52,7 @@ const otherLocale = computed(() => {
   <header class="sticky top-3 z-50 md:top-5">
     <div class="container-page">
       <div
-        :class="[
-          'mx-auto flex h-14 max-w-5xl items-center justify-between gap-2 rounded-full border pl-4 pr-2 transition-all duration-300 md:h-16 md:pl-6 md:pr-3 xl:max-w-6xl 2xl:max-w-[80rem] 2xl:pl-7 3xl:h-20 3xl:max-w-[92rem] 3xl:pl-8 3xl:pr-4 4xl:h-24 4xl:max-w-[108rem]',
+        class="mx-auto flex h-14 max-w-5xl items-center justify-between gap-2 rounded-full border pl-4 pr-2 transition-all duration-300 md:h-16 md:pl-6 md:pr-3 xl:max-w-6xl 2xl:max-w-[80rem] 2xl:pl-7 3xl:h-20 3xl:max-w-[92rem] 3xl:pl-8 3xl:pr-4 4xl:h-24 4xl:max-w-[108rem]" :class="[
           scrolled
             ? 'border-white/60 bg-white/85 shadow-[0_14px_40px_-14px_rgb(160_110_90_/_0.45)] backdrop-blur-2xl'
             : 'border-white/40 bg-white/55 shadow-[0_8px_28px_-12px_rgb(160_110_90_/_0.25)] backdrop-blur-xl',

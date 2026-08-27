@@ -1,9 +1,9 @@
+import type { Database } from '~/types/database.types'
 import { z } from 'zod'
 import {
-  serverSupabaseUser,
   serverSupabaseServiceRole,
+  serverSupabaseUser,
 } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 
 /**
  * POST /api/admin/admins — super-admin adds a teammate.
@@ -37,7 +37,8 @@ const schema = z.object({
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) fail(401, 'unauthorized')
+  if (!user)
+    fail(401, 'unauthorized')
   const uid = (user as any).id ?? (user as any).sub
 
   const admin = serverSupabaseServiceRole<Database>(event)
@@ -46,19 +47,22 @@ export default defineEventHandler(async (event) => {
     .select('user_id, role')
     .eq('user_id', uid)
     .maybeSingle()
-  if (!me) fail(403, 'forbidden')
-  if ((me as any).role !== 'super') fail(403, 'not_super')
+  if (!me)
+    fail(403, 'forbidden')
+  if ((me as any).role !== 'super')
+    fail(403, 'not_super')
 
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success)
+    fail(422, 'invalid_input')
 
   const email = parsed.data.email.trim().toLowerCase()
 
   // Find or create the auth user.
   let inviteeId: string | null = null
   const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000, page: 1 })
-  const found = list?.users.find((u) => u.email?.toLowerCase() === email)
+  const found = list?.users.find(u => u.email?.toLowerCase() === email)
   if (found) {
     inviteeId = found.id
     // Update password so they can log in with the provided one.
@@ -70,7 +74,8 @@ export default defineEventHandler(async (event) => {
       console.error('[admin/admins] update password', pwErr)
       fail(500, 'update_failed')
     }
-  } else {
+  }
+  else {
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
       password: parsed.data.password,

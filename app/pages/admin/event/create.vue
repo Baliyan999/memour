@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useLocalePath } from '#imports'
 
 definePageMeta({ layout: 'admin' })
@@ -32,15 +32,18 @@ const fromLeadId = ref<string | null>(null)
 // Prefill from query params (set by the /admin/leads → создать кнопка).
 onMounted(() => {
   const q = route.query
-  if (typeof q.couple_names === 'string') couple_names.value = q.couple_names
-  if (typeof q.wedding_date === 'string') wedding_date.value = q.wedding_date
+  if (typeof q.couple_names === 'string')
+    couple_names.value = q.couple_names
+  if (typeof q.wedding_date === 'string')
+    wedding_date.value = q.wedding_date
   if (typeof q.owner_phone === 'string' && /^\d{9}$/.test(q.owner_phone)) {
     owner_phone_digits.value = q.owner_phone
     owner_phone.value = `+998 ${q.owner_phone}`
   }
   if (typeof q.table_count === 'string') {
     const n = parseInt(q.table_count, 10)
-    if (Number.isFinite(n)) table_count.value = n
+    if (Number.isFinite(n))
+      table_count.value = n
   }
   if (typeof q.from_lead === 'string' && /^[0-9a-f-]{36}$/i.test(q.from_lead)) {
     fromLeadId.value = q.from_lead
@@ -58,7 +61,7 @@ async function submit() {
   error.value = null
   pending.value = true
   try {
-    const res = await $fetch<{ ok: boolean; event: { id: string } }>(
+    const res = await $fetch<{ ok: boolean, event: { id: string } }>(
       '/api/admin/events',
       {
         method: 'POST',
@@ -86,9 +89,11 @@ async function submit() {
       }
       router.push(localePath('/admin'))
     }
-  } catch (e: any) {
+  }
+  catch (e: any) {
     error.value = e?.data?.statusMessage ?? e?.message ?? 'Ошибка'
-  } finally {
+  }
+  finally {
     pending.value = false
   }
 }
@@ -96,7 +101,9 @@ async function submit() {
 
 <template>
   <div class="mx-auto max-w-2xl">
-    <h1 class="heading-display-md mb-6">Создать событие</h1>
+    <h1 class="heading-display-md mb-6">
+      Создать событие
+    </h1>
 
     <form class="surface-card flex flex-col gap-5 rounded-(--radius-xl) p-7" @submit.prevent="submit">
       <div class="flex flex-col gap-1.5">
@@ -171,10 +178,18 @@ async function submit() {
             v-model="plan_tier"
             class="h-11 rounded-md border border-(--color-border) bg-white px-3 text-sm"
           >
-            <option value="basic">Basic</option>
-            <option value="pro">Pro</option>
-            <option value="premium">Premium</option>
-            <option value="luxury">Luxury</option>
+            <option value="basic">
+              Basic
+            </option>
+            <option value="pro">
+              Pro
+            </option>
+            <option value="premium">
+              Premium
+            </option>
+            <option value="luxury">
+              Luxury
+            </option>
           </select>
         </div>
         <div class="flex flex-col gap-1.5">
@@ -183,24 +198,34 @@ async function submit() {
             v-model="status"
             class="h-11 rounded-md border border-(--color-border) bg-white px-3 text-sm"
           >
-            <option value="draft">Черновик (ждёт оплаты)</option>
-            <option value="active">Активно (оплачено)</option>
+            <option value="draft">
+              Черновик (ждёт оплаты)
+            </option>
+            <option value="active">
+              Активно (оплачено)
+            </option>
           </select>
         </div>
       </div>
 
-      <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+      <p v-if="error" class="text-sm text-red-600">
+        {{ error }}
+      </p>
 
       <div class="flex gap-3">
         <NuxtLink
           :to="localePath('/admin')"
           class="inline-flex h-11 flex-1 items-center justify-center rounded-md border border-(--color-border) bg-white text-sm hover:bg-(--color-muted)"
-        >Отмена</NuxtLink>
+        >
+          Отмена
+        </NuxtLink>
         <button
           type="submit"
           :disabled="pending"
           class="inline-flex h-11 flex-1 items-center justify-center rounded-md bg-(--color-primary) text-sm font-medium text-(--color-primary-foreground) hover:opacity-90 disabled:opacity-60"
-        >{{ pending ? 'Создаём…' : 'Создать' }}</button>
+        >
+          {{ pending ? 'Создаём…' : 'Создать' }}
+        </button>
       </div>
     </form>
   </div>

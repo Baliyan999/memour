@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, defineComponent, h, type PropType } from 'vue'
+import type { MotionValue } from 'motion-v'
+import type { PropType } from 'vue'
+import { easeInOut, motion, useReducedMotion, useScroll, useTransform } from 'motion-v'
+import { computed, defineComponent, h, ref } from 'vue'
 import { useI18n } from '#imports'
-import { motion, useScroll, useTransform, useReducedMotion, easeInOut, type MotionValue } from 'motion-v'
 
 /**
  * StickyHeadline — three short phrases that crossfade as the user
@@ -46,8 +48,8 @@ const PhotoCard = defineComponent({
         class: `relative rounded-2xl bg-white p-2 shadow-(--shadow-soft) ${p.cls}`,
         style: p.rotate ? { transform: `rotate(${p.rotate}deg)` } : undefined,
       }, [
-        p.src 
-          ? h('img', { src: p.src, class: 'h-full w-full rounded-xl object-cover', alt: '' }) 
+        p.src
+          ? h('img', { src: p.src, class: 'h-full w-full rounded-xl object-cover', alt: '' })
           : h('div', {
               class: 'h-full w-full rounded-xl',
               style: {
@@ -69,7 +71,7 @@ const PhraseLayer = defineComponent({
     progress: { type: Object as PropType<MotionValue<number>>, required: true },
     reduce: { type: Boolean, required: true },
     phrase: {
-      type: Object as PropType<{ before: string; accent: string; after: string; visual: Visual }>,
+      type: Object as PropType<{ before: string, accent: string, after: string, visual: Visual }>,
       required: true,
     },
   },
@@ -174,7 +176,7 @@ function renderVisual(variant: Visual) {
     '/images/dance.webp',
     '/images/guests.webp',
     '/images/candles.webp',
-  ];
+  ]
 
   const tiles = Array.from({ length: 12 }, (_, i) => ({
     hue: 10 + ((i * 23) % 80),

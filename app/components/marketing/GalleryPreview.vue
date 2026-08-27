@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, defineComponent, h, type PropType } from 'vue'
+import type { MotionValue } from 'motion-v'
+import type { PropType } from 'vue'
+import { motion, useReducedMotion, useScroll, useTransform } from 'motion-v'
+import { defineComponent, h, ref } from 'vue'
 import { useI18n } from '#imports'
-import { motion, useScroll, useTransform, useReducedMotion, type MotionValue } from 'motion-v'
 
 /**
  * GalleryPreview — photo mosaic showing how guests' shots aggregate
@@ -14,11 +16,11 @@ const { t } = useI18n()
 const reduce = useReducedMotion()
 
 const TILES = [
-  { ar: '3/4', src: '/images/rings.webp', x: 4,  y: 6,  w: 20, rot: -2 },
-  { ar: '1/1', src: '/images/champagne.webp', x: 28, y: 2,  w: 22, rot: 1 },
-  { ar: '4/5', src: '/images/bouquet.webp', x: 56, y: 8,  w: 20, rot: -1.5 },
-  { ar: '1/1', src: '/images/couple-back.webp', x: 80, y: 4,  w: 18, rot: 2 },
-  { ar: '4/3', src: '/images/dance.webp', x: 6,  y: 50, w: 24, rot: 1.5 },
+  { ar: '3/4', src: '/images/rings.webp', x: 4, y: 6, w: 20, rot: -2 },
+  { ar: '1/1', src: '/images/champagne.webp', x: 28, y: 2, w: 22, rot: 1 },
+  { ar: '4/5', src: '/images/bouquet.webp', x: 56, y: 8, w: 20, rot: -1.5 },
+  { ar: '1/1', src: '/images/couple-back.webp', x: 80, y: 4, w: 18, rot: 2 },
+  { ar: '4/3', src: '/images/dance.webp', x: 6, y: 50, w: 24, rot: 1.5 },
   { ar: '3/4', src: '/images/guests.webp', x: 36, y: 34, w: 20, rot: -2 },
   { ar: '1/1', src: '/images/candles.webp', x: 62, y: 50, w: 20, rot: 2 },
   { ar: '4/5', src: '/images/table-setting.webp', x: 84, y: 46, w: 14, rot: -1 },
@@ -86,13 +88,13 @@ const ParallaxTile = defineComponent({
                   src: p.tile.src,
                   class: 'absolute inset-0 h-full w-full object-cover',
                   alt: 'Gallery photo',
-                  loading: 'lazy'
+                  loading: 'lazy',
                 }),
                 h('div', {
                   'aria-hidden': true,
-                  class:
+                  'class':
                     'pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100',
-                  style: {
+                  'style': {
                     background:
                       'linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.5) 50%, transparent 60%)',
                   },
@@ -124,7 +126,9 @@ const ParallaxTile = defineComponent({
         >
           ⋄ ⋄ ⋄
         </motion.p>
-        <h2 class="heading-display-lg text-balance">{{ t('gallery.title') }}</h2>
+        <h2 class="heading-display-lg text-balance">
+          {{ t('gallery.title') }}
+        </h2>
         <motion.p
           :initial="{ opacity: 0, y: 12 }"
           :while-in-view="{ opacity: 1, y: 0 }"

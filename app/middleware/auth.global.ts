@@ -12,14 +12,15 @@
 export default defineNuxtRouteMiddleware(async (to) => {
   const stripped = to.path.replace(/^\/(ru|uz)(?=\/|$)/, '') || '/'
 
-  const isCoupleRoute =
-    stripped.startsWith('/dashboard') &&
-    !stripped.startsWith('/dashboard/login')
+  const isCoupleRoute
+    = stripped.startsWith('/dashboard')
+      && !stripped.startsWith('/dashboard/login')
 
-  const isAdminRoute =
-    stripped.startsWith('/admin') && !stripped.startsWith('/admin/login')
+  const isAdminRoute
+    = stripped.startsWith('/admin') && !stripped.startsWith('/admin/login')
 
-  if (!isCoupleRoute && !isAdminRoute) return
+  if (!isCoupleRoute && !isAdminRoute)
+    return
 
   const user = useSupabaseUser()
   const localePath = useLocalePath()

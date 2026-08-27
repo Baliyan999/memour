@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { ChevronDown, ChevronUp } from '@lucide/vue'
 import { ref, watch } from 'vue'
-import { ChevronUp, ChevronDown } from '@lucide/vue'
 
 /**
  * GuestStepper — number input with brand-styled +/- buttons stacked
@@ -36,7 +36,8 @@ function emitParsed() {
 function onInput(e: Event) {
   const t = e.target as HTMLInputElement
   const cleaned = t.value.replace(/\D/g, '').slice(0, 4)
-  if (cleaned !== t.value) t.value = cleaned
+  if (cleaned !== t.value)
+    t.value = cleaned
   local.value = cleaned
   emitParsed()
 }

@@ -1,8 +1,8 @@
-import {
-  serverSupabaseUser,
-  serverSupabaseServiceRole,
-} from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import {
+  serverSupabaseServiceRole,
+  serverSupabaseUser,
+} from '#supabase/server'
 
 /**
  * GET /api/admin/admins — list the admin team with role + email.
@@ -17,7 +17,8 @@ function fail(statusCode: number, code: string): never {
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) fail(401, 'unauthorized')
+  if (!user)
+    fail(401, 'unauthorized')
   const uid = (user as any).id ?? (user as any).sub
 
   const admin = serverSupabaseServiceRole<Database>(event)
@@ -26,7 +27,8 @@ export default defineEventHandler(async (event) => {
     .select('user_id, role')
     .eq('user_id', uid)
     .maybeSingle()
-  if (!me) fail(403, 'forbidden')
+  if (!me)
+    fail(403, 'forbidden')
 
   // Fetch all admin rows
   const { data: rows } = await admin
@@ -39,11 +41,12 @@ export default defineEventHandler(async (event) => {
   const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000, page: 1 })
   const emailMap = new Map<string, string>()
   for (const u of list?.users ?? []) {
-    if (u.email) emailMap.set(u.id, u.email)
+    if (u.email)
+      emailMap.set(u.id, u.email)
   }
 
   return {
-    admins: (rows ?? []).map((r) => ({
+    admins: (rows ?? []).map(r => ({
       user_id: r.user_id,
       role: (r as any).role ?? 'admin',
       added_at: r.added_at,

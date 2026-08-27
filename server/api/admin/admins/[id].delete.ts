@@ -1,8 +1,8 @@
-import {
-  serverSupabaseUser,
-  serverSupabaseServiceRole,
-} from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import {
+  serverSupabaseServiceRole,
+  serverSupabaseUser,
+} from '#supabase/server'
 
 /**
  * DELETE /api/admin/admins/[id] — remove a teammate from the admin
@@ -19,7 +19,8 @@ function fail(statusCode: number, code: string): never {
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) fail(401, 'unauthorized')
+  if (!user)
+    fail(401, 'unauthorized')
   const uid = (user as any).id ?? (user as any).sub
 
   const admin = serverSupabaseServiceRole<Database>(event)
@@ -28,15 +29,20 @@ export default defineEventHandler(async (event) => {
     .select('user_id, role')
     .eq('user_id', uid)
     .maybeSingle()
-  if (!me) fail(403, 'forbidden')
-  if ((me as any).role !== 'super') fail(403, 'not_super')
+  if (!me)
+    fail(403, 'forbidden')
+  if ((me as any).role !== 'super')
+    fail(403, 'not_super')
 
   const id = getRouterParam(event, 'id')
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) fail(400, 'invalid_id')
-  if (id === uid) fail(409, 'cannot_remove_self')
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id))
+    fail(400, 'invalid_id')
+  if (id === uid)
+    fail(409, 'cannot_remove_self')
 
   const { error } = await admin.from('admins').delete().eq('user_id', id!)
-  if (error) fail(500, 'delete_failed')
+  if (error)
+    fail(500, 'delete_failed')
 
   return { ok: true }
 })

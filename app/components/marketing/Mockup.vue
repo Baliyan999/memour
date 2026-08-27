@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { Battery, Heart, MapPin, Play, Send, Signal, Wifi, X } from '@lucide/vue'
 import { computed } from 'vue'
 import { useI18n } from '#imports'
-import { Battery, Heart, MapPin, Play, Send, Signal, Wifi, X } from '@lucide/vue'
 
 /**
  * Mockup — small UI mock specific to each feature. Pure CSS/SVG, no
@@ -54,7 +54,7 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
 
       <!-- Stage with the now-playing photo -->
       <div class="absolute inset-x-4 bottom-12 top-9 overflow-hidden rounded-md">
-        <img src="/images/slideshow-hero.webp" class="absolute inset-0 h-full w-full object-cover" alt="Slideshow hero" />
+        <img src="/images/slideshow-hero.webp" class="absolute inset-0 h-full w-full object-cover" alt="Slideshow hero">
         <div class="absolute left-2 bottom-2 rounded-full bg-black/45 px-2 py-0.5 text-[9px] text-white/90 backdrop-blur-sm">
           {{ t('features.mockup.slideshowCaption') }}
         </div>
@@ -126,7 +126,9 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
           <span class="block h-1 w-1 animate-pulse rounded-full bg-white" />
           REC
         </div>
-        <div class="absolute right-1.5 top-1.5 rounded-full bg-black/55 px-1.5 py-0.5 text-[7px] font-semibold text-white backdrop-blur-sm">00:08</div>
+        <div class="absolute right-1.5 top-1.5 rounded-full bg-black/55 px-1.5 py-0.5 text-[7px] font-semibold text-white backdrop-blur-sm">
+          00:08
+        </div>
         <div class="absolute inset-x-1.5 bottom-1.5 h-0.5 overflow-hidden rounded-full bg-white/25">
           <div class="h-full w-1/3" :style="{ background: `oklch(75% 0.16 ${hue + 12})` }" />
         </div>
@@ -146,7 +148,9 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
         <div
           class="grid h-6 w-6 place-items-center rounded-full text-[10px] font-semibold text-white"
           :style="{ background: `oklch(60% 0.16 ${hue})` }"
-        >{{ senderInitial }}</div>
+        >
+          {{ senderInitial }}
+        </div>
         <span class="text-[10px] font-medium text-(--color-foreground)">{{ t('features.mockup.voiceSender') }}</span>
         <span class="text-[9px] text-(--color-muted-foreground)">14:32</span>
       </div>
@@ -345,8 +349,12 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
           <span class="grid h-3 w-3 place-items-center rounded-full text-[8px]" :style="{ background: `oklch(85% 0.14 ${hue + 30})` }">📷</span>
           {{ t('features.mockup.botNotifyTitle') }}
         </div>
-        <div class="mt-0.5 text-[9px] text-(--color-muted-foreground)">{{ t('features.mockup.botNotifyBy') }}</div>
-        <div class="mt-0.5 flex items-center justify-end gap-0.5 text-[8px] text-(--color-muted-foreground)">14:38</div>
+        <div class="mt-0.5 text-[9px] text-(--color-muted-foreground)">
+          {{ t('features.mockup.botNotifyBy') }}
+        </div>
+        <div class="mt-0.5 flex items-center justify-end gap-0.5 text-[8px] text-(--color-muted-foreground)">
+          14:38
+        </div>
       </div>
       <div class="self-start max-w-[90%] rounded-xl rounded-bl-sm bg-white p-1.5 shadow-sm">
         <div class="grid grid-cols-3 gap-0.5 overflow-hidden rounded-md">

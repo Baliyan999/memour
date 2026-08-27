@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { motion } from 'motion-v'
 import { computed } from 'vue'
 import { useI18n, useLocalePath } from '#imports'
-import { motion } from 'motion-v'
 
 /**
  * Custom error page — branded fallback for 404 / 500 / etc.
@@ -12,7 +12,7 @@ import { motion } from 'motion-v'
  * floating sparkles drift around the polaroid for a tactile feel.
  */
 const props = defineProps<{
-  error: { statusCode: number; message?: string; statusMessage?: string }
+  error: { statusCode: number, message?: string, statusMessage?: string }
 }>()
 
 const { t } = useI18n()
@@ -105,7 +105,9 @@ const isNotFound = computed(() => code.value === 404)
                   font-size: 12px;
                   color: var(--color-muted-foreground);
                 "
-              >{{ isNotFound ? t('error.polaroidCaptionNotFound') : t('error.polaroidCaptionGeneric') }}</p>
+              >
+                {{ isNotFound ? t('error.polaroidCaptionNotFound') : t('error.polaroidCaptionGeneric') }}
+              </p>
             </div>
           </motion.div>
         </div>
@@ -171,9 +173,11 @@ const isNotFound = computed(() => code.value === 404)
             <span class="absolute inset-0 -z-0 bg-gradient-to-r from-(--color-primary) via-(--color-rose) to-(--color-primary) bg-[length:200%_100%] opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-hover:[animation:shimmer_2.4s_linear_infinite]" />
           </NuxtLink>
           <NuxtLink
-            :to="localePath('/') + '#lead'"
+            :to="`${localePath('/')}#lead`"
             class="inline-flex h-12 items-center justify-center rounded-md border border-(--color-border) bg-white/70 px-7 text-base font-medium backdrop-blur transition-colors hover:bg-(--color-muted)"
-          >{{ t('error.contactUs') }}</NuxtLink>
+          >
+            {{ t('error.contactUs') }}
+          </NuxtLink>
         </motion.div>
       </div>
     </main>

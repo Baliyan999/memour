@@ -17,8 +17,8 @@ withDefaults(
 
 <template>
   <motion.div
-    :initial="'hidden'"
-    :while-in-view="'visible'"
+    initial="hidden"
+    while-in-view="visible"
     :viewport="{ once: true, amount }"
     :variants="{
       hidden: {},

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, defineComponent, h, type PropType } from 'vue'
+import type { MotionValue } from 'motion-v'
+import type { PropType } from 'vue'
+import { Camera, Heart, QrCode } from '@lucide/vue'
+import { motion, useReducedMotion, useScroll, useTransform } from 'motion-v'
+import { computed, defineComponent, h, ref } from 'vue'
 import { useI18n } from '#imports'
-import { motion, useScroll, useTransform, useReducedMotion, type MotionValue } from 'motion-v'
-import { QrCode, Camera, Heart } from '@lucide/vue'
 
 /**
  * How — vertical timeline with 3 steps. As the user scrolls past the
@@ -64,24 +66,24 @@ const StepBadge = defineComponent({
         () => [
           !p.reduce
             ? h(motion.span, {
-                style: { opacity: haloOpacity },
+                'style': { opacity: haloOpacity },
                 'aria-hidden': true,
-                class:
+                'class':
                   'pointer-events-none absolute inset-0 -m-4 rounded-full bg-(--color-primary)/30 blur-xl',
               })
             : null,
           !p.reduce
             ? h(motion.span, {
-                style: { opacity: ringOpacity, scale: ringScale },
+                'style': { opacity: ringOpacity, scale: ringScale },
                 'aria-hidden': true,
-                class:
+                'class':
                   'pointer-events-none absolute inset-0 rounded-full border-2 border-(--color-primary)',
               })
             : null,
           h('span', {
             'aria-hidden': true,
-            class: 'pointer-events-none absolute inset-0 rounded-full',
-            style: { border: '1px solid oklch(92% 0.015 70)' },
+            'class': 'pointer-events-none absolute inset-0 rounded-full',
+            'style': { border: '1px solid oklch(92% 0.015 70)' },
           }),
           h(
             motion.div,

@@ -16,12 +16,13 @@
 export async function sendTelegram(text: string, chatId?: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
   const target = chatId ?? process.env.TELEGRAM_LEAD_CHAT_ID
-  if (!token || !target) return
+  if (!token || !target)
+    return
   await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ chat_id: target, text, parse_mode: 'HTML' }),
-  }).catch((e) => console.error('[telegram] send failed', e))
+  }).catch(e => console.error('[telegram] send failed', e))
 }
 
 interface DebounceEntry {
@@ -48,10 +49,10 @@ export async function notifyEventUpload(
   const pending = entry ? entry.pendingCount + 1 : 1
   debounceMap.set(eventId, { lastSentAt: now, pendingCount: 0 })
 
-  const text =
-    `📸 Новые фото на свадьбе\n` +
-    `<b>${escapeHtml(eventName)}</b>\n` +
-    (pending > 1 ? `Загружено: ${pending} с прошлого уведомления` : '')
+  const text
+    = `📸 Новые фото на свадьбе\n`
+      + `<b>${escapeHtml(eventName)}</b>\n${
+        pending > 1 ? `Загружено: ${pending} с прошлого уведомления` : ''}`
 
   await sendTelegram(text)
   return true

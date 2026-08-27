@@ -41,6 +41,7 @@ export default defineNuxtConfig({
     '@nuxtjs/google-fonts',
     '@nuxtjs/supabase',
     '@vueuse/nuxt',
+    '@sentry/nuxt',
   ],
 
   // Supabase auth — protected routes are gated by our own global
@@ -75,7 +76,7 @@ export default defineNuxtConfig({
     strategy: 'prefix',
     defaultLocale: 'uz',
     locales: [
-      { code: 'uz', name: "O'zbekcha", file: 'uz.json' },
+      { code: 'uz', name: 'O\'zbekcha', file: 'uz.json' },
       { code: 'ru', name: 'Русский', file: 'ru.json' },
     ],
     detectBrowserLanguage: {
@@ -99,6 +100,14 @@ export default defineNuxtConfig({
     supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
+    },
+  },
+
+  sentry: {
+    sourceMapsUploadOptions: {
+      org: 'memour',
+      project: 'memour-nuxt',
+      authToken: process.env.SENTRY_AUTH_TOKEN,
     },
   },
 

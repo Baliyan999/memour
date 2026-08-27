@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import { motion } from 'motion-v'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n, useSwitchLocalePath } from '#imports'
 
 definePageMeta({ layout: 'guest' })
@@ -9,7 +9,7 @@ definePageMeta({ layout: 'guest' })
 const { t, locale } = useI18n()
 const switchLocalePath = useSwitchLocalePath()
 const otherLocale = computed<'ru' | 'uz'>(() => (locale.value === 'ru' ? 'uz' : 'ru'))
-const otherLocaleLabel = computed(() => (locale.value === 'ru' ? "O'zbekcha" : 'Русский'))
+const otherLocaleLabel = computed(() => (locale.value === 'ru' ? 'O\'zbekcha' : 'Русский'))
 
 /**
  * /e/[id] — public landing for wedding guests.
@@ -40,7 +40,7 @@ const tableParam = computed(() => {
 
 const { id: deviceId, ensure: ensureDeviceId } = useDeviceId()
 
-type Binding = {
+interface Binding {
   table_number: number
   guest_name: string | null
   photo_count: number
@@ -48,7 +48,7 @@ type Binding = {
   voice_count: number
 }
 
-type EventResp = {
+interface EventResp {
   event: {
     id: string
     couple_names: string
@@ -68,7 +68,7 @@ type EventResp = {
     } | null
   }
   binding: Binding | null
-  limits: { photo: number; video: number; voice: number }
+  limits: { photo: number, video: number, voice: number }
 }
 
 // Initial fetch (SSR-safe): no device_id, so we won't get a binding —
@@ -83,8 +83,10 @@ const limits = ref(data.value?.limits ?? { photo: 15, video: 3, voice: 3 })
 watch(
   () => data.value,
   (next) => {
-    if (next?.binding) binding.value = next.binding
-    if (next?.limits) limits.value = next.limits
+    if (next?.binding)
+      binding.value = next.binding
+    if (next?.limits)
+      limits.value = next.limits
   },
 )
 
@@ -101,7 +103,7 @@ const mode = ref<Mode>('photo')
 const showVideo = computed(() => ['pro', 'premium', 'luxury'].includes(ev.value?.plan_tier ?? ''))
 const showVoice = computed(() => ['premium', 'luxury'].includes(ev.value?.plan_tier ?? ''))
 
-const uploads = ref<Array<{ id: string; uploaded_at: string }>>([])
+const uploads = ref<Array<{ id: string, uploaded_at: string }>>([])
 
 // Counters drive the "X / N" chips on the camera screen. Start from the
 // last value the server returned; each upload bumps them.
@@ -127,13 +129,17 @@ watch(binding, (b) => {
 // dock tabs.
 const activeIcon = computed(() => (mode.value === 'photo' ? '📸' : mode.value === 'video' ? '🎥' : '🎤'))
 const activeUsed = computed(() => {
-  if (mode.value === 'photo') return counts.value.photo_count
-  if (mode.value === 'video') return counts.value.video_count
+  if (mode.value === 'photo')
+    return counts.value.photo_count
+  if (mode.value === 'video')
+    return counts.value.video_count
   return counts.value.voice_count
 })
 const activeLimit = computed(() => {
-  if (mode.value === 'photo') return limits.value.photo
-  if (mode.value === 'video') return limits.value.video
+  if (mode.value === 'photo')
+    return limits.value.photo
+  if (mode.value === 'video')
+    return limits.value.video
   return limits.value.voice
 })
 const activeProgress = computed(() => {
@@ -141,8 +147,10 @@ const activeProgress = computed(() => {
   return Math.min(100, (activeUsed.value / lim) * 100)
 })
 const activeLabel = computed(() => {
-  if (mode.value === 'photo') return t('guest.camera.quotaPhotos', { used: activeUsed.value, total: activeLimit.value })
-  if (mode.value === 'video') return t('guest.camera.quotaVideos', { used: activeUsed.value, total: activeLimit.value })
+  if (mode.value === 'photo')
+    return t('guest.camera.quotaPhotos', { used: activeUsed.value, total: activeLimit.value })
+  if (mode.value === 'video')
+    return t('guest.camera.quotaVideos', { used: activeUsed.value, total: activeLimit.value })
   return t('guest.camera.quotaVoices', { used: activeUsed.value, total: activeLimit.value })
 })
 
@@ -168,7 +176,8 @@ function decideStage() {
   if (binding.value) {
     // We already know this guest. Carry forward their name and skip
     // the welcome form entirely.
-    if (binding.value.guest_name) guestName.value = binding.value.guest_name
+    if (binding.value.guest_name)
+      guestName.value = binding.value.guest_name
     stage.value = 'camera'
     return
   }
@@ -186,7 +195,8 @@ onMounted(async () => {
       })
       binding.value = fresh.binding
       limits.value = fresh.limits
-    } catch {
+    }
+    catch {
       // swallow — we still have the SSR response; binding stays null
     }
   }
@@ -198,20 +208,23 @@ watch([tableParam, binding], decideStage)
 const welcomePending = ref(false)
 
 async function startCapture() {
-  if (welcomePending.value) return
-  if (!guestName.value.trim() || !tableParam.value || !deviceId.value) return
+  if (welcomePending.value)
+    return
+  if (!guestName.value.trim() || !tableParam.value || !deviceId.value)
+    return
   welcomePending.value = true
   // Persist locally as a UX nicety.
   try {
     localStorage.setItem(`memour:guest:${eventId.value}`, guestName.value.trim())
-  } catch {/* ignore */}
+  }
+  catch { /* ignore */ }
 
   // Record the binding on the server NOW, not on first upload. This
   // way a guest who scans, enters their name, then closes the tab
   // (or wanders off and comes back later) jumps straight back to
   // the camera — the server already knows who they are.
   try {
-    const res = await $fetch<{ ok: boolean; binding: Binding }>(
+    const res = await $fetch<{ ok: boolean, binding: Binding }>(
       `/api/guest/binding/${eventId.value}`,
       {
         method: 'POST',
@@ -229,20 +242,23 @@ async function startCapture() {
       voice_count: res.binding.voice_count,
     }
     stage.value = 'camera'
-  } catch (e: any) {
+  }
+  catch (e: any) {
     const code = e?.data?.data?.code ?? e?.data?.code
     if (code === 'wrong_table') {
       // Stale binding for this device points at a different table —
       // server-side check beats client-side guesswork.
       stage.value = 'wrong_table'
-    } else {
+    }
+    else {
       // Soft failure (network blip, server hiccup): let them in
       // anyway. The upload endpoint also creates the binding as a
       // safety net, so they're not stranded.
       console.error('[guest/welcome] binding failed', e)
       stage.value = 'camera'
     }
-  } finally {
+  }
+  finally {
     welcomePending.value = false
   }
 }
@@ -250,10 +266,11 @@ async function startCapture() {
 function onUploaded(photo: {
   id: string
   uploaded_at: string
-  counts?: { photo_count: number; video_count: number; voice_count: number }
+  counts?: { photo_count: number, video_count: number, voice_count: number }
 }) {
   uploads.value = [{ id: photo.id, uploaded_at: photo.uploaded_at }, ...uploads.value].slice(0, 12)
-  if (photo.counts) counts.value = photo.counts
+  if (photo.counts)
+    counts.value = photo.counts
 }
 
 function onQuotaExceeded() {
@@ -297,7 +314,7 @@ const monogram = computed(() => {
   const raw = ev.value?.couple_names ?? ''
   const parts = raw
     .split(/\s*[&·+]\s*|\s+и\s+|\s+va\s+|\s+and\s+/i)
-    .map((s) => s.trim())
+    .map(s => s.trim())
     .filter(Boolean)
   if (parts.length >= 2) {
     return `${parts[0]![0]?.toUpperCase() ?? ''} & ${parts[1]![0]?.toUpperCase() ?? ''}`
@@ -306,7 +323,8 @@ const monogram = computed(() => {
 })
 
 const formattedDate = computed(() => {
-  if (!ev.value?.wedding_date) return null
+  if (!ev.value?.wedding_date)
+    return null
   // Locale-aware date — Cyrillic month names in RU, Latin in UZ.
   const tag = locale.value === 'uz' ? 'uz-UZ' : 'ru-RU'
   return new Date(ev.value.wedding_date).toLocaleDateString(tag, {
@@ -326,7 +344,9 @@ useSeoMeta({
   <!-- 404 -->
   <div v-if="fetchError" class="grid min-h-[100dvh] place-items-center p-6">
     <div class="surface-card max-w-md rounded-(--radius-xl) p-8 text-center">
-      <h1 class="heading-display-md">{{ t('guest.state.notFoundTitle') }}</h1>
+      <h1 class="heading-display-md">
+        {{ t('guest.state.notFoundTitle') }}
+      </h1>
       <p class="mt-2 text-(--color-muted-foreground)">
         {{ t('guest.state.notFoundDesc') }}
       </p>
@@ -334,14 +354,20 @@ useSeoMeta({
   </div>
 
   <div v-else-if="pending" class="grid min-h-[100dvh] place-items-center">
-    <div class="text-(--color-muted-foreground)">{{ t('guest.state.loading') }}</div>
+    <div class="text-(--color-muted-foreground)">
+      {{ t('guest.state.loading') }}
+    </div>
   </div>
 
   <!-- Draft -->
   <div v-else-if="isDraft" class="grid min-h-[100dvh] place-items-center p-6">
     <div class="surface-card max-w-md rounded-(--radius-xl) p-8 text-center">
-      <p class="text-xs uppercase tracking-[0.3em] text-(--color-muted-foreground)">{{ ev?.couple_names }}</p>
-      <h1 class="heading-display-md mt-3">{{ t('guest.state.draftTitle') }}</h1>
+      <p class="text-xs uppercase tracking-[0.3em] text-(--color-muted-foreground)">
+        {{ ev?.couple_names }}
+      </p>
+      <h1 class="heading-display-md mt-3">
+        {{ t('guest.state.draftTitle') }}
+      </h1>
       <p class="mt-3 text-(--color-muted-foreground)">
         {{ t('guest.state.draftDesc') }}
       </p>
@@ -568,7 +594,9 @@ useSeoMeta({
           <div class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-amber-50">
             <span class="text-2xl">⌫</span>
           </div>
-          <h2 class="mt-4 font-display text-2xl italic">{{ t('guest.noTable.title') }}</h2>
+          <h2 class="mt-4 font-display text-2xl italic">
+            {{ t('guest.noTable.title') }}
+          </h2>
           <p class="mt-2 text-sm text-(--color-muted-foreground)">
             {{ t('guest.noTable.desc') }}
           </p>
@@ -581,7 +609,9 @@ useSeoMeta({
           <div class="mx-auto grid h-14 w-14 place-items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700">
             <span class="text-xl">⊘</span>
           </div>
-          <h2 class="mt-4 font-display text-2xl italic">{{ t('guest.wrongTable.title') }}</h2>
+          <h2 class="mt-4 font-display text-2xl italic">
+            {{ t('guest.wrongTable.title') }}
+          </h2>
           <p class="mt-3 text-sm leading-relaxed text-(--color-muted-foreground)">
             {{ t('guest.wrongTable.descBefore') }}
             <strong class="font-medium text-(--color-foreground)">{{ t('guest.wrongTable.tableLabel', { n: binding.table_number }) }}</strong>.
@@ -599,27 +629,40 @@ useSeoMeta({
           <div class="mx-auto grid h-14 w-14 place-items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700">
             <span class="text-xl">✓</span>
           </div>
-          <h2 class="mt-4 font-display text-2xl italic">{{ t('guest.quotaFull.title') }}</h2>
+          <h2 class="mt-4 font-display text-2xl italic">
+            {{ t('guest.quotaFull.title') }}
+          </h2>
           <p class="mt-3 text-sm leading-relaxed text-(--color-muted-foreground)">
             {{ t('guest.quotaFull.desc') }}
           </p>
           <div class="mt-5 grid grid-cols-3 gap-3 text-center">
             <div class="rounded-md border border-(--color-border)/60 bg-white/70 px-2 py-3">
-              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">{{ t('guest.quotaFull.photo') }}</p>
-              <p class="mt-1 font-display text-lg">{{ counts.photo_count }}<span class="text-(--color-muted-foreground)">/{{ limits.photo }}</span></p>
+              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">
+                {{ t('guest.quotaFull.photo') }}
+              </p>
+              <p class="mt-1 font-display text-lg">
+                {{ counts.photo_count }}<span class="text-(--color-muted-foreground)">/{{ limits.photo }}</span>
+              </p>
             </div>
             <div v-if="showVideo" class="rounded-md border border-(--color-border)/60 bg-white/70 px-2 py-3">
-              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">{{ t('guest.quotaFull.video') }}</p>
-              <p class="mt-1 font-display text-lg">{{ counts.video_count }}<span class="text-(--color-muted-foreground)">/{{ limits.video }}</span></p>
+              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">
+                {{ t('guest.quotaFull.video') }}
+              </p>
+              <p class="mt-1 font-display text-lg">
+                {{ counts.video_count }}<span class="text-(--color-muted-foreground)">/{{ limits.video }}</span>
+              </p>
             </div>
             <div v-if="showVoice" class="rounded-md border border-(--color-border)/60 bg-white/70 px-2 py-3">
-              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">{{ t('guest.quotaFull.voice') }}</p>
-              <p class="mt-1 font-display text-lg">{{ counts.voice_count }}<span class="text-(--color-muted-foreground)">/{{ limits.voice }}</span></p>
+              <p class="text-[9px] uppercase tracking-widest text-(--color-muted-foreground)">
+                {{ t('guest.quotaFull.voice') }}
+              </p>
+              <p class="mt-1 font-display text-lg">
+                {{ counts.voice_count }}<span class="text-(--color-muted-foreground)">/{{ limits.voice }}</span>
+              </p>
             </div>
           </div>
         </div>
       </div>
-
     </Transition>
 
     <!-- Language switch — quiet text link at the foot of every

@@ -12,7 +12,7 @@ export default defineEventHandler((event) => {
 
   const urls = locales
     .map(
-      (locale) => `  <url>
+      locale => `  <url>
     <loc>${site}/${locale}</loc>
     <lastmod>${now}</lastmod>
     <changefreq>weekly</changefreq>

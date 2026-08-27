@@ -1,5 +1,5 @@
-import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { serverSupabaseServiceRole } from '#supabase/server'
 import { DEVICE_LIMITS } from '../../../utils/guest-quota'
 
 /**
@@ -79,7 +79,8 @@ export default defineEventHandler(async (event) => {
       .eq('event_id', id)
       .eq('device_id', deviceId)
       .maybeSingle()
-    if (row) binding = row
+    if (row)
+      binding = row
   }
 
   return {

@@ -20,13 +20,12 @@ withDefaults(
 
 <template>
   <div
-    :class="[
-      'animate-pulse bg-gradient-to-r from-(--color-muted) via-(--color-accent)/40 to-(--color-muted) bg-[length:200%_100%] [animation:shimmer_2s_linear_infinite]',
+    class="animate-pulse bg-gradient-to-r from-(--color-muted) via-(--color-accent)/40 to-(--color-muted) bg-[length:200%_100%] [animation:shimmer_2s_linear_infinite]" :class="[
       shape === 'circle' ? 'rounded-full aspect-square' : '',
-      rounded === 'sm' ? 'rounded-sm' :
-      rounded === 'md' ? 'rounded-md' :
-      rounded === 'lg' ? 'rounded-lg' :
-      rounded === 'full' ? 'rounded-full' : '',
+      rounded === 'sm' ? 'rounded-sm'
+      : rounded === 'md' ? 'rounded-md'
+        : rounded === 'lg' ? 'rounded-lg'
+          : rounded === 'full' ? 'rounded-full' : '',
       $props.class,
     ]"
   />

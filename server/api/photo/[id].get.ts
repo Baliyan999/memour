@@ -1,5 +1,5 @@
-import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { serverSupabaseServiceRole } from '#supabase/server'
 
 /**
  * GET /api/photo/[id] — returns a short-lived signed URL for a single
@@ -15,7 +15,8 @@ function fail(statusCode: number, code: string): never {
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) fail(400, 'invalid_id')
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id))
+    fail(400, 'invalid_id')
 
   const admin = serverSupabaseServiceRole<Database>(event)
 
@@ -24,16 +25,18 @@ export default defineEventHandler(async (event) => {
     .select('storage_path, thumbnail_path, is_hidden')
     .eq('id', id!)
     .maybeSingle()
-  if (error || !photo) fail(404, 'photo_not_found')
-  if (photo!.is_hidden) fail(410, 'photo_hidden')
+  if (error || !photo)
+    fail(404, 'photo_not_found')
+  if (photo!.is_hidden)
+    fail(410, 'photo_hidden')
 
   // ?t=thumb returns the small 400x400 thumbnail (much faster). When
   // it doesn't exist (legacy photos pre-sharp or non-photo media),
   // we fall through to the original.
   const query = getQuery(event)
   const wantsThumb = query.t === 'thumb'
-  const pathToServe =
-    wantsThumb && photo!.thumbnail_path ? photo!.thumbnail_path : photo!.storage_path
+  const pathToServe
+    = wantsThumb && photo!.thumbnail_path ? photo!.thumbnail_path : photo!.storage_path
 
   const { data: signed, error: signErr } = await admin.storage
     .from('photos')

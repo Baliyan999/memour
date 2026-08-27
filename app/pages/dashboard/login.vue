@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
-import { useI18n, useLocalePath } from '#imports'
+import { ArrowRight, Mail, Phone, Shield } from '@lucide/vue'
 import { motion } from 'motion-v'
-import { ArrowRight, Phone, Shield, Mail } from '@lucide/vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useI18n, useLocalePath } from '#imports'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -28,7 +28,8 @@ const user = useSupabaseUser()
 watch(
   user,
   (u) => {
-    if (u) navigateTo(localePath('/dashboard'))
+    if (u)
+      navigateTo(localePath('/dashboard'))
   },
   { immediate: true },
 )
@@ -40,18 +41,22 @@ watch(
 // reactive user, then the watcher above redirects to /dashboard.
 const supabaseAuthClient = useSupabaseClient()
 onMounted(async () => {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined')
+    return
   const hash = window.location.hash
-  if (!hash || !hash.includes('access_token=')) return
+  if (!hash || !hash.includes('access_token='))
+    return
   const params = new URLSearchParams(hash.slice(1))
   const access_token = params.get('access_token')
   const refresh_token = params.get('refresh_token')
-  if (!access_token || !refresh_token) return
+  if (!access_token || !refresh_token)
+    return
   try {
     await supabaseAuthClient.auth.setSession({ access_token, refresh_token })
     // Clean the hash so a refresh doesn't reapply the (now used) token.
     window.history.replaceState({}, '', window.location.pathname + window.location.search)
-  } catch (e) {
+  }
+  catch (e) {
     console.error('[login] setSession from hash failed', e)
   }
 })
@@ -68,7 +73,7 @@ const step = ref<Step>('phone')
 const supabase = useSupabaseClient()
 const emailAddr = ref('')
 const emailSent = ref(false)
-const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddr.value))
+const emailValid = computed(() => /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(emailAddr.value))
 
 // Phone-step state — mirrors LeadForm: digits is the raw 9-digit
 // user portion, modelValue is the formatted "+998 XX XXX XX XX".
@@ -100,7 +105,8 @@ function startResendCooldown(seconds: number) {
   clearInterval(resendTimer)
   resendTimer = window.setInterval(() => {
     resendIn.value = Math.max(0, resendIn.value - 1)
-    if (resendIn.value === 0) clearInterval(resendTimer)
+    if (resendIn.value === 0)
+      clearInterval(resendTimer)
   }, 1000) as unknown as number
 }
 
@@ -115,7 +121,8 @@ function localizedError(e: any): string {
   const key = code ? `couple.errors.${code}` : null
   if (key) {
     const translated = t(key)
-    if (translated !== key) return translated
+    if (translated !== key)
+      return translated
   }
   return t('couple.errors.unknown')
 }
@@ -124,7 +131,7 @@ async function sendCode() {
   error.value = null
   pending.value = true
   try {
-    const res = await $fetch<{ ok: boolean; dev_code?: string }>(
+    const res = await $fetch<{ ok: boolean, dev_code?: string }>(
       '/api/auth/phone/send',
       {
         method: 'POST',
@@ -136,9 +143,11 @@ async function sendCode() {
     startResendCooldown(30)
     await nextTick()
     codeRefs.value?.focus()
-  } catch (e: any) {
+  }
+  catch (e: any) {
     error.value = localizedError(e)
-  } finally {
+  }
+  finally {
     pending.value = false
   }
 }
@@ -147,7 +156,7 @@ async function verifyCode() {
   error.value = null
   pending.value = true
   try {
-    const res = await $fetch<{ ok: boolean; action_link: string }>(
+    const res = await $fetch<{ ok: boolean, action_link: string }>(
       '/api/auth/phone/verify',
       {
         method: 'POST',
@@ -161,9 +170,11 @@ async function verifyCode() {
     if (typeof window !== 'undefined') {
       window.location.href = res.action_link
     }
-  } catch (e: any) {
+  }
+  catch (e: any) {
     error.value = localizedError(e)
-  } finally {
+  }
+  finally {
     pending.value = false
   }
 }
@@ -171,7 +182,8 @@ async function verifyCode() {
 function onCodeInput(e: Event) {
   const v = (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6)
   code.value = v
-  if (v.length === 6) verifyCode()
+  if (v.length === 6)
+    verifyCode()
 }
 
 function backToPhone() {
@@ -181,23 +193,27 @@ function backToPhone() {
 }
 
 async function sendEmailLink() {
-  if (!emailValid.value) return
+  if (!emailValid.value)
+    return
   error.value = null
   pending.value = true
   try {
-    const redirectTo =
-      typeof window !== 'undefined'
+    const redirectTo
+      = typeof window !== 'undefined'
         ? `${window.location.origin}${localePath('/dashboard')}`
         : undefined
     const { error: err } = await supabase.auth.signInWithOtp({
       email: emailAddr.value,
       options: { emailRedirectTo: redirectTo },
     })
-    if (err) throw err
+    if (err)
+      throw err
     emailSent.value = true
-  } catch (e: any) {
+  }
+  catch (e: any) {
     error.value = e?.message ?? t('couple.errors.unknown')
-  } finally {
+  }
+  finally {
     pending.value = false
   }
 }
@@ -235,8 +251,12 @@ async function sendEmailLink() {
             <span class="h-px w-10 bg-(--color-border)" />
           </div>
           <p class="mt-3 max-w-xs text-sm text-(--color-muted-foreground)">
-            <template v-if="step === 'phone'">{{ t('couple.loginPhoneDesc') }}</template>
-            <template v-else>{{ t('couple.loginCodeDesc') }} <strong class="block whitespace-nowrap font-medium text-(--color-foreground) mt-0.5">+998&nbsp;{{ phoneDigits.replace(/(\d{2})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4') }}</strong></template>
+            <template v-if="step === 'phone'">
+              {{ t('couple.loginPhoneDesc') }}
+            </template>
+            <template v-else>
+              {{ t('couple.loginCodeDesc') }} <strong class="block whitespace-nowrap font-medium text-(--color-foreground) mt-0.5">+998&nbsp;{{ phoneDigits.replace(/(\d{2})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4') }}</strong>
+            </template>
           </p>
         </div>
 
@@ -247,8 +267,7 @@ async function sendEmailLink() {
         >
           <button
             type="button"
-            :class="[
-              'flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors',
+            class="flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors" :class="[
               channel === 'phone'
                 ? 'bg-(--color-primary) text-(--color-primary-foreground)'
                 : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
@@ -260,8 +279,7 @@ async function sendEmailLink() {
           </button>
           <button
             type="button"
-            :class="[
-              'flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors',
+            class="flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors" :class="[
               channel === 'email'
                 ? 'bg-(--color-primary) text-(--color-primary-foreground)'
                 : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
@@ -288,8 +306,12 @@ async function sendEmailLink() {
             <div class="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-(--color-primary) text-white">
               <Mail class="h-7 w-7" :stroke-width="1.6" />
             </div>
-            <p class="text-base">{{ t('couple.emailCheckInbox') }}</p>
-            <p class="mt-1 break-all text-sm text-(--color-muted-foreground)">{{ emailAddr }}</p>
+            <p class="text-base">
+              {{ t('couple.emailCheckInbox') }}
+            </p>
+            <p class="mt-1 break-all text-sm text-(--color-muted-foreground)">
+              {{ emailAddr }}
+            </p>
             <p class="mt-3 text-[11px] text-(--color-muted-foreground)">
               {{ t('couple.emailValidNote') }}
             </p>
@@ -316,7 +338,9 @@ async function sendEmailLink() {
               </div>
             </div>
 
-            <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+            <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {{ error }}
+            </p>
 
             <button
               type="submit"
@@ -360,7 +384,9 @@ async function sendEmailLink() {
             <p
               v-if="error"
               class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-            >{{ error }}</p>
+            >
+              {{ error }}
+            </p>
 
             <button
               type="submit"
@@ -400,7 +426,9 @@ async function sendEmailLink() {
                 </svg>
               </div>
               <div class="min-w-0 flex-1">
-                <p class="text-[10px] font-medium uppercase tracking-wider text-amber-800">{{ t('couple.devBannerEyebrow') }}</p>
+                <p class="text-[10px] font-medium uppercase tracking-wider text-amber-800">
+                  {{ t('couple.devBannerEyebrow') }}
+                </p>
                 <p class="mt-0.5 text-sm text-amber-900">
                   {{ t('couple.devBannerText') }}
                   <span class="ml-1 font-mono text-base font-semibold tracking-widest">{{ devCode }}</span>
@@ -433,7 +461,9 @@ async function sendEmailLink() {
             <p
               v-if="error"
               class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-            >{{ error }}</p>
+            >
+              {{ error }}
+            </p>
 
             <button
               type="submit"
@@ -452,13 +482,17 @@ async function sendEmailLink() {
                 type="button"
                 class="text-(--color-muted-foreground) underline decoration-(--color-muted-foreground)/40 underline-offset-2 hover:text-(--color-foreground)"
                 @click="backToPhone"
-              >{{ t('couple.changePhone') }}</button>
+              >
+                {{ t('couple.changePhone') }}
+              </button>
               <button
                 type="button"
                 :disabled="resendIn > 0 || pending"
                 class="text-(--color-primary) underline decoration-(--color-primary)/40 underline-offset-2 hover:decoration-(--color-primary) disabled:cursor-not-allowed disabled:opacity-50"
                 @click="sendCode"
-              >{{ resendIn > 0 ? t('couple.resendIn', { sec: resendIn }) : t('couple.resend') }}</button>
+              >
+                {{ resendIn > 0 ? t('couple.resendIn', { sec: resendIn }) : t('couple.resend') }}
+              </button>
             </div>
           </form>
         </Transition>

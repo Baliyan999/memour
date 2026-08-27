@@ -1,15 +1,16 @@
+import type { Database } from '~/types/database.types'
 // archiver v8 ships as ESM with named exports only; default import
 // breaks under Node's ESM module loader. Use createRequire to grab
 // the CJS factory function (`archiver('zip', opts)`) unchanged.
 import { createRequire } from 'node:module'
-const require = createRequire(import.meta.url)
-const archiver = require('archiver') as typeof import('archiver')
 import { PassThrough } from 'node:stream'
 import {
-  serverSupabaseUser,
   serverSupabaseServiceRole,
+  serverSupabaseUser,
 } from '#supabase/server'
-import type { Database } from '~/types/database.types'
+
+const require = createRequire(import.meta.url)
+const archiver = require('archiver') as typeof import('archiver')
 
 /**
  * GET /api/couple/zip/[id] — stream a ZIP archive of all photos for
@@ -29,10 +30,12 @@ function fail(statusCode: number, code: string): never {
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) fail(401, 'unauthorized')
+  if (!user)
+    fail(401, 'unauthorized')
 
   const id = getRouterParam(event, 'id')
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) fail(400, 'invalid_id')
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id))
+    fail(400, 'invalid_id')
 
   const admin = serverSupabaseServiceRole<Database>(event)
 
@@ -42,8 +45,10 @@ export default defineEventHandler(async (event) => {
     .select('id, couple_names, owner_id')
     .eq('id', id!)
     .maybeSingle()
-  if (!ev) fail(404, 'event_not_found')
-  if (ev!.owner_id !== ((user as any).id ?? (user as any).sub)) fail(403, 'forbidden')
+  if (!ev)
+    fail(404, 'event_not_found')
+  if (ev!.owner_id !== ((user as any).id ?? (user as any).sub))
+    fail(403, 'forbidden')
 
   const { data: photos, error: photosErr } = await admin
     .from('photos')
@@ -51,8 +56,10 @@ export default defineEventHandler(async (event) => {
     .eq('event_id', id!)
     .eq('is_hidden', false)
     .order('uploaded_at', { ascending: true })
-  if (photosErr) fail(500, 'list_failed')
-  if (!photos || photos.length === 0) fail(404, 'no_photos')
+  if (photosErr)
+    fail(500, 'list_failed')
+  if (!photos || photos.length === 0)
+    fail(404, 'no_photos')
 
   // Set response headers BEFORE we start streaming.
   const safeName = ev!.couple_names.replace(/[^a-z0-9а-яё ]/gi, '_').slice(0, 40) || 'memour'
@@ -92,7 +99,8 @@ export default defineEventHandler(async (event) => {
         archive.append(buf, { name })
       }
       await archive.finalize()
-    } catch (err) {
+    }
+    catch (err) {
       console.error('[zip] fatal', err)
       archive.abort()
       pass.destroy(err as Error)

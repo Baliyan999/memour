@@ -12,10 +12,12 @@
  */
 export function useHaptic() {
   function safe(pattern: number | number[]) {
-    if (typeof navigator === 'undefined' || !('vibrate' in navigator)) return
+    if (typeof navigator === 'undefined' || !('vibrate' in navigator))
+      return
     try {
       navigator.vibrate(pattern)
-    } catch {
+    }
+    catch {
       // Some browsers throw on subsequent vibrate() within a tab — ignore.
     }
   }

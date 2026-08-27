@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { motion, AnimatePresence } from 'motion-v'
 import { AlertTriangle } from '@lucide/vue'
+import { AnimatePresence, motion } from 'motion-v'
 
 /**
  * Global confirm modal — mounted once at app.vue. Picks up state from
@@ -34,8 +34,7 @@ const { state, decide } = useConfirm()
         >
           <div class="flex items-start gap-4">
             <div
-              :class="[
-                'grid h-11 w-11 shrink-0 place-items-center rounded-full',
+              class="grid h-11 w-11 shrink-0 place-items-center rounded-full" :class="[
                 state.current.tone === 'danger'
                   ? 'bg-red-100 text-red-600'
                   : 'bg-(--color-accent)/40 text-(--color-primary)',
@@ -44,7 +43,9 @@ const { state, decide } = useConfirm()
               <AlertTriangle class="h-5 w-5" :stroke-width="1.8" />
             </div>
             <div class="min-w-0 flex-1">
-              <h2 class="font-display text-xl">{{ state.current.title }}</h2>
+              <h2 class="font-display text-xl">
+                {{ state.current.title }}
+              </h2>
               <p v-if="state.current.description" class="mt-2 text-sm text-(--color-muted-foreground)">
                 {{ state.current.description }}
               </p>
@@ -56,17 +57,20 @@ const { state, decide } = useConfirm()
               type="button"
               class="inline-flex h-10 items-center rounded-md border border-(--color-border) bg-white px-4 text-sm hover:bg-(--color-muted)"
               @click="decide(false)"
-            >{{ state.current.cancelLabel ?? 'Отмена' }}</button>
+            >
+              {{ state.current.cancelLabel ?? 'Отмена' }}
+            </button>
             <button
               type="button"
-              :class="[
-                'inline-flex h-10 items-center rounded-md px-4 text-sm font-medium text-white',
+              class="inline-flex h-10 items-center rounded-md px-4 text-sm font-medium text-white" :class="[
                 state.current.tone === 'danger'
                   ? 'bg-red-600 hover:opacity-90'
                   : 'bg-(--color-primary) hover:opacity-90',
               ]"
               @click="decide(true)"
-            >{{ state.current.confirmLabel ?? 'Подтвердить' }}</button>
+            >
+              {{ state.current.confirmLabel ?? 'Подтвердить' }}
+            </button>
           </div>
         </motion.div>
       </motion.div>

@@ -65,8 +65,8 @@ defineProps<{
   <span
     v-else-if="kind === 'gold-dot'"
     aria-hidden="true"
-    :class="['inline-block rounded-full bg-(--color-primary)', className]"
-    :style="{ width: size ?? 6 + 'px', height: size ?? 6 + 'px' }"
+    class="inline-block rounded-full bg-(--color-primary)" :class="[className]"
+    :style="{ width: size ?? `${6}px`, height: size ?? `${6}px` }"
   />
 </template>
 

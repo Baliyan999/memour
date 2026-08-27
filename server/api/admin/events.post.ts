@@ -1,9 +1,9 @@
+import type { Database } from '~/types/database.types'
 import { z } from 'zod'
 import {
-  serverSupabaseUser,
   serverSupabaseServiceRole,
+  serverSupabaseUser,
 } from '#supabase/server'
-import type { Database } from '~/types/database.types'
 import { sendSms } from '../../utils/eskiz'
 
 /**
@@ -37,7 +37,8 @@ const bodySchema = z.object({
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  if (!user)
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
 
   const admin = serverSupabaseServiceRole<Database>(event)
 
@@ -65,14 +66,15 @@ export default defineEventHandler(async (event) => {
   let ownerId: string | null = null
   if (input.owner_email) {
     const { data: existing } = await admin.auth.admin.listUsers()
-    const found = existing?.users.find((u) => u.email === input.owner_email)
+    const found = existing?.users.find(u => u.email === input.owner_email)
     if (found) {
       ownerId = found.id
-    } else {
+    }
+    else {
       // Invite new user; they get a magic link by email.
       const config = useRuntimeConfig()
-      const { data: invited, error: inviteErr } =
-        await admin.auth.admin.inviteUserByEmail(input.owner_email, {
+      const { data: invited, error: inviteErr }
+        = await admin.auth.admin.inviteUserByEmail(input.owner_email, {
           redirectTo: `${config.public.siteUrl}/dashboard`,
         })
       if (inviteErr) {
@@ -120,7 +122,7 @@ export default defineEventHandler(async (event) => {
     const message = useTest
       ? 'Bu Eskiz dan test'
       : `Memour: для вашей свадьбы открыт кабинет. Войти: ${loginUrl}`
-    await sendSms(input.owner_phone, message).catch((e) =>
+    await sendSms(input.owner_phone, message).catch(e =>
       console.error('[admin/events] notify couple failed', e),
     )
   }
