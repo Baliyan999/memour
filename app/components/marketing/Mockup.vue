@@ -8,7 +8,7 @@ import { Battery, Heart, MapPin, Play, Send, Signal, Wifi, X } from '@lucide/vue
  * few small photos, no scroll/state subscriptions. Each variant is a
  * stylised reproduction of the real product UI for that feature
  * (projector slideshow, phone recording, voice bubble, swipe deck,
- * geofence map, Telegram chat).
+ * geofence map) — and a preview of the Telegram bot still to come.
  */
 const props = defineProps<{
   cardKey: 'slideshow' | 'video' | 'voice' | 'swipe' | 'geofence' | 'telegram'
@@ -316,6 +316,9 @@ const ALBUM = ['mock-album-couple', 'mock-album-table', 'mock-album-first-look',
   </div>
 
   <!-- ───────────── Telegram ───────────── -->
+  <!-- A preview of the couple's bot, which isn't live yet: its card and
+       the bot's status line say «скоро». Like the real notices will, it
+       names tables, never guests. -->
   <!-- Tight paddings and leading, and the first bubble's time on its
        sender line (as Telegram sets it), keep the input row whole in
        the 12rem stage (sm); the 15rem stage (3xl) gets its padding back. -->

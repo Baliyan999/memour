@@ -28,15 +28,18 @@ const { t } = useI18n()
 type Tier = {
   key: 'basic' | 'pro' | 'premium' | 'luxury'
   featureCount: number
+  // Lines (1-based) for features that aren't live yet: they carry the
+  // «скоро» pill on both faces.
+  soon?: number[]
   highlighted?: boolean
   luxe?: boolean
 }
 
 const TIERS: Tier[] = [
   { key: 'basic', featureCount: 5 },
-  { key: 'pro', featureCount: 7, highlighted: true },
-  { key: 'premium', featureCount: 6 },
-  { key: 'luxury', featureCount: 7, luxe: true },
+  { key: 'pro', featureCount: 6, soon: [6], highlighted: true },
+  { key: 'premium', featureCount: 6, soon: [5, 6] },
+  { key: 'luxury', featureCount: 5, luxe: true },
 ]
 
 // One flip state per tier key — reactive.
@@ -172,10 +175,11 @@ const LUXE_SURFACE = 'border border-(--color-champagne)/20 shadow-[inset_0_1px_0
 // The chosen tier travels to the lead form (LeadForm reads 'leadTier').
 const leadTier = useState<string | null>('leadTier', () => null)
 
-const features = (key: string, count: number) =>
-  Array.from({ length: count }, (_, j) => j + 1).map((k) => ({
-    short: t(`pricing.${key}.f${k}`),
-    desc: t(`pricing.${key}.f${k}Desc`),
+const features = (tier: Tier) =>
+  Array.from({ length: tier.featureCount }, (_, j) => j + 1).map((k) => ({
+    short: t(`pricing.${tier.key}.f${k}`),
+    desc: t(`pricing.${tier.key}.f${k}Desc`),
+    soon: !!tier.soon?.includes(k),
   }))
 </script>
 
@@ -242,7 +246,7 @@ const features = (key: string, count: number) =>
             <div
               v-if="tier.highlighted"
               class="pointer-events-none absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-(--color-primary) px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-(--color-primary-foreground) shadow-(--shadow-soft)"
-            >{{ t('pricing.popular') }}</div>
+            >{{ t('pricing.recommended') }}</div>
             <div
               v-if="tier.luxe"
               class="pointer-events-none absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.16em] shadow-[inset_0_0_0_1px_rgb(255_255_255/0.3),0_4px_12px_-4px_rgb(140_90_60/0.45)]"
@@ -327,7 +331,7 @@ const features = (key: string, count: number) =>
 
                 <ul class="flex flex-1 flex-col gap-2.5 text-sm md:gap-3.5 3xl:gap-4 3xl:text-base 4xl:gap-5 4xl:text-lg">
                   <li
-                    v-for="(f, j) in features(tier.key, tier.featureCount)"
+                    v-for="(f, j) in features(tier)"
                     :key="j"
                     class="flex items-start gap-3"
                   >
@@ -341,7 +345,7 @@ const features = (key: string, count: number) =>
                     </span>
                     <!-- Balanced, so a label that wraps in a narrow
                          column breaks into two even lines. -->
-                    <span class="text-balance">{{ f.short }}</span>
+                    <span class="text-balance"><MarketingSoonBadge v-if="f.soon" :text="f.short" /><template v-else>{{ f.short }}</template></span>
                   </li>
                 </ul>
 
@@ -425,7 +429,7 @@ const features = (key: string, count: number) =>
                     @scroll.passive="schedule"
                   >
                     <li
-                      v-for="(f, j) in features(tier.key, tier.featureCount)"
+                      v-for="(f, j) in features(tier)"
                       :key="j"
                       :class="['flex flex-col gap-1', cue[tier.key]?.scrolls !== false && 'last:pb-(--fade)']"
                     >
@@ -439,7 +443,7 @@ const features = (key: string, count: number) =>
                         >
                           <Check class="h-2.5 w-2.5" :stroke-width="3" />
                         </span>
-                        <span class="font-medium text-balance">{{ f.short }}</span>
+                        <span class="font-medium text-balance"><MarketingSoonBadge v-if="f.soon" :text="f.short" /><template v-else>{{ f.short }}</template></span>
                       </div>
                       <p :class="['pl-6 text-xs leading-relaxed', tier.luxe ? 'text-white/60' : 'text-(--color-muted-foreground)']">
                         {{ f.desc }}
