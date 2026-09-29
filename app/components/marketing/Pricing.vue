@@ -47,10 +47,31 @@ const faceButtons = new Map<string, HTMLElement>()
 function setFaceButton(key: string, el: unknown) {
   if (el instanceof HTMLElement) faceButtons.set(key, el)
 }
-async function toggle(key: string) {
+// Which face points at the viewer, from the live angle. Safari paints
+// separately composited children (the «Подробнее» chip) through
+// `backface-visibility`, mirrored on the other face, so the face that has
+// turned away is also `visibility: hidden` — switched as the card passes
+// 90°, not when the turn starts. Focus waits for its face to show up
+// (hidden elements can't take focus).
+const backShown = ref<Record<string, boolean>>({})
+const pendingFocus = new Map<string, ReturnType<typeof setTimeout>>()
+function showFace(key: string, back: boolean) {
+  if (backShown.value[key] !== back) backShown.value[key] = back
+  if (pendingFocus.has(key) && back === !!flipped.value[key]) {
+    clearTimeout(pendingFocus.get(key))
+    pendingFocus.delete(key)
+    nextTick(() => faceButtons.get(`${key}:${back ? 'back' : 'front'}`)?.focus({ preventScroll: true }))
+  }
+}
+function onTurn(key: string, latest: Record<string, unknown>) {
+  const deg = Number.parseFloat(String(latest.rotateY ?? 0)) || 0
+  showFace(key, Math.abs(deg % 360) > 90)
+}
+function toggle(key: string) {
   flipped.value[key] = !flipped.value[key]
-  await nextTick()
-  faceButtons.get(`${key}:${flipped.value[key] ? 'back' : 'front'}`)?.focus({ preventScroll: true })
+  // Fallback in case no animation frame reports the angle (instant turn).
+  clearTimeout(pendingFocus.get(key))
+  pendingFocus.set(key, setTimeout(() => showFace(key, !!flipped.value[key]), 900))
 }
 
 // Back-face list. When it's longer than the face (`scrolls`), its
@@ -139,6 +160,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   ro?.disconnect()
   cancelAnimationFrame(frame)
+  pendingFocus.forEach(clearTimeout)
 })
 
 // Luxury surface, both faces: a champagne hairline and a lit top edge
@@ -237,6 +259,7 @@ const features = (key: string, count: number) =>
             <motion.div
               :animate="{ rotateY: flipped[tier.key] ? 180 : 0 }"
               :transition="SPRING.gentle"
+              :on-update="(latest: Record<string, unknown>) => onTurn(tier.key, latest)"
               :style="{ transformStyle: 'preserve-3d' }"
               class="relative flex w-full flex-1 flex-col motion-reduce:transform-none!"
             >
@@ -254,6 +277,8 @@ const features = (key: string, count: number) =>
                   ...(tier.highlighted ? { background: 'linear-gradient(180deg, oklch(98% 0.02 70) 0%, oklch(94% 0.04 60) 100%)' } : {}),
                   ...(tier.luxe ? { background: 'linear-gradient(180deg, oklch(24% 0.04 50) 0%, oklch(18% 0.05 40) 100%)', color: 'oklch(95% 0.02 70)' } : {}),
                   backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
+                  visibility: backShown[tier.key] ? 'hidden' : undefined,
                 }"
               >
                 <!-- Same spot on every card, clear of the badge; the back's
@@ -350,6 +375,8 @@ const features = (key: string, count: number) =>
                   ...(tier.highlighted ? { background: 'linear-gradient(180deg, oklch(98% 0.02 70) 0%, oklch(94% 0.04 60) 100%)' } : {}),
                   ...(tier.luxe ? { background: 'linear-gradient(180deg, oklch(24% 0.04 50) 0%, oklch(18% 0.05 40) 100%)', color: 'oklch(95% 0.02 70)' } : {}),
                   backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
+                  visibility: backShown[tier.key] ? undefined : 'hidden',
                   transform: 'rotateY(180deg)',
                 }"
               >
