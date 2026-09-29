@@ -11,7 +11,7 @@ Ushbu blok shartlarni tezda tushunishga yordam beradi. U oferta matnining oʻrni
 - Shartnoma siz oferta bilan roziligingizni belgilab, tarifni toʻlaganingizda tuziladi.
 - Mehmonlar materiallarni Toshkent vaqti bilan uch kalendar kun davomida yuklashi mumkin: toʻydan bir kun oldin, toʻy kuni va undan keyingi kun.
 - Materiallar tarifingizda koʻrsatilgan muddat davomida saqlanadi. Soʻngra ular butunlay oʻchiriladi. Arxivni oldindan yuklab oling — oʻchirishdan 30 va 7 kun oldin eslatamiz.
-- Xizmatdan istalgan vaqtda voz kechish mumkin. Agar ariza toʻy kuni soat 00:00 gacha (Toshkent vaqti bilan) kelib tushgan boʻlsa va tadbirga koʻpi bilan [5] ta material yuklangan boʻlsa, Basic, Pro va Premium tariflari boʻyicha butun summani, Luxury tarifi boʻyicha esa jismoniy tovarlar va joyga chiqish uchun hujjatlar bilan tasdiqlangan xarajatlar chegirilgan summani qaytaramiz. Keyinroq voz kechilganda koʻrsatilmagan qism qiymatini qaytaramiz (16-boʻlim).
+- Xizmatdan istalgan vaqtda voz kechish mumkin. Agar ariza toʻy kuni soat 00:00 gacha (Toshkent vaqti bilan) kelib tushgan boʻlsa va tadbirga koʻpi bilan [5] ta material yuklangan boʻlsa, Basic, Pro va Premium tariflari boʻyicha butun summani, Luxury tarifi boʻyicha esa jismoniy tovarlar uchun hujjatlar bilan tasdiqlangan xarajatlar chegirilgan summani qaytaramiz. Keyinroq voz kechilganda koʻrsatilmagan qism qiymatini qaytaramiz (16-boʻlim).
 - Agar servis ishlamagan boʻlsa, nosozlik yengib boʻlmaydigan kuch sababli yuz bergan taqdirda ham koʻrsatilmagan qism uchun pulni qaytaramiz. Agar nosozlik biz javobgar boʻlgan sabablarga koʻra yuz bergan boʻlsa, qonunga koʻra sizda boshqa huquqlar ham bor (12, 13 va 16-boʻlimlar). Tadbir joyidagi internet va mehmonlarning telefonlari bunday sabablarga kirmaydi.
 - Savollar, shikoyatlar va pulni qaytarish: {{entity.email}}, {{entity.phone}}. Materiallar yuzasidan shikoyatlar: [abuse@memour.uz].
 
@@ -484,7 +484,7 @@ Ushbu boʻlim alohida sahifa sifatida ham eʼlon qilinadi: https://memour.uz/uz/
 
 16.2. **Tadbir sanasi boshlanishidan oldin voz kechish.** Buyurtmachi sabablarini tushuntirmasdan Xizmatdan voz kechishga haqli. Ushbu band qoidalari, agar ariza Toshkent vaqti bilan Tadbir sanasidagi soat 00:00 gacha olingan boʻlsa va shu paytgacha Tadbirga koʻpi bilan [5] ta material (masalan, QR-kodlarni tekshirishdagi sinov materiallari) yuklangan boʻlsa, qoʻllaniladi.
 - Basic, Pro, Premium Tariflari: toʻlangan summaning hammasi qaytariladi.
-- Luxury Tarifi: toʻlangan summa ushbu buyurtma boʻyicha haqiqatda qilingan va hujjatlar bilan tasdiqlangan xarajatlar chegirilgan holda qaytariladi. Faqat quyidagilarni ushlab qolish mumkin: allaqachon tayyorlangan yoki pudratchiga individual buyurtma asosida buyurtma qilingan Jismoniy tovarlar qiymati; agar xodimlarning joyga chiqishi allaqachon toʻlangan va uni bekor qilib boʻlmasa, joyga chiqish qiymati. Ijrochi javobga tasdiqlovchi hujjatlarning nusxalarini ilova qiladi.
+- Luxury Tarifi: toʻlangan summa ushbu buyurtma boʻyicha haqiqatda qilingan va hujjatlar bilan tasdiqlangan xarajatlar chegirilgan holda qaytariladi. Faqat quyidagilarni ushlab qolish mumkin: allaqachon tayyorlangan yoki pudratchiga individual buyurtma asosida buyurtma qilingan Jismoniy tovarlar qiymati. Ijrochi javobga tasdiqlovchi hujjatlarning nusxalarini ilova qiladi.
 - Quyidagilar ushlab qolinmaydi: Toʻlov operatorining komissiyasi, SMS qiymati, Servisning ishi, Tadbirni sozlash, QR-kodlarni yaratish.
 
 Pulni qaytarish oʻrniga Buyurtmachi Tadbir sanasini koʻchirishi mumkin (6.3-band).
@@ -611,28 +611,26 @@ Narxlar bitta Tadbir uchun, soʻmda, [QQS bilan / QQSsiz — 5.2-bandga qarang] 
 | | Basic | Pro | Premium | Luxury |
 |---|---|---|---|---|
 | Narx | [390 000] | [790 000] | [1 990 000] | [2 990 000] |
-| Tavsiya etiladigan mehmonlar soni | 50 tagacha | 150 tagacha | 300 tagacha | 500 tagacha |
-| Bitta qurilmadan suratlar | [15] tagacha | [15] tagacha | [15] tagacha | [15] tagacha |
-| Bitta qurilmadan videolar (har biri 15 soniyagacha) | yoʻq | [3] tagacha | [3] tagacha | [3] tagacha |
-| Bitta qurilmadan ovozli xabarlar (har biri 60 soniyagacha) | yoʻq | yoʻq | [3] tagacha | [3] tagacha |
+| Mehmonlar soni (qurilmalar) | 50 tagacha | 150 tagacha | 300 tagacha | 500 tagacha |
+| Bitta qurilmadan suratlar | 20 tagacha | 30 tagacha | 50 tagacha | 50 tagacha |
+| Bitta qurilmadan videolar (har biri 15 soniyagacha) | yoʻq | 5 tagacha | 15 tagacha | 15 tagacha |
+| Bitta qurilmadan ovozli xabarlar (har biri 60 soniyagacha) | yoʻq | yoʻq | 3 tagacha | 3 tagacha |
 | Stollar uchun QR-kodlar va mehmonlar uchun bildirishnoma jamlangan PDF | ha | ha | ha | ha |
 | Moderatsiya (yashirish, oʻchirish) | ha | ha | ha | ha |
 | Arxivni (ZIP) yuklab olish | ha | ha | ha | ha |
 | Jonli slayd-shou | yoʻq | ha | ha | ha |
-| Brendlash (juftlik ismlari, muqova, rang, salomlashuv matni) | yoʻq | ha | ha | ha |
+| Brendlash (muqova, rang, salomlashuv matni) | yoʻq | ha | ha | ha |
 | Yuklash oynasi | 3 kalendar kun (6.4-band) | 3 kalendar kun | 3 kalendar kun | 3 kalendar kun |
-| Tadbir sanasidan keyingi Saqlash muddati | [180 kun] | [180 kun] | [180 kun] | [180 kun] |
-| Jismoniy tovarlar va shaxsiy qoʻllab-quvvatlash | yoʻq | yoʻq | yoʻq | ha, quyida qarang |
+| Tadbir sanasidan keyingi Saqlash muddati | 180 kun | 180 kun | 180 kun | 365 kun |
+| Jismoniy tovarlar | yoʻq | yoʻq | yoʻq | ha, quyida qarang |
 
 **Barcha Tariflar uchun texnik cheklovlar:** bitta surat — 6 MB gacha, suratlar siqilgandan keyin JPEG formatida saqlanadi; bitta video — 15 soniyagacha va 30 MB gacha; bitta ovozli xabar — 60 soniyagacha va 5 MB gacha. Kvotalar Mehmonning bitta qurilmasi uchun hisoblanadi.
 
-**Tavsiya etiladigan mehmonlar soni** — Tarifni tanlash uchun moʻljal. Servis Mehmonlar sonini texnik jihatdan cheklamaydi.
+**Mehmonlar soni** — Tadbirga nechta turli Mehmon qurilmasi ulanishi mumkinligi. Ularning soni Tarif ruxsat etgan songa yetganda yangi qurilma ulana olmaydi; allaqachon ulangan qurilmalar oʻz kvotalari doirasida materiallarni yuklashda davom etadi.
 
 **Luxury Tarifi tarkibiga qoʻshimcha ravishda quyidagilar kiradi:**
-1. **Tadbir sanasida shaxsiy qoʻllab-quvvatlash.** Shaxsiy menejer [10:00] dan [24:00] gacha masofadan — telefon va Telegram orqali (Buyurtmachining xohishiga koʻra, 11.5-bandga qarang) — aloqada boʻladi: ekran yoki proyektorni sozlashda yordam beradi, Mehmonlarga javob beradi va muammolarni hal qiladi. Tadbir joyiga chiqish [kirmaydi / Toshkent shahri doirasida kiradi].
-2. **Brendlangan USB-fleshka** — ismlar va Tadbir sanasi gravyura qilingan, Arxiv yozilgan. Yuklash oynasi tugaganidan keyin [14] kun ichida Buyurtmachi Shaxsiy kabinetda koʻrsatadigan Oʻzbekistondagi manzilga pochta yoki kuryer orqali yuboriladi. Yetkazib berish narxga kiritilgan. Qaytarishlarni hisoblash uchun fleshka qiymati — [___] soʻm.
-3. **Bosma fotoalbom**: 50 sahifa, 30×30 sm, qattiq muqova. Buyurtmachi Tadbir sanasidan keyin [30] kun ichida [___] tagacha suratni tanlaydi. Chop etish uchun Ijrochi tanlangan suratlarni bosmaxonaga beradi (11.5-band). Ijrochi maketni kelishish uchun yuboradi. Albom maket tasdiqlanganidan keyin [___] kun ichida tayyorlanadi va joʻnatiladi. Agar Buyurtmachi suratlarni muddatida tanlamasa, Ijrochi albomni oʻz tanloviga koʻra oʻzi tuzishga haqli. Qaytarishlarni hisoblash uchun albom qiymati — [___] soʻm.
-4. **Ustuvor qoʻllab-quvvatlash**: Tadbir sanasida menejer [08:00] dan [02:00] gacha aloqada, birinchi javobning maqsadli vaqti — [15 daqiqa] gacha; boshqa kunlarda — [09:00] dan [21:00] gacha, birinchi javobning maqsadli vaqti — [2 soat] gacha. Maqsadli vaqt — qoʻllab-quvvatlash sifati koʻrsatkichi boʻlib, Xizmat koʻrsatish muddati emas. Maqsadli vaqtdan muntazam ravishda oshib ketish 12-boʻlim boʻyicha kamchilik sifatida baholanadi.
+1. **Brendlangan USB-fleshka** — ismlar va Tadbir sanasi gravyura qilingan, Arxiv yozilgan. Yuklash oynasi tugaganidan keyin [14] kun ichida Buyurtmachi Shaxsiy kabinetda koʻrsatadigan Oʻzbekistondagi manzilga pochta yoki kuryer orqali yuboriladi. Yetkazib berish narxga kiritilgan. Qaytarishlarni hisoblash uchun fleshka qiymati — [___] soʻm.
+2. **Bosma fotoalbom**: 50 sahifa, 30×30 sm, qattiq muqova. Buyurtmachi Tadbir sanasidan keyin [30] kun ichida [___] tagacha suratni tanlaydi. Chop etish uchun Ijrochi tanlangan suratlarni bosmaxonaga beradi (11.5-band). Ijrochi maketni kelishish uchun yuboradi. Albom maket tasdiqlanganidan keyin [___] kun ichida tayyorlanadi va joʻnatiladi. Agar Buyurtmachi suratlarni muddatida tanlamasa, Ijrochi albomni oʻz tanloviga koʻra oʻzi tuzishga haqli. Qaytarishlarni hisoblash uchun albom qiymati — [___] soʻm.
 
 **Narx tuzilmasi (16.2–16.5-bandlar boʻyicha qaytarishlarni hisoblash uchun):**
 - tayyorgarlik — faqat 16.2-banddagi yopiq roʻyxat boʻyicha xarajatlar (Basic, Pro va Premium Tariflari uchun — 0);

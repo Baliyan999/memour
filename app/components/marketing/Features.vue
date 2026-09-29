@@ -6,23 +6,26 @@ import { useReveal } from '~/composables/useMotion'
 /**
  * Features — "Что внутри". Asymmetric bento with 6 cards. Each carries
  * a small but recognisable mock of the actual feature UI (projector
- * slideshow, phone recording, voice bubble, swipe deck, geofence map,
- * Telegram chat). Hero card spans 2×2 on lg+, swipe card spans the
- * row width on tablet. No scroll-driven motion — entry is the shared
- * staggered spring reveal, hover brightens.
+ * slideshow, phone recording, voice bubble, swipe deck, venue map with
+ * the upload window, Telegram chat). The `geofence` key is that upload
+ * window card (the name is older than the copy). Hero card spans 2×2
+ * on lg+, swipe card spans the row width on tablet. No scroll-driven
+ * motion — entry is the shared staggered spring reveal, hover
+ * brightens.
  */
 const { t } = useI18n()
 
 type CardKey = 'slideshow' | 'video' | 'voice' | 'swipe' | 'geofence' | 'telegram'
 
 const ORDER: CardKey[] = ['slideshow', 'video', 'voice', 'swipe', 'geofence', 'telegram']
-const META: Record<CardKey, { hue: number; span: string }> = {
+// `soon`: not live yet — the title carries the «скоро» pill.
+const META: Record<CardKey, { hue: number; span: string; soon?: boolean }> = {
   slideshow: { hue: 25, span: 'sm:col-span-2 lg:col-span-2 lg:row-span-2' },
   video: { hue: 55, span: '' },
   voice: { hue: 75, span: '' },
   swipe: { hue: 35, span: 'sm:col-span-2 lg:col-span-1' },
   geofence: { hue: 15, span: '' },
-  telegram: { hue: 220, span: '' },
+  telegram: { hue: 220, span: '', soon: true },
 }
 
 const cards = computed(() =>
@@ -31,6 +34,7 @@ const cards = computed(() =>
     index: i,
     hue: META[key].hue,
     span: META[key].span,
+    soon: !!META[key].soon,
     title: t(`features.f${i + 1}Title`),
     desc: t(`features.f${i + 1}Desc`),
   })),
@@ -146,7 +150,7 @@ useReveal(listRef, { items: ':scope > li', stagger: 0.07, y: 24, amount: 0.1 })
                   ? 'text-lg text-(--color-foreground) sm:text-3xl 3xl:text-4xl 4xl:text-5xl'
                   : 'text-lg text-(--color-foreground) sm:text-xl 3xl:text-2xl 4xl:text-3xl'
               "
-            >{{ card.title }}</h3>
+            ><MarketingSoonBadge v-if="card.soon" :text="card.title" /><template v-else>{{ card.title }}</template></h3>
             <p
               :class="[
                 'mt-1.5 text-pretty leading-relaxed text-(--color-muted-foreground)',
