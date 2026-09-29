@@ -26,7 +26,9 @@ definePageMeta({ layout: 'guest' })
  *
  * The slideshow is anonymous: anyone with the URL can watch while the
  * event is active. The link is shared by the couple via dashboard.
- * UUIDs are unguessable.
+ * UUIDs are unguessable. It is part of Pro and up: on Basic the feed
+ * answers not_in_plan and the page says where the slideshow starts
+ * (and checks back, so an upgrade starts it).
  */
 const route = useRoute()
 const eventId = computed(() => route.params.id as string)
@@ -339,9 +341,8 @@ useSeoMeta({
   title: () => (coupleNames.value ? t('guest.live.pageTitle', { couple: coupleNames.value }) : 'Memour Live'),
 })
 
-const closedKey = computed(() =>
-  closed.value === 'archived' ? 'archived' : closed.value === 'not_active' ? 'notActive' : 'notFound',
-)
+const CLOSED_KEYS = { archived: 'archived', not_active: 'notActive', not_in_plan: 'notInPlan', not_found: 'notFound' } as const
+const closedKey = computed(() => CLOSED_KEYS[closed.value ?? 'not_found'])
 </script>
 
 <template>

@@ -6,6 +6,7 @@ import {
   serverSupabaseServiceRole,
 } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { tierHas } from '#shared/plans'
 import { fail, failZod } from '../../../utils/errors'
 import { sniffContainer } from '../../../utils/media-sniff'
 
@@ -19,7 +20,11 @@ import { sniffContainer } from '../../../utils/media-sniff'
  *   - greeting_text   string
  *   - cover_photo     file (optional, replaces existing)
  *
- * Caller must own the event. The cover photo lands in the public
+ * Caller must own the event, and the event's tier must include the
+ * guest-page design (Pro and up, shared/plans.ts) — else 403
+ * not_in_plan, before the upload is even read.
+ *
+ * The cover photo lands in the public
  * `branding` bucket at `branding://{event_id}/cover-{uuid}.{ext}`,
  * re-encoded to at most 2000px (EXIF stripped) — every guest downloads
  * it on a phone, so a raw 8 MB camera original is not an option.
@@ -37,11 +42,12 @@ export default defineEventHandler(async (event) => {
 
   const { data: ev } = await admin
     .from('events')
-    .select('id, owner_id')
+    .select('id, owner_id, plan_tier')
     .eq('id', id!)
     .maybeSingle()
   if (!ev) fail(404, 'event_not_found')
   if (ev!.owner_id !== ((user as any).id ?? (user as any).sub)) fail(403, 'forbidden')
+  if (!tierHas(ev!.plan_tier, 'branding')) fail(403, 'not_in_plan')
 
   const form = await readMultipartFormData(event)
   if (!form) fail(400, 'missing_body')

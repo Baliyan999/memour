@@ -4,6 +4,7 @@ import type { Database } from '~/types/database.types'
 import { hitRateLimit, getTrustedClientIp } from '../../../utils/rate-limit'
 import { fail } from '../../../utils/errors'
 import { consentField, hasGuestConsent, recordConsent, requireConsent } from '../../../utils/consent'
+import { claimGuestDevice } from '../../../utils/guest-quota'
 
 /**
  * POST /api/guest/binding/[id]
@@ -39,6 +40,10 @@ import { consentField, hasGuestConsent, recordConsent, requireConsent } from '..
  *   409 consent_outdated  the page showed older texts — reload
  *   409 wrong_table       this device already SENT media from a
  *                         different table at this event
+ *   409 guest_limit_reached  a device new to this event, and the event
+ *                         already has as many guests as its tier takes
+ *                         (shared/plans.ts); devices already in are
+ *                         never refused
  *   429 rate_limited
  */
 const schema = z.object({
@@ -75,7 +80,7 @@ export default defineEventHandler(async (event) => {
 
   const { data: ev } = await admin
     .from('events')
-    .select('id, status, table_count')
+    .select('id, status, table_count, plan_tier')
     .eq('id', id!)
     .maybeSingle()
   if (!ev) fail(404, 'event_not_found')
@@ -85,20 +90,8 @@ export default defineEventHandler(async (event) => {
   // Guest rules, the licence for their files and the privacy policy —
   // accepted before the device is bound or anything is uploaded.
   const consented = await hasGuestConsent(event, id!, parsed.data.device_id)
-  if (parsed.data.consent) {
-    const docs = requireConsent('guest_upload', parsed.data.consent)
-    if (!consented) {
-      await recordConsent(event, {
-        context: 'guest_upload',
-        subject: { type: 'guest', eventId: id!, deviceId: parsed.data.device_id, guestName: parsed.data.guest_name },
-        docs,
-        locale: parsed.data.locale,
-        extra: { table: parsed.data.guest_table },
-      })
-    }
-  } else if (!consented) {
-    fail(422, 'consent_required')
-  }
+  const docs = parsed.data.consent ? requireConsent('guest_upload', parsed.data.consent) : null
+  if (!docs && !consented) fail(422, 'consent_required')
 
   // Existing binding takes priority over the new (event, table)
   // pair from the URL — we never silently move a device that has
@@ -111,6 +104,30 @@ export default defineEventHandler(async (event) => {
     .eq('event_id', id!)
     .eq('device_id', parsed.data.device_id)
     .maybeSingle()
+
+  // First time we see this device for this event: it takes one of the
+  // event's guest places (a fresh row, counters at 0) — or the event is
+  // full and it gets 409 guest_limit_reached. Before the consent is
+  // written, so a guest who can't join leaves no record behind.
+  const claim = existing
+    ? null
+    : await claimGuestDevice(event, {
+      eventId: id!,
+      deviceId: parsed.data.device_id,
+      table: parsed.data.guest_table,
+      guestName: parsed.data.guest_name,
+      tier: ev!.plan_tier,
+    })
+
+  if (docs && !consented) {
+    await recordConsent(event, {
+      context: 'guest_upload',
+      subject: { type: 'guest', eventId: id!, deviceId: parsed.data.device_id, guestName: parsed.data.guest_name },
+      docs,
+      locale: parsed.data.locale,
+      extra: { table: parsed.data.guest_table },
+    })
+  }
 
   if (existing) {
     const tableChanged = existing.table_number !== parsed.data.guest_table
@@ -142,33 +159,19 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // First time we see this device for this event — insert a fresh
-  // row with zeroed counters.
-  const { data: row, error: insertErr } = await admin
+  const { data: row, error: readErr } = await admin
     .from('guest_devices')
-    .insert({
-      device_id: parsed.data.device_id,
-      event_id: id!,
-      table_number: parsed.data.guest_table,
-      guest_name: parsed.data.guest_name,
-    })
     .select('table_number, guest_name, photo_count, video_count, voice_count')
-    .single()
-  if (insertErr?.code === '23505') {
-    // A double tap on "Open camera" raced us to the insert.
-    const { data: raced } = await admin
-      .from('guest_devices')
-      .select('table_number, guest_name, photo_count, video_count, voice_count')
-      .eq('event_id', id!)
-      .eq('device_id', parsed.data.device_id)
-      .maybeSingle()
-    if (raced && raced.table_number === parsed.data.guest_table) return { ok: true, binding: raced }
-    fail(409, 'wrong_table')
-  }
-  if (insertErr || !row) {
-    console.error('[guest/binding] insert failed', insertErr)
+    .eq('event_id', id!)
+    .eq('device_id', parsed.data.device_id)
+    .maybeSingle()
+  if (readErr || !row) {
+    console.error('[guest/binding] read after claim failed', readErr)
     fail(500, 'server_error')
   }
+  // 'existing': a double tap on "Open camera" got the device in first,
+  // possibly from another table's QR.
+  if (claim === 'existing' && row!.table_number !== parsed.data.guest_table) fail(409, 'wrong_table')
 
   return { ok: true, binding: row }
 })

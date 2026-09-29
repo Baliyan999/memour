@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { motion, AnimatePresence, useReducedMotion } from 'motion-v'
-import { Check } from '@lucide/vue'
+import { Check, Users } from '@lucide/vue'
 import { useI18n, useSwitchLocalePath } from '#imports'
 
 definePageMeta({ layout: 'guest' })
@@ -37,6 +37,11 @@ const otherLocaleLabel = computed(() => (locale.value === 'ru' ? "O'zbekcha" : '
  *      upload counts against a per-device quota for the event's tier
  *      (see server/utils/guest-quota.ts). Modes the tier doesn't
  *      include aren't shown; a used-up mode shows a "done" card.
+ *   5. The tier also caps how many phones join the event (shared/
+ *      plans.ts). A phone that isn't bound yet while the event is full
+ *      (`guests_full`, or the server's 409 guest_limit_reached) gets a
+ *      friendly "all places are taken" card instead of the welcome
+ *      form; phones already in are never affected.
  *
  * The table number can NEVER be edited from the UI any more — it is
  * strictly the one written into the QR code by the admin.
@@ -102,6 +107,7 @@ type EventResp = {
   }
   binding: Binding | null
   consented: boolean
+  guests_full: boolean
   limits: Limits
   upload_window: UploadWindowInfo
 }
@@ -142,11 +148,15 @@ const acceptPrivacy = ref(false)
 const consentError = ref<string | null>(null)
 const limits = ref<Limits>(data.value?.limits ?? { photo: 20, video: 0, voice: 0 })
 const uploadWindow = ref<UploadWindowInfo | null>(data.value?.upload_window ?? null)
+// The event already has as many guests as its tier takes — only
+// matters while this phone isn't bound (see decideStage).
+const guestsFull = ref(data.value?.guests_full ?? false)
 watch(
   () => data.value,
   (next) => {
     if (next?.binding) binding.value = next.binding
     if (next) consented.value = next.consented
+    if (next) guestsFull.value = next.guests_full
     if (next?.limits) limits.value = next.limits
     if (next?.upload_window) uploadWindow.value = next.upload_window
   },
@@ -179,7 +189,7 @@ const tableOutOfRange = computed(() => {
   return !!(count && tableParam.value && tableParam.value > count)
 })
 
-type Stage = 'welcome' | 'camera' | 'wrong_table' | 'no_table' | 'quota_full' | 'window_before' | 'window_after'
+type Stage = 'welcome' | 'camera' | 'wrong_table' | 'no_table' | 'quota_full' | 'window_before' | 'window_after' | 'guest_limit'
 // First render (SSR and hydration) only uses what the server sent, so
 // both sides agree; decideStage() refines it on mount.
 function initialStage(): Stage {
@@ -296,7 +306,16 @@ function decideStage() {
     if (!availableModes.value.includes(mode.value)) mode.value = 'photo'
     return
   }
-  stage.value = 'welcome'
+  // A new phone: welcome — unless every place is taken already.
+  stage.value = guestsFull.value ? 'guest_limit' : 'welcome'
+}
+
+/** The server refused this phone a place: the event is full. */
+function showGuestLimit() {
+  guestsFull.value = true
+  binding.value = null
+  captureBusy.value = false
+  stage.value = 'guest_limit'
 }
 
 async function refreshBinding() {
@@ -310,6 +329,7 @@ async function refreshBinding() {
   data.value = fresh
   binding.value = fresh.binding
   consented.value = fresh.consented
+  guestsFull.value = fresh.guests_full
   limits.value = fresh.limits
   uploadWindow.value = fresh.upload_window
 }
@@ -407,6 +427,8 @@ async function startCapture() {
       stage.value = 'wrong_table'
     } else if (code === 'invalid_table') {
       stage.value = 'no_table'
+    } else if (code === 'guest_limit_reached') {
+      showGuestLimit()
     } else if (code === 'event_not_active') {
       await refresh()
     } else if (code === 'consent_required' || code === 'consent_outdated') {
@@ -486,6 +508,12 @@ async function onRejected(code: string) {
   } else if (code === 'event_not_active') {
     await refresh()
     return
+  } else if (code === 'guest_limit_reached') {
+    // Let in on a binding that never reached the server, and the event
+    // filled up since: nothing from this phone can be sent, so the frame
+    // in review goes and the card says what to do instead.
+    showGuestLimit()
+    return
   } else if (code === 'consent_required') {
     // The texts changed while the page was open. Keep the camera (and
     // the frame waiting in review) and ask over it.
@@ -528,6 +556,11 @@ async function acceptAndSend() {
     consentSheet.value = false
     await captureRef.value?.send()
   } catch (e: any) {
+    if ((e?.data?.data?.code ?? e?.data?.code) === 'guest_limit_reached') {
+      consentSheet.value = false
+      showGuestLimit()
+      return
+    }
     consentError.value = errorMessage(e, { fallback: 'guest.errors.upload_failed' })
   } finally {
     welcomePending.value = false
@@ -1098,6 +1131,23 @@ useSeoMeta({
               replace
               class="mt-6 inline-flex h-12 w-full touch-manipulation items-center justify-center rounded-full bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) transition-transform duration-100 active:scale-[0.98]"
             >{{ t('guest.wrongTable.goToTable', { n: binding.table_number }) }}</NuxtLink>
+          </div>
+        </div>
+
+        <!-- ============== EVERY GUEST PLACE TAKEN ============== -->
+        <div v-else-if="stage === 'guest_limit'" key="guest_limit" :class="['text-center', hasCover ? '-mt-10' : 'mt-8']">
+          <div class="surface-card rounded-(--radius-xl) p-8">
+            <div class="mx-auto grid h-14 w-14 place-items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700">
+              <Users class="h-6 w-6" :stroke-width="1.6" aria-hidden="true" />
+            </div>
+            <p class="mt-4 text-xs uppercase tracking-[0.3em] text-(--color-muted-foreground)">{{ ev.couple_names }}</p>
+            <h2 class="mt-2 font-display text-2xl italic">{{ t('guest.guestLimit.title') }}</h2>
+            <p class="mt-3 text-sm leading-relaxed text-(--color-muted-foreground)">
+              {{ t('guest.guestLimit.desc') }}
+            </p>
+            <p class="mt-5 rounded-md border border-(--color-border)/60 bg-white/70 px-4 py-3 text-sm leading-relaxed text-(--color-foreground)">
+              {{ t('guest.guestLimit.hint') }}
+            </p>
           </div>
         </div>
 

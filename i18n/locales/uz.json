@@ -344,7 +344,8 @@
       "mic_busy": "Mikrofonni boshqa ilova ishlatmoqda. Uni yoping va qayta urinib ko'ring.",
       "permission_denied_video": "Brauzer sozlamalarida kamera va mikrofonga ruxsat bering.",
       "permission_denied_voice": "Brauzer sozlamalarida mikrofonga ruxsat bering.",
-      "consent_required": "Avval mehmonlar uchun qoidalarga roziligingizni belgilang."
+      "consent_required": "Avval mehmonlar uchun qoidalarga roziligingizni belgilang.",
+      "guest_limit_reached": "Albomga sig'adigan barcha mehmonlar allaqachon ulangan — bu telefondan yuborib bo'lmaydi."
     },
     "state": {
       "loading": "Yuklanmoqda…",
@@ -396,6 +397,10 @@
         "archived": {
           "title": "Slayd-shou yakunlandi",
           "desc": "Bu to'y albomi allaqachon yopilgan. Biz bilan bo'lganingiz uchun rahmat!"
+        },
+        "notInPlan": {
+          "title": "Slayd-shou — Pro va undan yuqori tariflarda",
+          "desc": "Jonli slayd-shou Pro, Premium va Luxury tariflariga kiradi. Mehmonlar kadrlarini zaldagi ekranda ko'rsatish uchun bizga yozing — tarifni almashtirib beramiz."
         }
       }
     },
@@ -413,6 +418,11 @@
       "sheetLead": "Faylingiz yuborishni kutmoqda. Roziligingizni belgilang — darhol yuboramiz.",
       "acceptSend": "Qabul qilish va yuborish",
       "later": "Hozir emas"
+    },
+    "guestLimit": {
+      "title": "Albomdagi barcha o'rinlar band",
+      "desc": "Bu to'y albomiga sig'adigan barcha mehmonlar allaqachon ulangan, shuning uchun bu telefonni qo'shib bo'lmaydi.",
+      "hint": "Kadrlaringiz baribir albomga tushishi mumkin: ularni allaqachon suratga olayotgan mehmonga yuboring — u o'z telefonidan jo'natadi. Yoki bu haqda kelin-kuyovga ayting."
     }
   },
   "error": {
@@ -535,7 +545,12 @@
       "offerConsent": "Ushbu buyurtma uchun {link}ni, jumladan pulni qaytarish shartlarini qabul qilaman. Tushunaman: {date} sanasida to'y fayllari qaytarib bo'lmaydigan tarzda o'chiriladi, Memour ularni bu sanadan keyin saqlamaydi va zaxira saqlash joyi hisoblanmaydi. Arxivni shu sanagacha yuklab olaman.",
       "offerLink": "Ommaviy oferta",
       "termsConsent": "{link}ni, jumladan to'lov va pulni qaytarish shartlarini qabul qilaman. Tushunaman: {date} sanasida to'y fayllari qaytarib bo'lmaydigan tarzda o'chiriladi, Memour ularni bu sanadan keyin saqlamaydi va zaxira saqlash joyi hisoblanmaydi. Arxivni shu sanagacha yuklab olaman.",
-      "termsLink": "Foydalanish shartlari"
+      "termsLink": "Foydalanish shartlari",
+      "statGuests": "Mehmonlar",
+      "guestsOf": "{n} / {max}",
+      "guestsAria": "Mehmonlar: {n} / {max}",
+      "guestsNearLimit": "Deyarli barcha o'rinlar band: {max} ta mehmondan keyin yangi telefonlar ulana olmaydi. Ko'proq kerak bo'lsa, bizga yozing — tarifni almashtiramiz.",
+      "guestsAtLimit": "Barcha {max} ta o'rin band: yangi telefonlar ulana olmaydi, allaqachon ulangan mehmonlar esa avvalgidek suratga olishadi. Ko'proq kerak bo'lsa, bizga yozing — tarifni almashtiramiz."
     },
     "branding": {
       "title": "Bezatish",
@@ -608,7 +623,14 @@
     "consentTermsLink": "Foydalanuvchi kelishuvi",
     "consentTermsLinkInterim": "Foydalanish shartlari",
     "consentPrivacy": "Memour'ga ma'lumotlarimga, shu jumladan to'yimizning shaxsiy hayot, diniy marosim va salomatlik haqidagi ma'lumotlarni o'z ichiga olishi mumkin bo'lgan medialariga ishlov berishga rozilik beraman. Rozilik ma'lumotlarni saqlashni Yaponiyadagi serverlarda Supabase Pte. Ltd. kompaniyasiga va {link}da nomlangan boshqa ishlov beruvchilarga topshirishni o'z ichiga oladi (transchegaraviy uzatish).",
-    "consentPrivacyLink": "Maxfiylik siyosati"
+    "consentPrivacyLink": "Maxfiylik siyosati",
+    "upgrade": {
+      "eventTitle": "Slayd-shou va bezatish — Pro va undan yuqori tariflarda",
+      "eventDesc": "Zaldagi ekranda jonli slayd-shou va mehmonlar sahifasini o'zingizcha bezatish Pro, Premium va Luxury tariflariga kiradi.",
+      "brandingTitle": "Bezatish — Pro va undan yuqori tariflarda",
+      "brandingDesc": "Hozir mehmonlar sahifani Memour'ning standart dizaynida ko'radi. O'z muqovangiz, rangingiz va salomlashuvingiz Pro, Premium va Luxury tariflariga kiradi.",
+      "contact": "Tarifni almashtirish uchun bizga yozing: {email}"
+    }
   },
   "errors": {
     "generic": "Nimadir noto'g'ri ketdi. Qayta urinib ko'ring.",
@@ -705,7 +727,9 @@
     "unsupported_mime_logo": "Logotip formati mos emas. PNG, JPG yoki WebP formatini tanlang.",
     "consent_required": "Davom etish uchun roziligingizni belgilang.",
     "consent_outdated": "Hujjatlar yangilandi. Sahifani yangilang va roziligingizni qayta belgilang.",
-    "deletion_date_changed": "Fayllar o'chiriladigan sana o'zgardi. Yangi sanani tekshiring va roziligingizni qayta belgilang."
+    "deletion_date_changed": "Fayllar o'chiriladigan sana o'zgardi. Yangi sanani tekshiring va roziligingizni qayta belgilang.",
+    "not_in_plan": "Bu Pro, Premium va Luxury tariflariga kiradi.",
+    "guest_limit_reached": "Albomga sig'adigan barcha mehmonlar allaqachon ulangan."
   },
   "common": {
     "close": "Yopish",
@@ -758,7 +782,8 @@
       "notClaimed": "⚠ Kelin-kuyov hali kabinetga kirmagan",
       "notClaimedHint": "SMS orqali birinchi kirishdan keyin kelin-kuyov hisobi ushbu tadbirga avtomatik bog'lanadi.",
       "qrHint": "QR PDF sozlamalarini ochish",
-      "edit": "Tahrirlash"
+      "edit": "Tahrirlash",
+      "guests": "Mehmonlar: {n} / {max}"
     },
     "leads": {
       "title": "Arizalar",
@@ -852,7 +877,10 @@
       "saving": "Saqlanmoqda…",
       "save": "Saqlash",
       "saved": "Tadbir saqlandi",
-      "backToEvents": "Tadbirlarga"
+      "backToEvents": "Tadbirlarga",
+      "guests": "Mehmonlar: {n} / {max}",
+      "guestsFull": "Bu tarifda yangi mehmonlar endi ulana olmaydi — ulanganlar suratga olishda davom etadi.",
+      "guestsNear": "Bu tarifdagi deyarli barcha o'rinlar band."
     },
     "qr": {
       "preview": "Namuna",

@@ -14,7 +14,9 @@ import { fail } from '../../../../utils/errors'
  *   table   only this guest table (combined with `filter`)
  *   cursor  opaque keyset cursor from the previous page's `next`
  *   limit   page size, 1–100 (default 60)
- *   counts  1 → also return per-filter totals (first page only)
+ *   counts  1 → also return per-filter totals (first page only), plus
+ *           `guests`: guest devices bound to the event (the tier's
+ *           guest limit counts these, shared/plans.ts)
  *
  * Newest first, keyset-paginated on (uploaded_at, id) so photos that
  * arrive while the couple scrolls don't shift or duplicate pages, and
@@ -140,7 +142,7 @@ export default defineEventHandler(async (event) => {
         return count ?? 0
       })
   try {
-    const [total, hidden, highlights, video, voice, devices] = await Promise.all([
+    const [total, hidden, highlights, video, voice, devices, guests] = await Promise.all([
       countWhere((qb) => qb),
       countWhere((qb) => qb.eq('is_hidden', true)),
       countWhere((qb) => qb.eq('is_hidden', false).eq('is_highlight', true)),
@@ -151,12 +153,16 @@ export default defineEventHandler(async (event) => {
         if (error) throw error
         return data ?? []
       }),
+      admin.from('guest_devices').select('device_id', { count: 'exact', head: true }).eq('event_id', id!).then(({ count, error }) => {
+        if (error) throw error
+        return count ?? 0
+      }),
     ])
     const tables = [...new Set(devices.map((d) => d.table_number))].sort((a, b) => a - b)
     return {
       items,
       next,
-      counts: { total, visible: total - hidden, hidden, highlights, video, voice, tables },
+      counts: { total, visible: total - hidden, hidden, highlights, video, voice, tables, guests },
     }
   } catch (err) {
     console.error('[couple/photos] counts', err)

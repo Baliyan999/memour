@@ -1,11 +1,12 @@
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import sharp from 'sharp'
+import type { H3Event } from 'h3'
 import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
 import { notifyEventUpload } from '../../utils/telegram'
 import { hitRateLimit, getTrustedClientIp } from '../../utils/rate-limit'
-import { deviceLimitsForTier, counterColumn, type GuestMediaKind } from '../../utils/guest-quota'
+import { deviceLimitsForTier, counterColumn, claimGuestDevice, type GuestMediaKind } from '../../utils/guest-quota'
 import { readMultipartLimited } from '../../utils/multipart'
 import { sniffContainer, type MediaContainer } from '../../utils/media-sniff'
 import { uploadWindowState } from '../../utils/upload-window'
@@ -38,6 +39,8 @@ import { hasGuestConsent } from '../../utils/consent'
  *     allowing for their reported GPS accuracy, is refused
  *   - Per-device quota for the event's plan tier, reserved atomically
  *     before the file is stored
+ *   - A device new to the event takes one of its guest places first
+ *     (409 guest_limit_reached when the tier's guests are all in)
  *   - The device has accepted the current guest rules, licence notice
  *     and privacy policy for this event (consent_events, written by the
  *     welcome screen via /api/guest/binding) — else 403 consent_required
@@ -169,8 +172,9 @@ const CAS_ATTEMPTS = 6
  * requests can't both take the last slot; the loser re-reads.
  */
 async function reserveSlot(
+  event: H3Event,
   admin: Admin,
-  args: { eventId: string; deviceId: string; table: number; guestName: string | null; kind: GuestMediaKind; limit: number },
+  args: { eventId: string; deviceId: string; table: number; guestName: string | null; kind: GuestMediaKind; limit: number; tier: string | null },
 ): Promise<Counts> {
   const col = counterColumn(args.kind)
   const nowIso = new Date().toISOString()
@@ -190,22 +194,16 @@ async function reserveSlot(
 
     if (!row) {
       // First upload from this device (the welcome screen usually
-      // created the row already). Create it with this slot taken.
-      const { data: created, error: insertErr } = await admin
-        .from('guest_devices')
-        .insert({
-          device_id: args.deviceId,
-          event_id: args.eventId,
-          table_number: args.table,
-          ...nameField,
-          [col]: 1,
-        } as any)
-        .select(COUNTS)
-        .single()
-      if (created) return created
-      if (insertErr?.code === '23505') continue // another request created it first
-      console.error('[guest/upload] binding insert failed', insertErr)
-      fail(500, 'storage_error')
+      // created the row already). It takes a guest place — or gets 409
+      // guest_limit_reached — then the slot is taken like any other.
+      await claimGuestDevice(event, {
+        eventId: args.eventId,
+        deviceId: args.deviceId,
+        table: args.table,
+        guestName: args.guestName,
+        tier: args.tier,
+      })
+      continue
     }
 
     const r = row!
@@ -420,11 +418,12 @@ export default defineEventHandler(async (event) => {
   // Reserve the slot BEFORE storing anything; give it back if the
   // upload fails below.
   const slotArgs = { eventId: ev!.id, deviceId: input.device_id, kind }
-  const counts = await reserveSlot(admin, {
+  const counts = await reserveSlot(event, admin, {
     ...slotArgs,
     table: input.guest_table,
     guestName: input.guest_name || null,
     limit,
+    tier: ev!.plan_tier,
   })
 
   const folder = kind === 'voice' ? 'voice' : kind === 'video' ? 'video' : 'photos'

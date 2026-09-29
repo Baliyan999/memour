@@ -19,7 +19,7 @@ export interface LiveFeedResponse {
 }
 
 /** Why the slideshow can't run — each maps to a full-screen state. */
-export type LiveClosedReason = 'not_found' | 'not_active' | 'archived'
+export type LiveClosedReason = 'not_found' | 'not_active' | 'archived' | 'not_in_plan'
 
 const POLL_MS = 4_000
 // Retries back off to this and no further. When the venue router loses
@@ -28,6 +28,7 @@ const POLL_MS = 4_000
 // one more small poll.
 const MAX_BACKOFF_MS = 8_000
 // Draft screen: check back until the couple activates the event.
+// The same for a tier without the slideshow — an upgrade starts it.
 const NOT_ACTIVE_POLL_MS = 30_000
 const REQUEST_TIMEOUT_MS = 10_000
 
@@ -39,6 +40,7 @@ export function liveClosedReason(e: any): LiveClosedReason | null {
   const code = e?.data?.data?.code ?? e?.data?.code
   const status = e?.statusCode ?? e?.status ?? e?.response?.status
   if (code === 'event_archived' || status === 410) return 'archived'
+  if (code === 'not_in_plan') return 'not_in_plan'
   if (code === 'event_not_active' || status === 403) return 'not_active'
   if (code === 'event_not_found' || code === 'invalid_id' || status === 404) return 'not_found'
   return null
@@ -156,7 +158,7 @@ export function useLiveFeed(
       const reason = liveClosedReason(e)
       if (reason) {
         closed.value = reason
-        if (reason !== 'not_active') return // archived / gone: nothing to wait for
+        if (reason === 'archived' || reason === 'not_found') return // nothing to wait for
         next = NOT_ACTIVE_POLL_MS
       } else {
         failures++
@@ -205,7 +207,9 @@ export function useLiveFeed(
     window.addEventListener('pageshow', onOnline)
     document.addEventListener('visibilitychange', onVisible)
     if (closed.value === 'archived' || closed.value === 'not_found') return
-    schedulePoll(closed.value === 'not_active' ? NOT_ACTIVE_POLL_MS : opts.initial ? POLL_MS : 0)
+    schedulePoll(closed.value === 'not_active' || closed.value === 'not_in_plan'
+      ? NOT_ACTIVE_POLL_MS
+      : opts.initial ? POLL_MS : 0)
   })
 
   onBeforeUnmount(() => {

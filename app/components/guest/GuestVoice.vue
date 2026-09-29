@@ -202,7 +202,7 @@ function togglePlay() {
 const REVIEW_ARM_MS = 450
 let reviewSince = 0
 
-const PAGE_CODES = new Set(['quota_exceeded', 'wrong_table', 'window_not_open', 'window_closed', 'event_not_active', 'not_in_plan', 'invalid_table', 'consent_required'])
+const PAGE_CODES = new Set(['quota_exceeded', 'wrong_table', 'window_not_open', 'window_closed', 'event_not_active', 'not_in_plan', 'invalid_table', 'consent_required', 'guest_limit_reached'])
 
 async function send() {
   if (!lastBlob.value || state.value !== 'review') return

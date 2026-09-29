@@ -1,6 +1,7 @@
 import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
-import { deviceLimitsForTier } from '../../../utils/guest-quota'
+import { tierHas } from '#shared/plans'
+import { deviceLimitsForTier, guestLimitForTier } from '../../../utils/guest-quota'
 import { uploadWindow, uploadWindowState } from '../../../utils/upload-window'
 import { fail } from '../../../utils/errors'
 import { hasGuestConsent } from '../../../utils/consent'
@@ -27,6 +28,15 @@ import { hasGuestConsent } from '../../../utils/consent'
  * at 18:00" / "closed" up front instead of after the guest has shot,
  * and — with a device_id — whether that device has accepted the
  * current guest texts (`consented`; the welcome screen asks otherwise).
+ *
+ * `guests_full`: a device that isn't bound yet would be refused — the
+ * event already has as many guests as its tier takes. The page says so
+ * up front instead of after the name and the boxes; the binding
+ * endpoint is what actually enforces it.
+ *
+ * Branding is the couple's design of this page (Pro and up). On Basic
+ * it is left out, so the page shows the standard Memour design even if
+ * a row was saved earlier.
  *
  * Returns 404 if the event doesn't exist, 410 if it is archived.
  */
@@ -95,13 +105,23 @@ export default defineEventHandler(async (event) => {
   }
   const consented = deviceId ? await hasGuestConsent(event, id!, deviceId) : false
 
+  let guestsFull = false
+  if (deviceId && !binding) {
+    const { count } = await admin
+      .from('guest_devices')
+      .select('device_id', { count: 'exact', head: true })
+      .eq('event_id', id)
+    guestsFull = (count ?? 0) >= guestLimitForTier(data.plan_tier)
+  }
+
   const now = Date.now()
   const window = uploadWindow(data.wedding_date)
 
   return {
-    event: data,
+    event: { ...data, branding: tierHas(data.plan_tier, 'branding') ? data.branding : null },
     binding,
     consented,
+    guests_full: guestsFull,
     limits: deviceLimitsForTier(data.plan_tier),
     upload_window: {
       opens_at: window?.opensAt.toISOString() ?? null,

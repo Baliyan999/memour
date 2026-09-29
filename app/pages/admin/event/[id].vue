@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n, useLocalePath } from '#imports'
+import { GUEST_LIMIT_WARN_AT, guestLimitForTier } from '#shared/plans'
 
 definePageMeta({ layout: 'admin' })
 
@@ -14,6 +15,10 @@ definePageMeta({ layout: 'admin' })
  *
  * Fields are checked here first (novalidate — the browser's bubbles
  * speak the browser's language) with the server's limits.
+ *
+ * Under the tier: guests so far against the limit of the tier picked
+ * in the form (shared/plans.ts) — an upgrade raises it the moment it
+ * is saved.
  */
 const { t } = useI18n()
 const localePath = useLocalePath()
@@ -33,6 +38,7 @@ interface AdminEvent {
   owner_id: string | null
   owner_phone: string | null
   table_count: number | null
+  guests: number
 }
 const { data, error: loadError } = await useFetch<{ event: AdminEvent }>(`/api/admin/events/${id}`)
 
@@ -48,6 +54,13 @@ const initialDigits = ev?.owner_phone?.replace(/^\+998/, '') ?? ''
 const owner_phone_digits = ref(initialDigits)
 const owner_phone = ref(`+998 ${initialDigits}`)
 const claimed = !!ev?.owner_id
+
+const guestLimit = computed(() => guestLimitForTier(plan_tier.value))
+const guestsState = computed<'ok' | 'near' | 'full'>(() => {
+  const n = ev?.guests ?? 0
+  if (n >= guestLimit.value) return 'full'
+  return n >= Math.ceil(guestLimit.value * GUEST_LIMIT_WARN_AT) ? 'near' : 'ok'
+})
 
 const pending = ref(false)
 const error = ref<string | null>(null)
@@ -176,6 +189,14 @@ async function submit() {
           >
             <option v-for="tier in (['basic', 'pro', 'premium', 'luxury'] as const)" :key="tier" :value="tier">{{ t(`pricing.${tier}.name`) }}</option>
           </select>
+          <p
+            class="text-[11px] tabular-nums"
+            :class="guestsState === 'ok' ? 'text-(--color-muted-foreground)' : 'text-amber-700'"
+            role="status"
+          >
+            {{ t('admin.eventForm.guests', { n: ev.guests, max: guestLimit }) }}<template v-if="guestsState !== 'ok'">.
+              {{ t(guestsState === 'full' ? 'admin.eventForm.guestsFull' : 'admin.eventForm.guestsNear') }}</template>
+          </p>
         </div>
         <div class="flex flex-col gap-1.5">
           <label for="ev-status" class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('admin.eventForm.status') }}</label>

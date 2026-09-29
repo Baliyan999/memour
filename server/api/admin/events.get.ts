@@ -9,6 +9,9 @@ import { fail } from '../../utils/errors'
  * GET /api/admin/events — lists every event in the system. Service-role
  * client bypasses RLS so admins see all events regardless of owner.
  * Caller must be an admin (checked against `admins` table).
+ *
+ * `guests` per event: guest devices bound to it — what the tier's guest
+ * limit counts (shared/plans.ts).
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
@@ -24,12 +27,14 @@ export default defineEventHandler(async (event) => {
 
   const { data, error } = await admin
     .from('events')
-    .select('id, couple_names, wedding_date, venue_name, status, plan_tier, owner_id, created_at, table_count')
+    .select('id, couple_names, wedding_date, venue_name, status, plan_tier, owner_id, created_at, table_count, guest_devices(count)')
     .order('created_at', { ascending: false })
 
   if (error) {
     console.error('[admin/events] list', error)
     fail(500, 'list_failed')
   }
-  return { events: data ?? [] }
+  return {
+    events: (data ?? []).map(({ guest_devices, ...ev }) => ({ ...ev, guests: guest_devices[0]?.count ?? 0 })),
+  }
 })

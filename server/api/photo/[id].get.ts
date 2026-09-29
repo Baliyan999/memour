@@ -1,5 +1,6 @@
 import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { tierHas } from '#shared/plans'
 import { userId } from '../../utils/auth'
 import { fail } from '../../utils/errors'
 
@@ -11,7 +12,8 @@ import { fail } from '../../utils/errors'
  * Public: anyone with an item UUID gets the URL while the event is
  * active and the item isn't hidden. UUIDs are cryptographically random
  * so guessing them is infeasible. Used by the live slideshow which is
- * shared via a (couple-controlled) link.
+ * shared via a (couple-controlled) link — so only for tiers that have
+ * the slideshow (Pro and up); on Basic the answer is 403 not_in_plan.
  *
  * Owner: the couple also gets hidden items and items of non-active
  * events — the dashboard's Hidden filter and moderation show them so
@@ -25,19 +27,21 @@ export default defineEventHandler(async (event) => {
 
   const { data: photo, error } = await admin
     .from('photos')
-    .select('event_id, storage_path, thumbnail_path, is_hidden, media_type, events!inner(owner_id, status)')
+    .select('event_id, storage_path, thumbnail_path, is_hidden, media_type, events!inner(owner_id, status, plan_tier)')
     .eq('id', id!)
     .maybeSingle()
   if (error || !photo) fail(404, 'photo_not_found')
 
   const ev = photo!.events
-  if (photo!.is_hidden || ev.status !== 'active') {
+  const liveInPlan = tierHas(ev.plan_tier, 'live_slideshow')
+  if (photo!.is_hidden || ev.status !== 'active' || !liveInPlan) {
     // Only pay for the session lookup when the public answer is "no".
     const uid = await userId(event)
     if (!uid || uid !== ev.owner_id) {
       if (photo!.is_hidden) fail(410, 'photo_hidden')
       if (ev.status === 'archived') fail(410, 'event_archived')
-      fail(403, 'event_not_active')
+      if (ev.status !== 'active') fail(403, 'event_not_active')
+      fail(403, 'not_in_plan')
     }
   }
 

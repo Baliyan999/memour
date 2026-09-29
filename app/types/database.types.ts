@@ -556,6 +556,16 @@ export type Database = {
     }
     Functions: {
       archive_expired_events: { Args: never; Returns: undefined }
+      claim_guest_device: {
+        Args: {
+          p_device_id: string
+          p_event_id: string
+          p_guest_name?: string
+          p_max_devices: number
+          p_table_number: number
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

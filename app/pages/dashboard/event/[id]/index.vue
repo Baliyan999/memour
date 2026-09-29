@@ -8,6 +8,7 @@ import {
 } from '@lucide/vue'
 import type { Database } from '~/types/database.types'
 import { formatDate, formatDuration } from '~/utils/format'
+import { GUEST_LIMIT_WARN_AT, guestLimitForTier, tierHas } from '#shared/plans'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -20,6 +21,10 @@ definePageMeta({ layout: 'dashboard' })
  * /api/photo refuses those) and real COUNT(*) totals for the stats and
  * filter chips. The grid loads the next page as its end scrolls into
  * view, so events of any size stay reachable.
+ *
+ * The tier (shared/plans.ts) shows here too: guests so far against the
+ * tier's limit, and on Basic the slideshow and branding buttons carry
+ * a "Pro" mark and open a note on what a higher tier adds.
  */
 const { t, te, locale } = useI18n()
 const localePath = useLocalePath()
@@ -76,6 +81,7 @@ interface Counts {
   video: number
   voice: number
   tables: number[]
+  guests: number
 }
 interface Page { items: Media[]; next: string | null; counts?: Counts }
 
@@ -153,6 +159,17 @@ useIntersectionObserver(sentinel, (entries) => {
 }, { rootMargin: '600px 0px' })
 
 const photoCount = computed(() => counts.value ? counts.value.total - counts.value.video - counts.value.voice : 0)
+
+// ─── Tier: guest limit, slideshow, branding ──────────────────────────
+const guestLimit = computed(() => guestLimitForTier(ev.value?.plan_tier))
+const guestsState = computed<'ok' | 'near' | 'full'>(() => {
+  const n = counts.value?.guests ?? 0
+  if (n >= guestLimit.value) return 'full'
+  return n >= Math.ceil(guestLimit.value * GUEST_LIMIT_WARN_AT) ? 'near' : 'ok'
+})
+const liveInPlan = computed(() => tierHas(ev.value?.plan_tier, 'live_slideshow'))
+const brandingInPlan = computed(() => tierHas(ev.value?.plan_tier, 'branding'))
+const upgradeOpen = ref(false)
 const tables = computed(() => counts.value?.tables ?? [])
 
 function setFilter(f: FilterKey) {
@@ -445,10 +462,12 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
             {{ t('couple.event.branding') }}
+            <!-- Not in this tier: the page itself says what Pro adds. -->
+            <span v-if="!brandingInPlan" class="rounded-full bg-(--color-accent)/60 px-1.5 py-px text-[10px] font-medium uppercase tracking-wider text-(--color-primary)">{{ t('pricing.pro.name') }}</span>
           </NuxtLink>
           <!-- The slideshow only runs for active events; it follows the couple's language. -->
           <a
-            v-if="ev.status === 'active'"
+            v-if="ev.status === 'active' && liveInPlan"
             :href="localePath(`/e/${ev.id}/live`)"
             target="_blank"
             rel="noopener"
@@ -459,6 +478,21 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
             </svg>
             {{ t('couple.event.liveSlideshow') }}
           </a>
+          <!-- Not in this tier: marked, and it opens the note on what Pro adds. -->
+          <button
+            v-else-if="!liveInPlan && ev.status !== 'archived'"
+            type="button"
+            :class="[btn, 'text-(--color-muted-foreground)']"
+            :aria-expanded="upgradeOpen"
+            aria-controls="upgrade-note"
+            @click="upgradeOpen = !upgradeOpen"
+          >
+            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            {{ t('couple.event.liveSlideshow') }}
+            <span class="rounded-full bg-(--color-accent)/60 px-1.5 py-px text-[10px] font-medium uppercase tracking-wider text-(--color-primary)">{{ t('pricing.pro.name') }}</span>
+          </button>
           <button
             v-if="ev.status === 'active'"
             type="button"
@@ -488,6 +522,19 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
           </button>
         </div>
       </div>
+      <AnimatePresence>
+        <motion.div
+          v-if="upgradeOpen && !liveInPlan"
+          id="upgrade-note"
+          class="mt-4"
+          :initial="reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }"
+          :animate="{ opacity: 1, y: 0 }"
+          :exit="reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }"
+          :transition="spring"
+        >
+          <DashboardUpgradeNote :title="t('couple.upgrade.eventTitle')" :desc="t('couple.upgrade.eventDesc')" />
+        </motion.div>
+      </AnimatePresence>
     </div>
 
     <!-- Pay-to-activate banner: shown only for draft events -->
@@ -610,7 +657,7 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
 
     <!-- Stats -->
     <div class="mb-8">
-      <div class="grid grid-cols-3 gap-2 sm:gap-4">
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
         <div class="surface-card min-w-0 rounded-(--radius-xl) p-4 sm:p-5">
           <p class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('couple.event.statPhotos') }}</p>
           <p class="mt-1 font-display text-2xl sm:text-3xl">{{ photoCount }}</p>
@@ -619,6 +666,15 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
             <span v-if="counts.video && counts.voice"> · </span>
             <span v-if="counts.voice">{{ t('couple.event.statVoices', { n: counts.voice }) }}</span>
           </p>
+        </div>
+        <!-- Phones bound to the event against the tier's guest limit -->
+        <div class="surface-card min-w-0 rounded-(--radius-xl) p-4 sm:p-5">
+          <p class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('couple.event.statGuests') }}</p>
+          <p
+            class="mt-1 font-display text-2xl tabular-nums sm:text-3xl"
+            :class="{ 'text-amber-700': counts && guestsState !== 'ok' }"
+            :aria-label="counts ? t('couple.event.guestsAria', { n: counts.guests, max: guestLimit }) : undefined"
+          >{{ counts ? t('couple.event.guestsOf', { n: counts.guests, max: guestLimit }) : '—' }}</p>
         </div>
         <div class="surface-card min-w-0 rounded-(--radius-xl) p-4 sm:p-5">
           <p class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('couple.event.statTables') }}</p>
@@ -632,6 +688,14 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
           <p class="mt-1 font-display text-lg leading-tight hyphens-auto min-[400px]:text-xl sm:text-3xl">{{ t(`couple.statusBadge.${ev.status}`) }}</p>
         </div>
       </div>
+      <!-- Close to (or at) the guest limit: new phones can't join past it -->
+      <p
+        v-if="counts && guestsState !== 'ok' && ev.status !== 'archived'"
+        class="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800"
+        role="status"
+      >
+        {{ t(guestsState === 'full' ? 'couple.event.guestsAtLimit' : 'couple.event.guestsNearLimit', { max: guestLimit }) }}
+      </p>
       <!-- Retention: until when the media is kept (wedding + 180 days, Luxury 365) -->
       <p v-if="ev.status !== 'draft' && !ev.purged_at && ev.archive_expires_at" class="mt-3 text-xs text-(--color-muted-foreground)">
         {{ t('couple.event.storedUntil', { date: fmtDate(ev.archive_expires_at) }) }}

@@ -14,6 +14,8 @@ Six new migrations:
 | `20260928010000_consent_events.sql` | New append-only table `consent_events`: who accepted which legal text, when and from where (lead form, couple login, guest welcome screen, checkout). No client access; UPDATE / DELETE / TRUNCATE refused. Nothing else changes. **The app of this release needs it:** without the table every lead, login, first guest upload and checkout fails, because a consent that can't be recorded stops the action. |
 | `20260928020000_leads_plan_tier.sql` | New nullable column `leads.plan_tier`: the tier a visitor picked on a Pricing card before sending the lead form. `/admin/leads` shows it and "→ create event" pre-selects it. Existing rows stay `NULL`. **The app of this release needs it:** without the column every lead form submission fails. |
 
+A seventh, from the tier-limits change, has [its own section below](#20260929000000_claim_guest_device-guest-limit-per-tier) with pre-checks, apply, post-checks and rollback. It goes after these six (in the same `db push` or later) and before the app that needs it.
+
 The twelve older files in `supabase/migrations/` are prod's own history, under the same versions (only the two bootstrap `UPDATE`s that named the founding admin are left out of the repo). `supabase db push` sees them as already applied and doesn't run them again.
 
 ## Order: migration first, then the app
@@ -246,6 +248,70 @@ commit;
 ```
 
 This was tested on a local copy. After the rollback the catalog (policies, grants, default privileges, FKs, function ACLs and bodies, triggers, indexes, buckets) matches the pre-migration state; the only difference is the extra `purged_at` column. Re-applying the migration afterwards works.
+
+## 20260929000000_claim_guest_device (guest limit per tier)
+
+Each tier now takes a real number of guests per event: Basic 50, Pro 150, Premium 300, Luxury 500 (`shared/plans.ts`). A guest is one phone (browser) bound to the event, a `guest_devices` row. The migration adds one function, `public.claim_guest_device(event, device, table, max_devices, guest_name)`. The app calls it with the service role when a phone it has never seen joins an event (welcome screen, or a first upload). The function counts the event's devices under a per-event advisory lock and inserts the new row only while the count is below the limit. It answers `created`, `existing` (the phone was already in, and it is never refused) or `limit_reached`. Two new guests arriving at the same moment can't both take the last place. The limit comes from the event's tier at that moment, so an upgrade applies to the very next guest. The function is `SECURITY DEFINER` with `search_path = ''`, and only `service_role` can execute it. Nothing else changes: no table, no column, no data. Additive and idempotent: running it twice is harmless.
+
+**Order: migration first, then the app.** The app of this release calls the function for every new guest. Without it, a new guest gets "server error" on the welcome screen and can't join. The app running now never calls it, so applying the migration early is harmless.
+
+**Pre-checks** (read-only):
+
+```sql
+-- 1. The release's six migrations are applied (the list ends with 20260928020000)
+select version from supabase_migrations.schema_migrations where version >= '20260928000000' order by 1;
+
+-- 2. Nothing of that name yet: expect 0 rows
+select oid::regprocedure from pg_proc where proname = 'claim_guest_device';
+
+-- 3. Guests per event against the tier's limit. An event already over it keeps every
+--    phone it has; only new phones are refused, until the tier is raised.
+select e.id, e.plan_tier, e.status, count(d.device_id) as guests,
+       case e.plan_tier when 'pro' then 150 when 'premium' then 300 when 'luxury' then 500 else 50 end as guest_limit
+from public.events e left join public.guest_devices d on d.event_id = e.id
+group by e.id order by guests desc;
+```
+
+**Apply.** Option A, the CLI (linked as above): `npx supabase db push --dry-run` must list `20260929000000_claim_guest_device.sql` (plus any of the six not applied yet), then `npx supabase db push`. Option B, the SQL editor: paste and run the whole file, then record it:
+
+```bash
+npx supabase migration repair --status applied 20260929000000
+```
+
+**Post-checks:**
+
+```sql
+-- SECURITY DEFINER, search_path pinned, EXECUTE only for the owner and service_role:
+-- claim_guest_device(uuid,text,integer,integer,text) | t | {search_path=""} | {postgres=X/postgres,service_role=X/postgres}
+select oid::regprocedure, prosecdef, proconfig, proacl from pg_proc where proname = 'claim_guest_device';
+
+-- Clients can't call it: expect "permission denied for function claim_guest_device"
+begin; set local role anon; select public.claim_guest_device(gen_random_uuid(), 'x', 1, 50); rollback;
+begin; set local role authenticated; select public.claim_guest_device(gen_random_uuid(), 'x', 1, 50); rollback;
+
+-- Optional: what it answers, on a throwaway event that is rolled back
+begin;
+insert into public.events (id, couple_names, wedding_date, status, plan_tier)
+  values ('00000000-0000-4000-8000-00000000c1a1', 'claim check', current_date, 'active', 'basic');
+select public.claim_guest_device('00000000-0000-4000-8000-00000000c1a1', 'd1', 1, 1);  -- created
+select public.claim_guest_device('00000000-0000-4000-8000-00000000c1a1', 'd1', 1, 1);  -- existing
+select public.claim_guest_device('00000000-0000-4000-8000-00000000c1a1', 'd2', 1, 1);  -- limit_reached
+rollback;
+```
+
+After the app deploy, open a test event's table link on a phone that hasn't joined it yet: the welcome screen, then "Open camera", must work. `supabase db lint` reports nothing for the function. On a local copy, 40 parallel claims on an event at 40 of 50 gave exactly 10 `created`, and 20 parallel new guests through the API never took the event past its limit, on all four tiers.
+
+**Rollback.** Deploy the previous app first: this release's app needs the function for every new guest. Then:
+
+```sql
+begin;
+drop function if exists public.claim_guest_device(uuid, text, integer, integer, text);
+delete from supabase_migrations.schema_migrations where version = '20260929000000';
+commit;
+notify pgrst, 'reload schema';
+```
+
+Nothing else is left behind. Guest rows the function created stay, as ordinary `guest_devices` rows.
 
 ## After the migration: operations
 

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useI18n, useLocalePath } from '#imports'
 import { RefreshCw } from '@lucide/vue'
 import { formatDate } from '~/utils/format'
+import { GUEST_LIMIT_WARN_AT, guestLimitForTier } from '#shared/plans'
 
 definePageMeta({ layout: 'admin' })
 
@@ -10,7 +11,8 @@ definePageMeta({ layout: 'admin' })
  * Admin events list — pulls all events via /api/admin/events (which
  * uses service-role to bypass RLS). The page itself is gated by the
  * global auth middleware that checks the admins table. A failed load
- * says so (with a retry) instead of "no events yet".
+ * says so (with a retry) instead of "no events yet". Each row shows its
+ * guests against the tier's limit (shared/plans.ts), amber from 90 %.
  */
 const { t, te, locale } = useI18n()
 const localePath = useLocalePath()
@@ -27,6 +29,7 @@ const { data, error, refresh, pending } = await useFetch<{
     owner_id: string | null
     created_at: string
     table_count: number | null
+    guests: number
   }>
 }>('/api/admin/events')
 
@@ -52,6 +55,8 @@ const fmtDate = (d: string) => formatDate(d, locale.value)
 // rather than itself.
 const statusLabel = (s: string) => te(`couple.statusBadge.${s}`) ? t(`couple.statusBadge.${s}`) : ''
 const tierLabel = (tier: string | null) => tier && te(`pricing.${tier}.name`) ? t(`pricing.${tier}.name`) : ''
+const guestsNear = (ev: { guests: number; plan_tier: string | null }) =>
+  ev.guests >= Math.ceil(guestLimitForTier(ev.plan_tier) * GUEST_LIMIT_WARN_AT)
 </script>
 
 <template>
@@ -113,6 +118,12 @@ const tierLabel = (tier: string | null) => tier && te(`pricing.${tier}.name`) ? 
             </div>
             <p class="mt-1 text-sm text-(--color-muted-foreground)">
               {{ fmtDate(ev.wedding_date) }}<span v-if="ev.venue_name"> · {{ ev.venue_name }}</span>
+            </p>
+            <p
+              class="mt-1 text-[11px] tabular-nums"
+              :class="guestsNear(ev) ? 'text-amber-700' : 'text-(--color-muted-foreground)'"
+            >
+              {{ t('admin.events.guests', { n: ev.guests, max: guestLimitForTier(ev.plan_tier) }) }}
             </p>
             <p
               v-if="!ev.owner_id"

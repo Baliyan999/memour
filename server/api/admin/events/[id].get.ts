@@ -6,7 +6,9 @@ import type { Database } from '~/types/database.types'
 import { fail } from '../../../utils/errors'
 
 /**
- * GET /api/admin/events/[id] — one event for the admin edit form.
+ * GET /api/admin/events/[id] — one event for the admin edit form, with
+ * `guests`: the guest devices bound to it (what the tier's guest limit
+ * counts, shared/plans.ts).
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
@@ -29,5 +31,14 @@ export default defineEventHandler(async (event) => {
     .eq('id', id!)
     .maybeSingle()
   if (!ev) fail(404, 'event_not_found')
-  return { event: ev }
+
+  const { count, error } = await admin
+    .from('guest_devices')
+    .select('device_id', { count: 'exact', head: true })
+    .eq('event_id', id!)
+  if (error) {
+    console.error('[admin/events] guest count', error)
+    fail(500, 'list_failed')
+  }
+  return { event: { ...ev!, guests: count ?? 0 } }
 })

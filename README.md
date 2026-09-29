@@ -64,6 +64,7 @@ The schema lives in [`supabase/migrations/`](./supabase/migrations) — the sing
 | `20260928000200_purge_otps_cron` | daily pg_cron job: login-code rows (`phone_otps`, `admin_otps`: phone/email, IP, user agent) older than 7 days are deleted |
 | `20260928000300_payments_unique_paid` | at most one settled provider payment per event, one row per provider transaction |
 | `20260928020000_leads_plan_tier` | `leads.plan_tier`: the tier picked on a Pricing card before the lead form was sent |
+| `20260929000000_claim_guest_device` | `claim_guest_device()`: a new guest phone joins an event only while it has fewer than its tier's guests (Basic 50, Pro 150, Premium 300, Luxury 500 — `shared/plans.ts`), atomically; phones already in are never refused |
 
 **Security model.** The browser holds the anon key and the user's JWT, so anything RLS allows is reachable straight through PostgREST. Clients therefore only *read* their own rows (events, photos, branding, payments; admins read their own `admins` row). Every write goes through a Nitro endpoint on the service role, which is where the checks live (payment gate, zod limits, ownership). Server-only tables (`phone_otps`, `admin_otps`, `guest_devices`, `leads`, `referrals`, `referral_attributions`) are closed to clients entirely. Do not add client-side `.insert/.update/.delete`; if one is ever truly needed, grant the specific columns and add a policy `WITH CHECK` — never `FOR ALL`.
 
@@ -207,6 +208,7 @@ Done:
 - [x] Couple/admin auth + RLS
 - [x] Guest camera (photo/video/voice) + soft geofence + upload window (18:00 the evening before → 12:00 the day after, Tashkent)
 - [x] Live slideshow (polls `/api/guest/live-init`, catches up after a dropped connection)
+- [x] Tier limits enforced on the server (`shared/plans.ts`): per-phone photo/video/voice quotas, guests per event, live slideshow and guest-page design from Pro
 - [x] QR PDF generation (PDFKit + Manrope Cyrillic)
 - [x] ZIP archive streaming (archiver)
 - [x] Swipe moderation

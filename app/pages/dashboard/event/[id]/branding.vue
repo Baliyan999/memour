@@ -5,6 +5,7 @@ import { useI18n, useLocalePath } from '#imports'
 import { RefreshCw } from '@lucide/vue'
 import imageCompression from 'browser-image-compression'
 import type { Database } from '~/types/database.types'
+import { tierHas } from '#shared/plans'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -20,6 +21,11 @@ definePageMeta({ layout: 'dashboard' })
  *
  * If the current settings can't be loaded, the form isn't shown at
  * all: saving an empty form would overwrite the names and greeting.
+ *
+ * The design of the guest page is part of Pro and up (shared/plans.ts;
+ * the endpoint answers not_in_plan otherwise). On Basic the page shows
+ * what a higher tier adds instead of the form — guests see the standard
+ * Memour design, whatever was saved before.
  */
 const { t } = useI18n()
 const errorMessage = useErrorMessage()
@@ -32,7 +38,7 @@ const id = route.params.id as string
 const { data: ev, error: loadErr, pending: loadPending, refresh } = await useAsyncData(`event-branding-${id}`, async () => {
   const { data, error } = await supabase
     .from('events')
-    .select('id, couple_names, branding(*)')
+    .select('id, couple_names, plan_tier, branding(*)')
     .eq('id', id)
     .maybeSingle()
   if (error) throw error
@@ -42,6 +48,8 @@ const { data: ev, error: loadErr, pending: loadPending, refresh } = await useAsy
 if (!loadErr.value && !ev.value) {
   throw createError({ statusCode: 404, statusMessage: 'event_not_found', fatal: true })
 }
+
+const brandingInPlan = computed(() => tierHas(ev.value?.plan_tier, 'branding'))
 
 const form = reactive({
   bride_name: '',
@@ -124,6 +132,11 @@ async function save() {
     if (res.cover_photo) coverPreviewUrl.value = res.cover_photo
     coverFile.value = null
   } catch (e: any) {
+    // The tier was lowered while the page was open: show why instead.
+    if (errorInfo(e).code === 'not_in_plan') {
+      await refresh()
+      return
+    }
     // file_too_large_cover / unsupported_mime_cover; a proxy's 413 page
     // has no code, but its status still means "too big".
     error.value = errorMessage(e, { variant: 'cover', fallback: 'couple.branding.saveFailed' })
@@ -162,6 +175,13 @@ async function save() {
         {{ t('common.retry') }}
       </button>
     </div>
+
+    <!-- Basic: no form, just what a higher tier adds -->
+    <DashboardUpgradeNote
+      v-else-if="ev && !brandingInPlan"
+      :title="t('couple.upgrade.brandingTitle')"
+      :desc="t('couple.upgrade.brandingDesc')"
+    />
 
     <form v-else class="surface-card flex flex-col gap-5 rounded-(--radius-xl) p-7" novalidate @submit.prevent="save">
       <!-- Cover photo -->

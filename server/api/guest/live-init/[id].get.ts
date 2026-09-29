@@ -1,5 +1,6 @@
 import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { tierHas } from '#shared/plans'
 import { fail } from '../../../utils/errors'
 
 /**
@@ -12,7 +13,9 @@ import { fail } from '../../../utils/errors'
  * Wi-Fi was down or the laptop slept.
  *
  * Anonymous: the event id is printed on every table's QR, so this is as
- * public as the /e/[id]/live page itself. Only `active` events are
+ * public as the /e/[id]/live page itself. The slideshow is part of Pro
+ * and up (shared/plans.ts): a Basic event gets 403 not_in_plan whatever
+ * its status. Only `active` events are
  * served (draft → 403, archived → 410), and never more than the newest
  * FEED_LIMIT visible items — the projector shows those plus whatever
  * arrives while it runs, and nobody holding the id can page back
@@ -63,10 +66,11 @@ export default defineEventHandler(async (event) => {
 
   const { data: ev } = await admin
     .from('events')
-    .select('id, couple_names, status')
+    .select('id, couple_names, status, plan_tier')
     .eq('id', id!)
     .maybeSingle()
   if (!ev) fail(404, 'event_not_found')
+  if (!tierHas(ev!.plan_tier, 'live_slideshow')) fail(403, 'not_in_plan')
   if (ev!.status === 'archived') fail(410, 'event_archived')
   if (ev!.status !== 'active') fail(403, 'event_not_active')
 
