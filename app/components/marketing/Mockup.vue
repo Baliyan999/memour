@@ -8,7 +8,8 @@ import { Battery, Heart, MapPin, Play, Send, Signal, Wifi, X } from '@lucide/vue
  * few small photos, no scroll/state subscriptions. Each variant is a
  * stylised reproduction of the real product UI for that feature
  * (projector slideshow, phone recording, voice bubble, swipe deck,
- * geofence map) — and a preview of the Telegram bot still to come.
+ * venue map with the upload window) — and a preview of the Telegram
+ * bot still to come.
  */
 const props = defineProps<{
   cardKey: 'slideshow' | 'video' | 'voice' | 'swipe' | 'geofence' | 'telegram'
@@ -258,11 +259,11 @@ const ALBUM = ['mock-album-couple', 'mock-album-table', 'mock-album-first-look',
     </div>
   </div>
 
-  <!-- ───────────── Geofence ───────────── -->
+  <!-- ───────────── Upload window (card key `geofence`) ───────────── -->
   <!-- Aerial photo of the venue, centred on the pin; a light warm wash
        pulls the pool towards the page palette without flattening the
-       golden hour. The dashed radius rides on a pale halo so it reads
-       over any part of the photo, even at 1× density. -->
+       golden hour. The chip shows the upload window. No radius or zone
+       is drawn: the product doesn't limit uploads by distance. -->
   <div v-else-if="cardKey === 'geofence'" class="absolute inset-0 overflow-hidden">
     <div class="absolute inset-0" :style="{ background: `oklch(86% 0.07 ${hue + 10})` }" />
     <MarketingPhoto
@@ -284,10 +285,6 @@ const ALBUM = ['mock-album-couple', 'mock-album-table', 'mock-album-first-look',
         </radialGradient>
       </defs>
       <circle cx="100" cy="100" r="78" :fill="`url(#geo-fill-${hue})`" />
-      <circle cx="100" cy="100" r="78" :stroke="`oklch(98% 0.01 ${hue})`" stroke-width="3.5" opacity="0.7" />
-      <circle cx="100" cy="100" r="78" :stroke="`oklch(58% 0.18 ${hue})`" stroke-width="2.25" stroke-dasharray="5 5" />
-      <circle cx="100" cy="100" r="42" :stroke="`oklch(98% 0.01 ${hue})`" stroke-width="2.5" opacity="0.5" />
-      <circle cx="100" cy="100" r="42" :stroke="`oklch(58% 0.16 ${hue})`" stroke-width="1.25" stroke-dasharray="2 4" opacity="0.85" />
     </svg>
     <div class="absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center">
       <div class="relative">
@@ -309,9 +306,6 @@ const ALBUM = ['mock-album-couple', 'mock-album-table', 'mock-album-first-look',
         <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-500" />
       </span>
       <span class="text-[10px] font-medium text-(--color-foreground)">{{ t('features.mockup.geofenceActive') }}</span>
-    </div>
-    <div class="absolute bottom-3 right-3 rounded-md bg-white/80 px-2 py-1 text-[10px] font-medium text-(--color-foreground)/80 shadow-sm backdrop-blur-sm">
-      {{ t('features.mockup.geofenceRadius') }}
     </div>
   </div>
 

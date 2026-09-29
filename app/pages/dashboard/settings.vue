@@ -11,9 +11,9 @@ definePageMeta({ layout: 'dashboard' })
  *
  * Sections:
  *   • Language (links to the locale-switched copy of this same page)
- *   • Telegram bot — deep link to start a chat with @QRFotografBot
- *     (kept as one-tap CTA; full bind flow comes later when the bot
- *     receives /start <token>)
+ *   • Telegram bot — not built yet: a plain card with the «скоро»
+ *     pill, no link (the bot doesn't answer /start yet). Make it a
+ *     link again once the couple's bot can bind to an account.
  *   • Sign out
  */
 const { t, locale, locales } = useI18n()
@@ -36,8 +36,6 @@ const displayEmail = computed(() => {
 const localeOptions = computed(() =>
   (locales.value as Array<{ code: 'ru' | 'uz'; name: string }>),
 )
-
-const botUsername = 'QRFotografBot'
 
 const { toast } = useToast()
 const signingOut = ref(false)
@@ -107,26 +105,18 @@ async function signOut() {
         </div>
       </div>
 
-      <!-- Telegram -->
-      <a
-        :href="`https://t.me/${botUsername}`"
-        target="_blank"
-        rel="noopener"
-        class="surface-card group flex items-center justify-between gap-4 rounded-(--radius-xl) p-6 transition-[background-color,transform] duration-150 hover:bg-(--color-muted)/30 active:scale-[0.99]"
-      >
-        <div class="flex items-center gap-3">
-          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-600">
-            <MessageSquare class="h-5 w-5" :stroke-width="1.6" />
-          </div>
-          <div>
-            <p class="font-medium">{{ t('couple.settings.telegramTitle') }}</p>
-            <p class="text-xs text-(--color-muted-foreground)">
-              {{ t('couple.settings.telegramHint') }}
-            </p>
-          </div>
+      <!-- Telegram — coming soon, so not a link -->
+      <div class="surface-card flex items-center gap-3 rounded-(--radius-xl) p-6">
+        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-600">
+          <MessageSquare class="h-5 w-5" :stroke-width="1.6" />
         </div>
-        <ChevronRight class="h-5 w-5 text-(--color-muted-foreground) transition-transform group-hover:translate-x-1" />
-      </a>
+        <div>
+          <p class="font-medium"><MarketingSoonBadge :text="t('couple.settings.telegramTitle')" /></p>
+          <p class="text-xs text-(--color-muted-foreground)">
+            {{ t('couple.settings.telegramHint') }}
+          </p>
+        </div>
+      </div>
 
       <!-- Sign out -->
       <button

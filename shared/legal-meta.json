@@ -24,11 +24,11 @@
     }
   },
   "offer": {
-    "version": "2026-09-28.2",
-    "sha256": "f96c57108c271a906326664b465d396f33e29b86d74d12b51cde9255a6a6fa5a",
+    "version": "2026-09-29",
+    "sha256": "6e1dcddee1011ad84771abcec8cb4addd6767697f4276d2a7223514eb782820b",
     "open": {
-      "uz": 94,
-      "ru": 94
+      "uz": 72,
+      "ru": 72
     },
     "todo": {
       "uz": 47,

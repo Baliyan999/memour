@@ -6,10 +6,12 @@ import { useReveal } from '~/composables/useMotion'
 /**
  * Features — "Что внутри". Asymmetric bento with 6 cards. Each carries
  * a small but recognisable mock of the actual feature UI (projector
- * slideshow, phone recording, voice bubble, swipe deck, geofence map,
- * Telegram chat). Hero card spans 2×2 on lg+, swipe card spans the
- * row width on tablet. No scroll-driven motion — entry is the shared
- * staggered spring reveal, hover brightens.
+ * slideshow, phone recording, voice bubble, swipe deck, venue map with
+ * the upload window, Telegram chat). The `geofence` key is that upload
+ * window card (the name is older than the copy). Hero card spans 2×2
+ * on lg+, swipe card spans the row width on tablet. No scroll-driven
+ * motion — entry is the shared staggered spring reveal, hover
+ * brightens.
  */
 const { t } = useI18n()
 
