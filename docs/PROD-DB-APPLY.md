@@ -325,3 +325,13 @@ Nothing else is left behind. Guest rows the function created stay, as ordinary `
   `owner_phone = null` is already done by the trigger once the user is deleted; it's there for when you run this first.
 - **Changing an event's wedding date or tier** (admin edit, upgrade) recomputes `archive_expires_at` from the new values. To set a custom date instead, write `archive_expires_at` in the same `UPDATE`.
 - **Deleting an event that has payments** now fails (`violates foreign key constraint payments_event_id_fkey`). That is intended: archive it instead.
+- **Guest places held by phones that sent nothing.** Every phone that joins an event takes one of its tier's guest places, and the event id is printed on every table card. A new phone can join only while the upload window is open (18:00 the evening before → 12:00 the day after), so places can't be used up days in advance. If they still fill up with phones that never sent a file (a script, or guests who only typed their name) and real guests see "all places are taken", free those places: in the admin panel, open the event and click «Освободить места телефонов, которые ничего не отправили: N» under the tier (shown only while there are such phones). Phones that sent something keep their place. The same in the SQL editor:
+  ```sql
+  -- how many would be freed
+  select count(*) from public.guest_devices
+  where event_id = '<event id>' and photo_count = 0 and video_count = 0 and voice_count = 0;
+
+  delete from public.guest_devices
+  where event_id = '<event id>' and photo_count = 0 and video_count = 0 and voice_count = 0;
+  ```
+  A freed phone that comes back joins again while there is room. Its consent records stay.

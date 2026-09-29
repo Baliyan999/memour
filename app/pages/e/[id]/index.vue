@@ -41,7 +41,10 @@ const otherLocaleLabel = computed(() => (locale.value === 'ru' ? "O'zbekcha" : '
  *      plans.ts). A phone that isn't bound yet while the event is full
  *      (`guests_full`, or the server's 409 guest_limit_reached) gets a
  *      friendly "all places are taken" card instead of the welcome
- *      form; phones already in are never affected.
+ *      form; phones already in are never affected. The first paint
+ *      can't tell which one this phone is (no device_id on the server),
+ *      so on a full event it shows a neutral placeholder until the
+ *      device check on mount decides.
  *
  * The table number can NEVER be edited from the UI any more — it is
  * strictly the one written into the QR code by the admin.
@@ -149,14 +152,16 @@ const consentError = ref<string | null>(null)
 const limits = ref<Limits>(data.value?.limits ?? { photo: 20, video: 0, voice: 0 })
 const uploadWindow = ref<UploadWindowInfo | null>(data.value?.upload_window ?? null)
 // The event already has as many guests as its tier takes — only
-// matters while this phone isn't bound (see decideStage).
+// matters while this phone isn't bound (see decideStage). Taken from
+// the first paint (for the placeholder) and then only from answers that
+// carried this phone's device_id (refreshBinding): a plain refresh()
+// can't tell a phone already in from a new one.
 const guestsFull = ref(data.value?.guests_full ?? false)
 watch(
   () => data.value,
   (next) => {
     if (next?.binding) binding.value = next.binding
     if (next) consented.value = next.consented
-    if (next) guestsFull.value = next.guests_full
     if (next?.limits) limits.value = next.limits
     if (next?.upload_window) uploadWindow.value = next.upload_window
   },
@@ -189,14 +194,18 @@ const tableOutOfRange = computed(() => {
   return !!(count && tableParam.value && tableParam.value > count)
 })
 
-type Stage = 'welcome' | 'camera' | 'wrong_table' | 'no_table' | 'quota_full' | 'window_before' | 'window_after' | 'guest_limit'
+type Stage = 'checking' | 'welcome' | 'camera' | 'wrong_table' | 'no_table' | 'quota_full' | 'window_before' | 'window_after' | 'guest_limit'
 // First render (SSR and hydration) only uses what the server sent, so
-// both sides agree; decideStage() refines it on mount.
+// both sides agree; decideStage() refines it on mount. On a full event
+// the server can't know yet whether this phone is already in (camera)
+// or new (all places taken) — a neutral placeholder until it does,
+// never a name form that would be taken away.
 function initialStage(): Stage {
   const s = uploadWindow.value?.state
   if (s === 'before') return 'window_before'
   if (s === 'after') return 'window_after'
   if (!tableParam.value || tableOutOfRange.value) return 'no_table'
+  if (guestsFull.value) return 'checking'
   return 'welcome'
 }
 
@@ -358,7 +367,11 @@ onMounted(async () => {
   try {
     await refreshBinding()
   } catch {
-    // swallow — we still have the SSR response; binding stays null
+    // swallow — we still have the SSR response; binding stays null.
+    // Its guests_full can't tell a phone already in from a new one, so
+    // show the form and let the binding endpoint decide (a new phone on
+    // a full event gets guest_limit_reached there).
+    guestsFull.value = false
   }
   decideStage()
   tickTimer = setInterval(() => { nowTick.value = Date.now() }, 20_000)
@@ -429,6 +442,14 @@ async function startCapture() {
       stage.value = 'no_table'
     } else if (code === 'guest_limit_reached') {
       showGuestLimit()
+    } else if (code === 'window_closed') {
+      windowClosedByServer.value = true
+    } else if (code === 'window_not_open') {
+      // Our clock ran ahead of the server's. Take its time again; if we
+      // still think the window is open, say it here and let them retry.
+      await refreshBinding().catch(() => {})
+      decideStage()
+      if (stage.value === 'welcome') consentError.value = errorMessage(code)
     } else if (code === 'event_not_active') {
       await refresh()
     } else if (code === 'consent_required' || code === 'consent_outdated') {
@@ -556,11 +577,14 @@ async function acceptAndSend() {
     consentSheet.value = false
     await captureRef.value?.send()
   } catch (e: any) {
-    if ((e?.data?.data?.code ?? e?.data?.code) === 'guest_limit_reached') {
+    const code = e?.data?.data?.code ?? e?.data?.code
+    if (code === 'guest_limit_reached') {
       consentSheet.value = false
       showGuestLimit()
       return
     }
+    // The frame can't go any more; the page follows once it's dropped.
+    if (code === 'window_closed') windowClosedByServer.value = true
     consentError.value = errorMessage(e, { fallback: 'guest.errors.upload_failed' })
   } finally {
     welcomePending.value = false
@@ -976,8 +1000,25 @@ useSeoMeta({
         leave-to-class="opacity-0"
         mode="out-in"
       >
+        <!-- ============== CHECKING THIS PHONE (full event) ============== -->
+        <div
+          v-if="stage === 'checking'"
+          key="checking"
+          :class="['text-center', hasCover ? '-mt-10' : 'mt-8']"
+          role="status"
+          aria-busy="true"
+        >
+          <div class="surface-card rounded-(--radius-xl) p-8">
+            <p class="text-xs uppercase tracking-[0.3em] text-(--color-muted-foreground)">{{ ev.couple_names }}</p>
+            <Skeleton class="mx-auto mt-4 h-7 w-2/3" />
+            <Skeleton class="mx-auto mt-4 h-4 w-5/6" />
+            <Skeleton class="mx-auto mt-2 h-4 w-1/2" />
+            <span class="sr-only">{{ t('guest.state.loading') }}</span>
+          </div>
+        </div>
+
         <!-- ============== WELCOME ============== -->
-        <div v-if="stage === 'welcome'" key="welcome">
+        <div v-else-if="stage === 'welcome'" key="welcome">
           <!-- Monogram disc + names -->
           <motion.div
             :initial="hydrated ? { opacity: 0, y: 16 } : false"

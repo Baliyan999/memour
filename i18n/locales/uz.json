@@ -880,7 +880,12 @@
       "backToEvents": "Tadbirlarga",
       "guests": "Mehmonlar: {n} / {max}",
       "guestsFull": "Bu tarifda yangi mehmonlar endi ulana olmaydi — ulanganlar suratga olishda davom etadi.",
-      "guestsNear": "Bu tarifdagi deyarli barcha o'rinlar band."
+      "guestsNear": "Bu tarifdagi deyarli barcha o'rinlar band.",
+      "freeIdle": "Hech narsa yubormagan telefonlar o'rnini bo'shatish: {n}",
+      "freeIdleTitle": "O'rinlar bo'shatilsinmi?",
+      "freeIdleDesc": "Bu to'yga hali hech narsa yubormagan telefonlar o'z o'rnini yo'qotadi: {n} ta. Bunday mehmon qaytib kelsa, bo'sh o'rin bo'lsa, qaytadan ulanadi. Yuborilgan suratlar, videolar va ovozli xabarlarga tegilmaydi.",
+      "freeIdleConfirm": "Bo'shatish",
+      "freedIdle": "Bo'shatilgan o'rinlar: {n}"
     },
     "qr": {
       "preview": "Namuna",

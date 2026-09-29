@@ -8,7 +8,8 @@ import { fail } from '../../../utils/errors'
 /**
  * GET /api/admin/events/[id] — one event for the admin edit form, with
  * `guests`: the guest devices bound to it (what the tier's guest limit
- * counts, shared/plans.ts).
+ * counts, shared/plans.ts), and `idle_guests`: those of them that never
+ * sent a file — the places DELETE ./[id]/idle-guests can give back.
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
@@ -32,13 +33,22 @@ export default defineEventHandler(async (event) => {
     .maybeSingle()
   if (!ev) fail(404, 'event_not_found')
 
-  const { count, error } = await admin
-    .from('guest_devices')
-    .select('device_id', { count: 'exact', head: true })
-    .eq('event_id', id!)
-  if (error) {
-    console.error('[admin/events] guest count', error)
+  const [all, idle] = await Promise.all([
+    admin
+      .from('guest_devices')
+      .select('device_id', { count: 'exact', head: true })
+      .eq('event_id', id!),
+    admin
+      .from('guest_devices')
+      .select('device_id', { count: 'exact', head: true })
+      .eq('event_id', id!)
+      .eq('photo_count', 0)
+      .eq('video_count', 0)
+      .eq('voice_count', 0),
+  ])
+  if (all.error || idle.error) {
+    console.error('[admin/events] guest count', all.error ?? idle.error)
     fail(500, 'list_failed')
   }
-  return { event: { ...ev!, guests: count ?? 0 } }
+  return { event: { ...ev!, guests: all.count ?? 0, idle_guests: idle.count ?? 0 } }
 })

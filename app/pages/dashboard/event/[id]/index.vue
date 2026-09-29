@@ -656,8 +656,10 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
     </section>
 
     <!-- Stats -->
+    <!-- Two by two until there is room for four cards whose numbers
+         ("500 из 500", "Черновик") stay on one line at full size. -->
     <div class="mb-8">
-      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
+      <div class="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
         <div class="surface-card min-w-0 rounded-(--radius-xl) p-4 sm:p-5">
           <p class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('couple.event.statPhotos') }}</p>
           <p class="mt-1 font-display text-2xl sm:text-3xl">{{ photoCount }}</p>
@@ -671,7 +673,7 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
         <div class="surface-card min-w-0 rounded-(--radius-xl) p-4 sm:p-5">
           <p class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('couple.event.statGuests') }}</p>
           <p
-            class="mt-1 font-display text-2xl tabular-nums sm:text-3xl"
+            class="mt-1 whitespace-nowrap font-display text-2xl tabular-nums sm:text-3xl"
             :class="{ 'text-amber-700': counts && guestsState !== 'ok' }"
             :aria-label="counts ? t('couple.event.guestsAria', { n: counts.guests, max: guestLimit }) : undefined"
           >{{ counts ? t('couple.event.guestsOf', { n: counts.guests, max: guestLimit }) : '—' }}</p>

@@ -18,7 +18,9 @@ definePageMeta({ layout: 'admin' })
  *
  * Under the tier: guests so far against the limit of the tier picked
  * in the form (shared/plans.ts) — an upgrade raises it the moment it
- * is saved.
+ * is saved. Places held by phones that never sent a file can be given
+ * back (DELETE …/idle-guests): the way out when a script or idle
+ * phones filled the event and real guests are turned away.
  */
 const { t } = useI18n()
 const localePath = useLocalePath()
@@ -39,6 +41,7 @@ interface AdminEvent {
   owner_phone: string | null
   table_count: number | null
   guests: number
+  idle_guests: number
 }
 const { data, error: loadError } = await useFetch<{ event: AdminEvent }>(`/api/admin/events/${id}`)
 
@@ -55,12 +58,38 @@ const owner_phone_digits = ref(initialDigits)
 const owner_phone = ref(`+998 ${initialDigits}`)
 const claimed = !!ev?.owner_id
 
+const guests = ref(ev?.guests ?? 0)
+const idleGuests = ref(ev?.idle_guests ?? 0)
 const guestLimit = computed(() => guestLimitForTier(plan_tier.value))
 const guestsState = computed<'ok' | 'near' | 'full'>(() => {
-  const n = ev?.guests ?? 0
+  const n = guests.value
   if (n >= guestLimit.value) return 'full'
   return n >= Math.ceil(guestLimit.value * GUEST_LIMIT_WARN_AT) ? 'near' : 'ok'
 })
+
+const freeing = ref(false)
+async function freeIdleGuests() {
+  if (freeing.value) return
+  const ok = await confirmDialog({
+    title: t('admin.eventForm.freeIdleTitle'),
+    description: t('admin.eventForm.freeIdleDesc', { n: idleGuests.value }),
+    confirmLabel: t('admin.eventForm.freeIdleConfirm'),
+    cancelLabel: t('common.cancel'),
+    tone: 'danger',
+  })
+  if (!ok) return
+  freeing.value = true
+  try {
+    const res = await $fetch<{ freed: number; guests: number }>(`/api/admin/events/${id}/idle-guests`, { method: 'DELETE' })
+    guests.value = res.guests
+    idleGuests.value = 0
+    toast.success(t('admin.eventForm.freedIdle', { n: res.freed }))
+  } catch (e) {
+    toast.error(errorMessage(e))
+  } finally {
+    freeing.value = false
+  }
+}
 
 const pending = ref(false)
 const error = ref<string | null>(null)
@@ -194,9 +223,16 @@ async function submit() {
             :class="guestsState === 'ok' ? 'text-(--color-muted-foreground)' : 'text-amber-700'"
             role="status"
           >
-            {{ t('admin.eventForm.guests', { n: ev.guests, max: guestLimit }) }}<template v-if="guestsState !== 'ok'">.
+            {{ t('admin.eventForm.guests', { n: guests, max: guestLimit }) }}<template v-if="guestsState !== 'ok'">.
               {{ t(guestsState === 'full' ? 'admin.eventForm.guestsFull' : 'admin.eventForm.guestsNear') }}</template>
           </p>
+          <button
+            v-if="idleGuests > 0"
+            type="button"
+            :disabled="freeing"
+            class="self-start text-left text-[11px] text-(--color-foreground) underline decoration-(--color-border) underline-offset-2 hover:decoration-current disabled:opacity-60"
+            @click="freeIdleGuests"
+          >{{ t('admin.eventForm.freeIdle', { n: idleGuests }) }}</button>
         </div>
         <div class="flex flex-col gap-1.5">
           <label for="ev-status" class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('admin.eventForm.status') }}</label>

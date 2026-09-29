@@ -20,7 +20,11 @@
  * storage comes back as a new guest and takes a new place.
  * claimGuestDevice() takes a place atomically (SQL function
  * public.claim_guest_device), so two new guests arriving at the same
- * instant can't both get the last one.
+ * instant can't both get the last one. Both callers (binding, upload)
+ * let a new device in only inside the upload window, so the places
+ * can't be used up days before the wedding; places held by devices
+ * that never sent anything can be given back by an admin
+ * (DELETE /api/admin/events/[id]/idle-guests).
  */
 import type { H3Event } from 'h3'
 import { serverSupabaseServiceRole } from '#supabase/server'

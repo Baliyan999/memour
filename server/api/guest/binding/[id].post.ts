@@ -5,6 +5,7 @@ import { hitRateLimit, getTrustedClientIp } from '../../../utils/rate-limit'
 import { fail } from '../../../utils/errors'
 import { consentField, hasGuestConsent, recordConsent, requireConsent } from '../../../utils/consent'
 import { claimGuestDevice } from '../../../utils/guest-quota'
+import { uploadWindowState } from '../../../utils/upload-window'
 
 /**
  * POST /api/guest/binding/[id]
@@ -35,6 +36,13 @@ import { claimGuestDevice } from '../../../utils/guest-quota'
  * Errors:
  *   404 event_not_found   id doesn't match a row
  *   403 event_not_active  the event was archived/drafted again
+ *   403 window_not_open / window_closed
+ *                         a device new to this event, outside the
+ *                         upload window (server/utils/upload-window.ts).
+ *                         Guest places are taken only while guests can
+ *                         shoot, so they can't be used up in advance;
+ *                         the page never asks outside the window anyway.
+ *                         Devices already in keep working.
  *   422 invalid_table     ?t= is past the event's table_count
  *   422 consent_required  no consent in the body and none on record
  *   409 consent_outdated  the page showed older texts — reload
@@ -80,18 +88,12 @@ export default defineEventHandler(async (event) => {
 
   const { data: ev } = await admin
     .from('events')
-    .select('id, status, table_count, plan_tier')
+    .select('id, status, table_count, plan_tier, wedding_date')
     .eq('id', id!)
     .maybeSingle()
   if (!ev) fail(404, 'event_not_found')
   if (ev!.status !== 'active') fail(403, 'event_not_active')
   if (ev!.table_count && parsed.data.guest_table > ev!.table_count) fail(422, 'invalid_table')
-
-  // Guest rules, the licence for their files and the privacy policy —
-  // accepted before the device is bound or anything is uploaded.
-  const consented = await hasGuestConsent(event, id!, parsed.data.device_id)
-  const docs = parsed.data.consent ? requireConsent('guest_upload', parsed.data.consent) : null
-  if (!docs && !consented) fail(422, 'consent_required')
 
   // Existing binding takes priority over the new (event, table)
   // pair from the URL — we never silently move a device that has
@@ -104,6 +106,22 @@ export default defineEventHandler(async (event) => {
     .eq('event_id', id!)
     .eq('device_id', parsed.data.device_id)
     .maybeSingle()
+
+  // A new device takes one of the event's guest places, so it joins
+  // only while the upload window is open. The event id is printed on
+  // every table card; without this, a script could fill every place
+  // days before the wedding and real guests would be turned away.
+  if (!existing) {
+    const windowState = uploadWindowState(ev!.wedding_date)
+    if (windowState === 'before') fail(403, 'window_not_open')
+    if (windowState === 'after') fail(403, 'window_closed')
+  }
+
+  // Guest rules, the licence for their files and the privacy policy —
+  // accepted before the device is bound or anything is uploaded.
+  const consented = await hasGuestConsent(event, id!, parsed.data.device_id)
+  const docs = parsed.data.consent ? requireConsent('guest_upload', parsed.data.consent) : null
+  if (!docs && !consented) fail(422, 'consent_required')
 
   // First time we see this device for this event: it takes one of the
   // event's guest places (a fresh row, counters at 0) — or the event is

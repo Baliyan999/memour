@@ -32,7 +32,9 @@ import { hasGuestConsent } from '../../../utils/consent'
  * `guests_full`: a device that isn't bound yet would be refused — the
  * event already has as many guests as its tier takes. The page says so
  * up front instead of after the name and the boxes; the binding
- * endpoint is what actually enforces it.
+ * endpoint is what actually enforces it. Also without a device_id (the
+ * server-rendered first paint): the page then waits for its own device
+ * check instead of showing a name form that may be taken away.
  *
  * Branding is the couple's design of this page (Pro and up). On Basic
  * it is left out, so the page shows the standard Memour design even if
@@ -106,7 +108,7 @@ export default defineEventHandler(async (event) => {
   const consented = deviceId ? await hasGuestConsent(event, id!, deviceId) : false
 
   let guestsFull = false
-  if (deviceId && !binding) {
+  if (!binding) {
     const { count } = await admin
       .from('guest_devices')
       .select('device_id', { count: 'exact', head: true })
