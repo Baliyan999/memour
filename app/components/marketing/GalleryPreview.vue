@@ -120,12 +120,14 @@ useReveal(sceneRef, { items: '[data-tile]', stagger: 0.06, y: 24, amount: 0.1 })
     <MarketingFloatingOrnaments :count="6" :hue-base="30" />
 
     <div class="container-page relative">
-      <div ref="headRef" class="mx-auto mb-8 max-w-2xl text-center md:mb-10 3xl:mb-14 4xl:mb-16">
+      <div ref="headRef" class="mx-auto mb-8 text-center md:mb-10 3xl:mb-14 4xl:mb-16">
         <p data-reveal aria-hidden="true" class="mb-3 text-xs uppercase tracking-[0.3em] text-(--color-primary)">
           ⋄ ⋄ ⋄
         </p>
-        <h2 data-reveal class="heading-display-lg text-balance">{{ t('gallery.title') }}</h2>
-        <p data-reveal class="mt-4 text-(--color-muted-foreground)">
+        <!-- Width in em so the title keeps two lines as the display size
+             grows; a fixed 672px box squeezed it into four on 4K. -->
+        <h2 data-reveal class="heading-display-lg mx-auto max-w-[11em] text-balance">{{ t('gallery.title') }}</h2>
+        <p data-reveal class="mx-auto mt-4 max-w-2xl text-(--color-muted-foreground)">
           {{ t('gallery.subtitle') }}
         </p>
       </div>
