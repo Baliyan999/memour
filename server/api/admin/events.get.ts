@@ -3,6 +3,7 @@ import {
   serverSupabaseServiceRole,
 } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { fail } from '../../utils/errors'
 
 /**
  * GET /api/admin/events — lists every event in the system. Service-role
@@ -11,7 +12,7 @@ import type { Database } from '~/types/database.types'
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  if (!user) fail(401, 'unauthorized')
 
   const admin = serverSupabaseServiceRole<Database>(event)
   const { data: adminRow } = await admin
@@ -19,13 +20,16 @@ export default defineEventHandler(async (event) => {
     .select('user_id')
     .eq('user_id', ((user as any).id ?? (user as any).sub))
     .maybeSingle()
-  if (!adminRow) throw createError({ statusCode: 403, statusMessage: 'Not an admin' })
+  if (!adminRow) fail(403, 'forbidden')
 
   const { data, error } = await admin
     .from('events')
     .select('id, couple_names, wedding_date, venue_name, status, plan_tier, owner_id, created_at, table_count')
     .order('created_at', { ascending: false })
 
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  if (error) {
+    console.error('[admin/events] list', error)
+    fail(500, 'list_failed')
+  }
   return { events: data ?? [] }
 })

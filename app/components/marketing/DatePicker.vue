@@ -24,6 +24,13 @@ import { Calendar, ChevronLeft, ChevronRight } from '@lucide/vue'
  * via a Teleport to <body> (escaping any ancestor's overflow), Mon-Sun
  * grid built with date-fns, ru/uz month/weekday names. Min date is
  * today; max date is today + 3 years.
+ *
+ * Keyboard: opening moves focus to the selected (or today's) day;
+ * arrows move by day/week, PageUp/PageDown by month, Enter picks, the
+ * month arrows carry the focusable day along. Esc, or tabbing out past
+ * either end of the popup, closes it and hands focus back to the
+ * trigger. The `id` lands on the trigger so an outside <label for>
+ * names it.
  */
 const props = defineProps<{
   modelValue: string | null
@@ -33,7 +40,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: string | null): void
 }>()
 
-const { locale } = useI18n()
+const { t, locale } = useI18n()
 const dfLocale = computed(() => (locale.value === 'uz' ? uz : ru))
 
 const today = startOfDay(new Date())
@@ -45,6 +52,8 @@ const cursor = ref(startOfMonth(selected.value ?? today))
 
 const triggerEl = ref<HTMLButtonElement | null>(null)
 const popupEl = ref<HTMLDivElement | null>(null)
+// Day that holds the roving tabindex / receives keyboard focus.
+const focused = ref<Date>(selected.value ?? today)
 const pos = ref<{ top: number; left: number; placement: 'above' | 'below' } | null>(null)
 
 const mounted = ref(false)
@@ -99,15 +108,63 @@ function isDisabled(d: Date) {
 function pickDay(d: Date) {
   if (isDisabled(d)) return
   emitSelected(d)
-  open.value = false
+  close()
 }
 
-function prevMonth() {
-  cursor.value = addMonths(cursor.value, -1)
+function close() {
+  open.value = false
+  triggerEl.value?.focus()
 }
-function nextMonthFn() {
-  cursor.value = addMonths(cursor.value, 1)
+
+function focusDay(d: Date) {
+  const clamped = isBefore(d, today) ? today : isAfter(d, maxDate) ? maxDate : d
+  focused.value = clamped
+  if (!isSameMonth(clamped, cursor.value)) cursor.value = startOfMonth(clamped)
+  nextTick(() => popupEl.value?.querySelector<HTMLButtonElement>('[data-focused="true"]')?.focus())
 }
+
+const KEY_STEPS: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }
+function onGridKey(e: KeyboardEvent) {
+  if (e.key in KEY_STEPS) {
+    e.preventDefault()
+    focusDay(addDays(focused.value, KEY_STEPS[e.key]!))
+  } else if (e.key === 'PageUp' || e.key === 'PageDown') {
+    e.preventDefault()
+    focusDay(addMonths(focused.value, e.key === 'PageUp' ? -1 : 1))
+  }
+}
+
+// The popup is teleported to the end of <body>: tabbing out of it would
+// land past the footer. Leaving it from either end closes it instead and
+// continues from the trigger.
+function onPopupKey(e: KeyboardEvent) {
+  if (e.key !== 'Tab' || !popupEl.value) return
+  const stops = Array.from(popupEl.value.querySelectorAll<HTMLElement>('button:not([disabled]):not([tabindex="-1"])'))
+  const edge = e.shiftKey ? stops[0] : stops.at(-1)
+  if (!edge || document.activeElement === edge) {
+    e.preventDefault()
+    close()
+  }
+}
+
+const dayLabel = (d: Date) => format(d, 'd MMMM yyyy', { locale: dfLocale.value })
+
+// Month arrows stay within today…maxDate and move the focusable day
+// along (same day of the month, clamped), so the grid always keeps one
+// tab stop.
+const firstMonth = startOfMonth(today)
+const lastMonth = startOfMonth(maxDate)
+const canPrev = computed(() => isAfter(cursor.value, firstMonth))
+const canNext = computed(() => isBefore(cursor.value, lastMonth))
+function shiftMonth(delta: number) {
+  if (delta < 0 ? !canPrev.value : !canNext.value) return
+  const month = addMonths(cursor.value, delta)
+  cursor.value = month
+  const day = new Date(month.getFullYear(), month.getMonth(), Math.min(focused.value.getDate(), endOfMonth(month).getDate()))
+  focused.value = isBefore(day, today) ? today : isAfter(day, maxDate) ? maxDate : day
+}
+function prevMonth() { shiftMonth(-1) }
+function nextMonthFn() { shiftMonth(1) }
 
 // Position popup relative to the trigger via getBoundingClientRect.
 // Position: fixed + teleport to body means no ancestor overflow can
@@ -133,6 +190,7 @@ watch(open, async (v) => {
   cursor.value = startOfMonth(selected.value ?? today)
   await nextTick()
   measure()
+  focusDay(selected.value ?? today)
 })
 
 function onScroll() { if (open.value) measure() }
@@ -159,27 +217,28 @@ function onPointer(e: PointerEvent) {
   open.value = false
 }
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') open.value = false
+  if (e.key === 'Escape' && open.value) close()
 }
 </script>
 
 <template>
   <div class="relative">
     <!-- Hidden input so a parent <form> would still pick up the value. -->
-    <input :id="id" type="hidden" name="wedding_date" :value="modelValue ?? ''">
+    <input type="hidden" name="wedding_date" :value="modelValue ?? ''">
 
     <button
+      :id="id"
       ref="triggerEl"
       type="button"
       :aria-expanded="open"
       aria-haspopup="dialog"
-      class="flex h-11 w-full items-center justify-between rounded-md border border-(--color-border) bg-white px-3 text-sm text-(--color-foreground) shadow-sm transition-colors hover:border-(--color-primary)/40 focus:outline-none focus:ring-2 focus:ring-(--color-ring) 3xl:h-12 3xl:text-base 4xl:h-14 4xl:px-4 4xl:text-lg"
+      class="press flex h-11 w-full items-center justify-between rounded-md border border-(--color-border) bg-white px-3 text-sm text-(--color-foreground) shadow-sm hover:border-(--color-primary)/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) 3xl:h-12 3xl:text-base 4xl:h-14 4xl:px-4 4xl:text-lg"
       @click="open = !open"
     >
       <span :class="selected ? '' : 'text-(--color-muted-foreground)'">
         {{ triggerLabel }}
       </span>
-      <Calendar class="h-4 w-4 shrink-0 text-(--color-muted-foreground)" :stroke-width="1.6" />
+      <Calendar class="h-4 w-4 shrink-0 text-(--color-muted-foreground)" :stroke-width="1.6" aria-hidden="true" />
     </button>
 
     <Teleport v-if="mounted" to="body">
@@ -194,6 +253,9 @@ function onKey(e: KeyboardEvent) {
         <div
           v-if="open && pos"
           ref="popupEl"
+          role="dialog"
+          aria-modal="false"
+          :aria-label="monthCaption"
           :style="{
             position: 'fixed',
             top: `${pos.top}px`,
@@ -202,22 +264,25 @@ function onKey(e: KeyboardEvent) {
             zIndex: 50,
           }"
           class="rounded-lg border border-(--color-border) bg-white p-3 shadow-(--shadow-glow)"
+          @keydown="onPopupKey"
         >
           <!-- Caption + month nav -->
           <div class="mb-2 flex items-center justify-between gap-2">
             <button
               type="button"
-              aria-label="Previous month"
-              class="grid h-7 w-7 place-items-center rounded-md text-(--color-primary) transition-colors hover:bg-(--color-accent)/50"
+              :aria-label="t('lead.datePrevMonth')"
+              :aria-disabled="!canPrev"
+              class="grid h-9 w-9 place-items-center rounded-md text-(--color-primary) transition-colors hover:bg-(--color-accent)/50 aria-disabled:cursor-not-allowed aria-disabled:opacity-30 aria-disabled:hover:bg-transparent"
               @click="prevMonth"
             >
               <ChevronLeft class="h-4 w-4" :stroke-width="2" />
             </button>
-            <span class="font-display text-sm capitalize">{{ monthCaption }}</span>
+            <span class="font-display text-sm capitalize" aria-live="polite">{{ monthCaption }}</span>
             <button
               type="button"
-              aria-label="Next month"
-              class="grid h-7 w-7 place-items-center rounded-md text-(--color-primary) transition-colors hover:bg-(--color-accent)/50"
+              :aria-label="t('lead.dateNextMonth')"
+              :aria-disabled="!canNext"
+              class="grid h-9 w-9 place-items-center rounded-md text-(--color-primary) transition-colors hover:bg-(--color-accent)/50 aria-disabled:cursor-not-allowed aria-disabled:opacity-30 aria-disabled:hover:bg-transparent"
               @click="nextMonthFn"
             >
               <ChevronRight class="h-4 w-4" :stroke-width="2" />
@@ -225,19 +290,24 @@ function onKey(e: KeyboardEvent) {
           </div>
 
           <!-- Weekday header -->
-          <div class="mb-1 grid grid-cols-7 text-center text-[10px] uppercase text-(--color-muted-foreground)">
+          <div aria-hidden="true" class="mb-1 grid grid-cols-7 text-center text-[10px] uppercase text-(--color-muted-foreground)">
             <span v-for="(w, i) in weekDayLabels" :key="i" class="py-1">{{ w }}</span>
           </div>
 
-          <!-- Day grid -->
-          <div class="grid grid-cols-7 gap-0.5">
+          <!-- Day grid — 36px targets on touch, 32px with a mouse. -->
+          <div class="grid grid-cols-7 gap-0.5" @keydown="onGridKey">
             <button
               v-for="d in days"
               :key="d.toISOString()"
               type="button"
               :disabled="isDisabled(d)"
+              :tabindex="isSameDay(d, focused) ? 0 : -1"
+              :data-focused="isSameDay(d, focused)"
+              :aria-label="dayLabel(d)"
+              :aria-pressed="!!selected && isSameDay(d, selected)"
+              :aria-current="isSameDay(d, today) ? 'date' : undefined"
               :class="[
-                'h-7 w-7 rounded-md text-[12px] transition-colors',
+                'h-9 w-9 rounded-md text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) pointer-fine:h-8 pointer-fine:w-8 pointer-fine:text-[12px]',
                 isSameMonth(d, cursor) ? '' : 'opacity-40',
                 isDisabled(d) ? 'cursor-not-allowed opacity-30' : 'hover:bg-(--color-accent)/50',
                 selected && isSameDay(d, selected)

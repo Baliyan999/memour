@@ -1,17 +1,23 @@
 import QRCode from 'qrcode'
-import sharp from 'sharp'
+import { z } from 'zod'
 
 /**
- * Custom QR-code renderer: reads the cell matrix from `qrcode`, emits
- * styled SVG with configurable shapes / colors / gradients / center
- * logo, then rasterises to PNG via sharp for PDF embedding.
+ * Custom QR-code renderer: reads the cell matrix from `qrcode` and
+ * turns it into a list of vector shapes with configurable dot / corner
+ * shapes, colors, gradient and a cleared center for a logo.
+ *
+ * The same shape list feeds two outputs, so the admin preview and the
+ * printed PDF can never drift apart:
+ *   - renderStyledQRSVG — the SVG the admin preview shows;
+ *   - qr-pdf.ts draws the shapes straight into pdfkit as vector paths
+ *     (crisp at any print size, a few KB per card instead of a PNG).
  *
  * Gradient support: when `gradient` is set, dots and finder shapes
- * fill with an SVG linearGradient instead of a solid color.
+ * fill with one linear gradient spanning the whole code.
  *
- * Logo support: a `logo` Buffer (PNG/JPEG) gets embedded centred on
- * the QR; the matrix uses error-correction level 'H', so up to ~30%
- * of pixels can be obscured without breaking scans.
+ * Logo support: the matrix uses error-correction level 'H', so the
+ * cells under a centered logo (~22% of the width) can be cleared
+ * without breaking scans.
  */
 
 export type DotShape = 'square' | 'rounded' | 'circle' | 'classy'
@@ -30,6 +36,25 @@ export interface QRStyle {
   bg: string
   gradient?: QRGradient | null
   logo?: Buffer | null
+}
+
+/** One vector primitive, in the coordinate space of the QR box. */
+export type QRShape =
+  | { kind: 'rect'; x: number; y: number; w: number; h: number; r: number }
+  | { kind: 'circle'; cx: number; cy: number; r: number }
+  | { kind: 'path'; d: string }
+
+/** Shapes painted in order; `fill` says which color of the style to use. */
+export interface QRLayer {
+  fill: 'fg' | 'bg'
+  shapes: QRShape[]
+}
+
+export interface QRGeometry {
+  size: number
+  layers: QRLayer[]
+  /** Square left empty for the logo (null when there is no logo). */
+  logoBox: { x: number; y: number; size: number } | null
 }
 
 const FINDER_SIZE = 7
@@ -52,185 +77,188 @@ function isUnderLogo(x: number, y: number, n: number, logoCells: number): boolea
   return Math.abs(x - mid) <= half && Math.abs(y - mid) <= half
 }
 
-function dotPath(
-  shape: DotShape,
-  px: number,
-  py: number,
-  s: number,
-  fill: string,
-): string {
+// Round to 1/100 px — keeps the SVG / PDF content streams compact.
+const r2 = (v: number) => Math.round(v * 100) / 100
+
+function rect(x: number, y: number, w: number, h: number, r = 0): QRShape {
+  return { kind: 'rect', x: r2(x), y: r2(y), w: r2(w), h: r2(h), r: r2(r) }
+}
+
+function dotShape(shape: DotShape, px: number, py: number, s: number): QRShape {
   switch (shape) {
-    case 'square':
-      return `<rect x="${px}" y="${py}" width="${s}" height="${s}" fill="${fill}"/>`
     case 'rounded': {
       const inset = s * 0.1
-      return `<rect x="${px + inset}" y="${py + inset}" width="${s - 2 * inset}" height="${s - 2 * inset}" rx="${s * 0.28}" fill="${fill}"/>`
+      return rect(px + inset, py + inset, s - 2 * inset, s - 2 * inset, s * 0.28)
     }
     case 'circle':
-      return `<circle cx="${px + s / 2}" cy="${py + s / 2}" r="${s * 0.42}" fill="${fill}"/>`
+      return { kind: 'circle', cx: r2(px + s / 2), cy: r2(py + s / 2), r: r2(s * 0.42) }
     case 'classy': {
       const inset = s * 0.08
-      return `<rect x="${px + inset}" y="${py + inset}" width="${s - 2 * inset}" height="${s - 2 * inset}" rx="${s * 0.42}" fill="${fill}"/>`
+      return rect(px + inset, py + inset, s - 2 * inset, s - 2 * inset, s * 0.42)
     }
+    case 'square':
+    default:
+      // Unknown values fall back to squares — an unscannable blank
+      // code is worse than a plain one.
+      return rect(px, py, s, s)
   }
 }
 
-function finderPath(
-  shape: CornerShape,
-  cx: number,
-  cy: number,
-  cellSize: number,
-  fill: string,
-  bg: string,
-): string {
-  const size = 7 * cellSize
+/** Rounded square with only the top-left corner sharp — the "leaf" eye. */
+function leafPath(x: number, y: number, w: number, r: number): string {
+  const [X, Y, W, R] = [r2(x), r2(y), r2(w), r2(r)]
+  return (
+    `M ${X} ${Y} L ${r2(X + W - R)} ${Y} ` +
+    `A ${R} ${R} 0 0 1 ${r2(X + W)} ${r2(Y + R)} ` +
+    `L ${r2(X + W)} ${r2(Y + W - R)} ` +
+    `A ${R} ${R} 0 0 1 ${r2(X + W - R)} ${r2(Y + W)} ` +
+    `L ${r2(X + R)} ${r2(Y + W)} ` +
+    `A ${R} ${R} 0 0 1 ${X} ${r2(Y + W - R)} Z`
+  )
+}
+
+/** The three nested squares of one finder: outer (fg), gap (bg), eye (fg). */
+function finderShapes(shape: CornerShape, cx: number, cy: number, cell: number): [QRShape, QRShape, QRShape] {
+  const size = 7 * cell
+  const inner = size - 2 * cell
+  const eye = size - 4 * cell
   switch (shape) {
-    case 'square':
-      return (
-        `<rect x="${cx}" y="${cy}" width="${size}" height="${size}" fill="${fill}"/>` +
-        `<rect x="${cx + cellSize}" y="${cy + cellSize}" width="${size - 2 * cellSize}" height="${size - 2 * cellSize}" fill="${bg}"/>` +
-        `<rect x="${cx + 2 * cellSize}" y="${cy + 2 * cellSize}" width="${size - 4 * cellSize}" height="${size - 4 * cellSize}" fill="${fill}"/>`
-      )
-    case 'rounded': {
-      const r1 = size * 0.22
-      const r2 = (size - 2 * cellSize) * 0.22
-      const r3 = (size - 4 * cellSize) * 0.22
-      return (
-        `<rect x="${cx}" y="${cy}" width="${size}" height="${size}" rx="${r1}" fill="${fill}"/>` +
-        `<rect x="${cx + cellSize}" y="${cy + cellSize}" width="${size - 2 * cellSize}" height="${size - 2 * cellSize}" rx="${r2}" fill="${bg}"/>` +
-        `<rect x="${cx + 2 * cellSize}" y="${cy + 2 * cellSize}" width="${size - 4 * cellSize}" height="${size - 4 * cellSize}" rx="${r3}" fill="${fill}"/>`
-      )
-    }
+    case 'rounded':
+      return [
+        rect(cx, cy, size, size, size * 0.22),
+        rect(cx + cell, cy + cell, inner, inner, inner * 0.22),
+        rect(cx + 2 * cell, cy + 2 * cell, eye, eye, eye * 0.22),
+      ]
     case 'circle': {
       const r1 = size / 2
-      const r2 = r1 - cellSize
-      const r3 = r1 - 2 * cellSize
-      const ccx = cx + r1
-      const ccy = cy + r1
-      return (
-        `<circle cx="${ccx}" cy="${ccy}" r="${r1}" fill="${fill}"/>` +
-        `<circle cx="${ccx}" cy="${ccy}" r="${r2}" fill="${bg}"/>` +
-        `<circle cx="${ccx}" cy="${ccy}" r="${r3}" fill="${fill}"/>`
-      )
+      const c = { x: r2(cx + r1), y: r2(cy + r1) }
+      return [
+        { kind: 'circle', cx: c.x, cy: c.y, r: r2(r1) },
+        { kind: 'circle', cx: c.x, cy: c.y, r: r2(r1 - cell) },
+        { kind: 'circle', cx: c.x, cy: c.y, r: r2(r1 - 2 * cell) },
+      ]
     }
-    case 'leaf': {
-      const r = size * 0.3
-      const outerD =
-        `M ${cx} ${cy} L ${cx + size - r} ${cy} ` +
-        `A ${r} ${r} 0 0 1 ${cx + size} ${cy + r} ` +
-        `L ${cx + size} ${cy + size - r} ` +
-        `A ${r} ${r} 0 0 1 ${cx + size - r} ${cy + size} ` +
-        `L ${cx + r} ${cy + size} ` +
-        `A ${r} ${r} 0 0 1 ${cx} ${cy + size - r} Z`
-      const innerR = (size - 2 * cellSize) * 0.3
-      const ix = cx + cellSize, iy = cy + cellSize, iw = size - 2 * cellSize
-      const innerD =
-        `M ${ix} ${iy} L ${ix + iw - innerR} ${iy} ` +
-        `A ${innerR} ${innerR} 0 0 1 ${ix + iw} ${iy + innerR} ` +
-        `L ${ix + iw} ${iy + iw - innerR} ` +
-        `A ${innerR} ${innerR} 0 0 1 ${ix + iw - innerR} ${iy + iw} ` +
-        `L ${ix + innerR} ${iy + iw} ` +
-        `A ${innerR} ${innerR} 0 0 1 ${ix} ${iy + iw - innerR} Z`
-      const dotR = (size - 4 * cellSize) * 0.3
-      const dx = cx + 2 * cellSize, dy = cy + 2 * cellSize, dw = size - 4 * cellSize
-      const dotD =
-        `M ${dx} ${dy} L ${dx + dw - dotR} ${dy} ` +
-        `A ${dotR} ${dotR} 0 0 1 ${dx + dw} ${dy + dotR} ` +
-        `L ${dx + dw} ${dy + dw - dotR} ` +
-        `A ${dotR} ${dotR} 0 0 1 ${dx + dw - dotR} ${dy + dw} ` +
-        `L ${dx + dotR} ${dy + dw} ` +
-        `A ${dotR} ${dotR} 0 0 1 ${dx} ${dy + dw - dotR} Z`
-      return (
-        `<path d="${outerD}" fill="${fill}"/>` +
-        `<path d="${innerD}" fill="${bg}"/>` +
-        `<path d="${dotD}" fill="${fill}"/>`
-      )
-    }
+    case 'leaf':
+      return [
+        { kind: 'path', d: leafPath(cx, cy, size, size * 0.3) },
+        { kind: 'path', d: leafPath(cx + cell, cy + cell, inner, inner * 0.3) },
+        { kind: 'path', d: leafPath(cx + 2 * cell, cy + 2 * cell, eye, eye * 0.3) },
+      ]
+    case 'square':
+    default:
+      return [
+        rect(cx, cy, size, size),
+        rect(cx + cell, cy + cell, inner, inner),
+        rect(cx + 2 * cell, cy + 2 * cell, eye, eye),
+      ]
   }
 }
 
-export function renderStyledQRSVG(text: string, style: QRStyle, pxSize: number): string {
+/**
+ * Shapes for `text` in a `size` × `size` box. Pass `{ unitsPerModule }`
+ * instead of a size to get whole-number coordinates (the PDF scales
+ * them down with one transform — short numbers keep the file small).
+ */
+export function buildQRGeometry(
+  text: string,
+  style: Pick<QRStyle, 'dot' | 'corner'>,
+  size: number | { unitsPerModule: number },
+  withLogo: boolean,
+): QRGeometry {
   const qr = QRCode.create(text, { errorCorrectionLevel: 'H' })
-  const modules: any = qr.modules
+  const modules = qr.modules
   const n = modules.size
-  const cellSize = pxSize / n
+  const cell = typeof size === 'number' ? size / n : size.unitsPerModule
+  const boxSize = n * cell
 
-  // If we're embedding a logo, clear ~22% of the central cells (safe
-  // under EC level H which can recover ~30%). cellsCovered must be
-  // ODD so the logo sits exactly centered.
-  const hasLogo = !!style.logo
+  // With a logo, clear ~22% of the central cells (safe under EC level
+  // H which can recover ~30%). The count must be ODD so the logo sits
+  // exactly centered.
   let logoCells = 0
-  if (hasLogo) {
+  if (withLogo) {
     logoCells = Math.floor(n * 0.22)
     if (logoCells % 2 === 0) logoCells += 1
   }
 
-  // Build the fill — either solid `fg` or a gradient ref.
+  const dots: QRShape[] = []
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      // BitMatrix.get takes (row, col). Reading it as (x, y) drew the
+      // code mirrored along its diagonal — most scanners cope, but not
+      // every one has to.
+      if (!modules.get(y, x)) continue
+      if (isFinder(x, y, n)) continue
+      if (withLogo && isUnderLogo(x, y, n, logoCells)) continue
+      dots.push(dotShape(style.dot, x * cell, y * cell, cell))
+    }
+  }
+
+  const layers: QRLayer[] = [{ fill: 'fg', shapes: dots }]
+  for (const [fx, fy] of [[0, 0], [n - 7, 0], [0, n - 7]] as const) {
+    const [outer, gap, eye] = finderShapes(style.corner, fx * cell, fy * cell, cell)
+    layers.push({ fill: 'fg', shapes: [outer] }, { fill: 'bg', shapes: [gap] }, { fill: 'fg', shapes: [eye] })
+  }
+
+  const logoBox = withLogo
+    ? {
+        x: (Math.floor(n / 2) - Math.floor(logoCells / 2)) * cell,
+        y: (Math.floor(n / 2) - Math.floor(logoCells / 2)) * cell,
+        size: logoCells * cell,
+      }
+    : null
+  return { size: boxSize, layers, logoBox }
+}
+
+/** Gradient end points for an angle, in a size × size box. */
+export function gradientVector(angleDeg: number, size: number) {
+  const a = angleDeg * (Math.PI / 180)
+  return {
+    x1: r2(size / 2 - (Math.cos(a) * size) / 2),
+    y1: r2(size / 2 - (Math.sin(a) * size) / 2),
+    x2: r2(size / 2 + (Math.cos(a) * size) / 2),
+    y2: r2(size / 2 + (Math.sin(a) * size) / 2),
+  }
+}
+
+function shapeSvg(s: QRShape, fill: string): string {
+  switch (s.kind) {
+    case 'rect':
+      return s.r > 0
+        ? `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="${s.r}" fill="${fill}"/>`
+        : `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${fill}"/>`
+    case 'circle':
+      return `<circle cx="${s.cx}" cy="${s.cy}" r="${s.r}" fill="${fill}"/>`
+    case 'path':
+      return `<path d="${s.d}" fill="${fill}"/>`
+  }
+}
+
+export function renderStyledQRSVG(text: string, style: QRStyle, pxSize: number): string {
+  const geo = buildQRGeometry(text, style, pxSize, !!style.logo)
+
+  // Build the fill — either solid `fg` or one gradient over the whole
+  // code (userSpaceOnUse, so it matches the PDF, which can't afford a
+  // separate gradient per dot).
   let defs = ''
-  let fill = style.fg
+  let fg = style.fg
   if (style.gradient) {
-    const id = 'qrGrad'
-    const a = (style.gradient.angle ?? 45) * (Math.PI / 180)
-    const x1 = 50 - Math.cos(a) * 50
-    const y1 = 50 - Math.sin(a) * 50
-    const x2 = 50 + Math.cos(a) * 50
-    const y2 = 50 + Math.sin(a) * 50
-    defs = `<defs><linearGradient id="${id}" x1="${x1}%" y1="${y1}%" x2="${x2}%" y2="${y2}%">` +
+    const v = gradientVector(style.gradient.angle ?? 45, pxSize)
+    defs = `<defs><linearGradient id="qrGrad" gradientUnits="userSpaceOnUse" x1="${v.x1}" y1="${v.y1}" x2="${v.x2}" y2="${v.y2}">` +
       `<stop offset="0%" stop-color="${style.gradient.from}"/>` +
       `<stop offset="100%" stop-color="${style.gradient.to}"/>` +
       `</linearGradient></defs>`
-    fill = `url(#${id})`
+    fg = 'url(#qrGrad)'
   }
 
   let svg = `<svg width="${pxSize}" height="${pxSize}" viewBox="0 0 ${pxSize} ${pxSize}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">`
   svg += defs
   svg += `<rect width="${pxSize}" height="${pxSize}" fill="${style.bg}"/>`
-
-  // Data cells
-  for (let y = 0; y < n; y++) {
-    for (let x = 0; x < n; x++) {
-      if (!modules.get(x, y)) continue
-      if (isFinder(x, y, n)) continue
-      if (hasLogo && isUnderLogo(x, y, n, logoCells)) continue
-      svg += dotPath(style.dot, x * cellSize, y * cellSize, cellSize, fill)
-    }
+  for (const layer of geo.layers) {
+    const fill = layer.fill === 'fg' ? fg : style.bg
+    for (const s of layer.shapes) svg += shapeSvg(s, fill)
   }
-
-  // Finder patterns
-  svg += finderPath(style.corner, 0, 0, cellSize, fill, style.bg)
-  svg += finderPath(style.corner, (n - 7) * cellSize, 0, cellSize, fill, style.bg)
-  svg += finderPath(style.corner, 0, (n - 7) * cellSize, cellSize, fill, style.bg)
-
   svg += '</svg>'
   return svg
-}
-
-export async function renderStyledQRPng(
-  text: string,
-  style: QRStyle,
-  pxSize: number,
-): Promise<Buffer> {
-  // Rasterise the SVG first.
-  const svg = renderStyledQRSVG(text, style, pxSize)
-  let img = sharp(Buffer.from(svg))
-
-  // Overlay the logo centered on top, if provided.
-  if (style.logo) {
-    const qr = QRCode.create(text, { errorCorrectionLevel: 'H' })
-    const n = (qr.modules as any).size
-    const cellSize = pxSize / n
-    let logoCells = Math.floor(n * 0.22)
-    if (logoCells % 2 === 0) logoCells += 1
-    const logoPx = Math.round(logoCells * cellSize * 0.85) // little inner padding
-    const logoBuf = await sharp(style.logo)
-      .resize(logoPx, logoPx, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
-      .png()
-      .toBuffer()
-    img = sharp(await img.png().toBuffer())
-      .composite([{ input: logoBuf, gravity: 'center' }])
-  }
-
-  return img.png({ compressionLevel: 6 }).toBuffer()
 }
 
 // Preset bundles for the admin UI quick-picker.
@@ -261,4 +289,106 @@ export const QR_PRESETS: QRPreset[] = [
 
 export function getPreset(id?: string | null): QRPreset {
   return QR_PRESETS.find((p) => p.id === id) ?? QR_PRESETS[0]!
+}
+
+// ── Settings (events.qr_settings) ─────────────────────────────────────
+//
+// One schema for what the admin can save and what the preview / PDF
+// endpoints accept in the query string, so a hand-crafted URL can't
+// smuggle markup into the SVG or pick shapes the renderer doesn't know.
+
+const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/)
+export const QR_STYLE_IDS = ['custom', ...QR_PRESETS.map((p) => p.id)] as [string, ...string[]]
+export const QR_LAYOUT_IDS = ['2x2', '4x2', 'single'] as const
+export const QR_LANGS = ['uz', 'ru'] as const
+export type QrLayoutId = (typeof QR_LAYOUT_IDS)[number]
+export type QrLang = (typeof QR_LANGS)[number]
+
+const styleIdSchema = z.enum(QR_STYLE_IDS)
+const layoutSchema = z.enum(QR_LAYOUT_IDS)
+const langSchema = z.enum(QR_LANGS)
+const dotSchema = z.enum(['square', 'rounded', 'circle', 'classy'])
+const cornerSchema = z.enum(['square', 'rounded', 'circle', 'leaf'])
+const gradientSchema = z.object({ from: hex, to: hex, angle: z.number().min(0).max(360) })
+
+/** What POST /api/admin/qr-settings accepts (logo_path is server-set). */
+export const qrSettingsSchema = z.object({
+  style: styleIdSchema.optional(),
+  layout: layoutSchema.optional(),
+  lang: langSchema.optional(),
+  dot: dotSchema.optional(),
+  corner: cornerSchema.optional(),
+  fg: hex.optional(),
+  bg: hex.optional(),
+  gradient: gradientSchema.nullable().optional(),
+}).strict()
+
+function pick<T>(schema: z.ZodType<T>, v: unknown): T | undefined {
+  const r = schema.safeParse(v)
+  return r.success ? r.data : undefined
+}
+
+export interface ResolvedQrSettings {
+  styleId: string
+  style: QRStyle
+  layout: QrLayoutId
+  lang: QrLang
+}
+
+/**
+ * Merge the saved qr_settings with query-string overrides.
+ *
+ *   - A preset (`style=<id>`) is used exactly as defined — custom
+ *     fields left over from an earlier "Свой стиль" save never leak
+ *     into it.
+ *   - Custom fields in the query (dot / corner / fg / bg / gFrom+gTo)
+ *     mean "custom": they overlay the saved custom fields, and the
+ *     gradient is on only if the query carries one.
+ *   - Invalid values are ignored field by field.
+ */
+export function resolveQrSettings(
+  saved: unknown,
+  query: Record<string, unknown> = {},
+): ResolvedQrSettings {
+  const s = (saved && typeof saved === 'object' ? saved : {}) as Record<string, unknown>
+  const q = query
+
+  const qFrom = pick(hex, q.gFrom)
+  const qTo = pick(hex, q.gTo)
+  const qAngle = typeof q.gAngle === 'string' || typeof q.gAngle === 'number' ? Number(q.gAngle) : 45
+  const qCustom = {
+    dot: pick(dotSchema, q.dot),
+    corner: pick(cornerSchema, q.corner),
+    fg: pick(hex, q.fg),
+    bg: pick(hex, q.bg),
+    gradient: qFrom && qTo
+      ? { from: qFrom, to: qTo, angle: Number.isFinite(qAngle) ? Math.min(360, Math.max(0, qAngle)) : 45 }
+      : null,
+  }
+  const queryHasCustom = Object.values(qCustom).some((v) => v != null)
+  const qStyle = pick(styleIdSchema, q.style)
+
+  const styleId = qStyle ?? (queryHasCustom ? 'custom' : pick(styleIdSchema, s.style) ?? 'mono')
+
+  let style: QRStyle
+  if (styleId === 'custom') {
+    const base = getPreset('mono').style
+    style = {
+      dot: qCustom.dot ?? pick(dotSchema, s.dot) ?? base.dot,
+      corner: qCustom.corner ?? pick(cornerSchema, s.corner) ?? base.corner,
+      fg: qCustom.fg ?? pick(hex, s.fg) ?? base.fg,
+      bg: qCustom.bg ?? pick(hex, s.bg) ?? base.bg,
+      gradient: queryHasCustom ? qCustom.gradient : (pick(gradientSchema, s.gradient) ?? null),
+    }
+  } else {
+    const preset = getPreset(styleId)
+    style = { ...preset.style, gradient: preset.style.gradient ?? null }
+  }
+
+  return {
+    styleId,
+    style,
+    layout: pick(layoutSchema, q.layout) ?? pick(layoutSchema, s.layout) ?? '2x2',
+    lang: pick(langSchema, q.lang) ?? pick(langSchema, s.lang) ?? 'uz',
+  }
 }

@@ -4,10 +4,11 @@ import { useI18n } from '#imports'
 import { Battery, Heart, MapPin, Play, Send, Signal, Wifi, X } from '@lucide/vue'
 
 /**
- * Mockup — small UI mock specific to each feature. Pure CSS/SVG, no
- * scroll/state subscriptions. Each variant is a stylised reproduction
- * of the real product UI for that feature (projector slideshow, phone
- * recording, voice bubble, swipe deck, geofence map, Telegram chat).
+ * Mockup — small UI mock specific to each feature. CSS/SVG UI over a
+ * few small photos, no scroll/state subscriptions. Each variant is a
+ * stylised reproduction of the real product UI for that feature
+ * (projector slideshow, phone recording, voice bubble, swipe deck,
+ * geofence map, Telegram chat).
  */
 const props = defineProps<{
   cardKey: 'slideshow' | 'video' | 'voice' | 'swipe' | 'geofence' | 'telegram'
@@ -27,96 +28,74 @@ const voiceBars = computed(() =>
 )
 
 const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1))
+
+// Photo slots — crops and sizes in scripts/optimize-images.mjs (MOCK).
+// The first projector thumbnail is the photo on screen.
+const STRIP = ['mock-strip-slideshow', 'mock-strip-dance', 'mock-strip-bouquet', 'mock-strip-sparklers', 'mock-strip-candles'] as const
+const ALBUM = ['mock-album-couple', 'mock-album-table', 'mock-album-first-look', 'mock-album-champagne'] as const
 </script>
 
 <template>
   <!-- ───────────── Slideshow (Hero) ───────────── -->
-  <div v-if="cardKey === 'slideshow'" class="absolute inset-0 grid place-items-center p-6 sm:p-8">
+  <!-- The projector frame is 16:9 and the photo fills it, with the
+       live bar and thumbnail strip floating over it — so the photo is
+       never squeezed into a letterbox strip on narrow cards. It grows
+       with the bento card (whose stage is at least that big from xl
+       on, see Features), and its bar, caption and strip grow with it. -->
+  <div v-if="cardKey === 'slideshow'" class="absolute inset-0 grid place-items-center p-5 sm:p-8">
     <div
-      class="relative aspect-[16/9] w-full max-w-[480px] overflow-hidden rounded-xl border border-(--color-border)/70"
+      class="relative aspect-[16/9] w-full max-w-[480px] overflow-hidden rounded-xl border border-(--color-border)/70 xl:max-w-[600px] 2xl:max-w-[700px] 3xl:max-w-[860px] 4xl:max-w-[1000px]"
       :style="{
         background: 'oklch(18% 0.02 280)',
         boxShadow: `0 40px 70px -30px oklch(50% 0.1 ${hue} / 0.5), 0 0 0 6px oklch(15% 0.015 280), 0 0 0 7px oklch(40% 0.04 280)`,
       }"
     >
+      <MarketingPhoto
+        name="slideshow-hero-wide"
+        sizes="(min-width: 2560px) 1000px, (min-width: 1920px) 860px, (min-width: 1536px) 700px, (min-width: 1280px) 600px, (min-width: 640px) 480px, 80vw"
+        class="absolute inset-0 h-full w-full object-cover"
+      />
+      <div
+        aria-hidden="true"
+        class="absolute inset-0"
+        :style="{ background: 'linear-gradient(to bottom, rgb(0 0 0 / 0.45), transparent 30%, transparent 58%, rgb(0 0 0 / 0.6))' }"
+      />
+
       <!-- Top bar -->
-      <div class="absolute inset-x-0 top-0 z-10 flex items-center gap-2 px-3 py-2">
-        <div class="flex items-center gap-1.5 rounded-full bg-red-500/20 px-2 py-0.5 ring-1 ring-red-400/50">
-          <span class="relative flex h-1.5 w-1.5">
+      <div class="absolute inset-x-0 top-0 z-10 flex items-center gap-2 px-3 py-2 xl:px-4 xl:py-3 3xl:gap-3 3xl:px-5 3xl:py-4 4xl:px-6">
+        <div class="flex items-center gap-1.5 rounded-full bg-red-500/20 px-2 py-0.5 ring-1 ring-red-400/50 3xl:gap-2 3xl:px-3 3xl:py-1">
+          <span class="relative flex h-1.5 w-1.5 3xl:h-2 3xl:w-2">
             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-            <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
+            <span class="relative inline-flex h-full w-full rounded-full bg-red-500" />
           </span>
-          <span class="text-[9px] font-semibold uppercase tracking-wider text-red-200">Live</span>
+          <span class="text-[9px] font-semibold uppercase tracking-wider text-red-200 xl:text-[11px] 3xl:text-sm 4xl:text-base">Live</span>
         </div>
-        <span class="text-[10px] text-white/50">{{ t('features.mockup.slideshowVenue') }}</span>
-        <span class="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">247</span>
+        <span class="truncate text-[10px] text-white/70 xl:text-xs 3xl:text-sm 4xl:text-base">{{ t('features.mockup.slideshowVenue') }}</span>
+        <span class="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm xl:text-xs 3xl:px-3 3xl:py-1 3xl:text-sm 4xl:text-base">247</span>
       </div>
 
-      <!-- Stage with the now-playing photo -->
-      <div class="absolute inset-x-4 bottom-12 top-9 overflow-hidden rounded-md">
-        <div
-          class="absolute inset-0"
-          :style="{
-            background: `radial-gradient(120% 100% at 70% 30%,
-              oklch(82% 0.13 ${hue + 14}) 0%,
-              oklch(68% 0.16 ${hue + 4}) 45%,
-              oklch(45% 0.12 ${hue - 8}) 100%)`,
-          }"
-        />
-        <div
-          aria-hidden="true"
-          class="absolute inset-0"
-          :style="{ background: 'linear-gradient(135deg, rgba(255,255,255,0.35) 0%, transparent 35%)' }"
-        />
-        <svg class="absolute inset-0 h-full w-full" viewBox="0 0 400 200" preserveAspectRatio="xMidYMax slice">
-          <defs>
-            <linearGradient id="couple-grad" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stop-color="oklch(20% 0.04 280)" stop-opacity="0.95" />
-              <stop offset="1" stop-color="oklch(35% 0.06 280)" stop-opacity="0.7" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M155 200 L155 130 Q155 105 175 100 Q172 92 178 86 Q184 80 192 82 Q198 75 205 80 Q212 75 218 82 Q224 80 230 86 Q236 92 232 100 Q252 105 252 130 L252 200 Z"
-            fill="url(#couple-grad)"
-            transform="translate(20 0)"
-          />
-          <path
-            d="M220 200 L220 140 Q220 118 240 115 Q237 105 244 99 Q251 93 259 96 Q267 93 274 99 Q281 105 278 115 Q298 118 298 140 L298 200 Z"
-            fill="url(#couple-grad)"
-          />
-          <circle cx="80" cy="50" r="1.5" fill="white" opacity="0.7" />
-          <circle cx="120" cy="80" r="1" fill="white" opacity="0.5" />
-          <circle cx="330" cy="60" r="1.5" fill="white" opacity="0.7" />
-          <circle cx="350" cy="100" r="1" fill="white" opacity="0.5" />
-          <circle cx="60" cy="120" r="1" fill="white" opacity="0.4" />
-        </svg>
-        <div class="absolute left-2 bottom-2 rounded-full bg-black/45 px-2 py-0.5 text-[9px] text-white/90 backdrop-blur-sm">
-          {{ t('features.mockup.slideshowCaption') }}
-        </div>
+      <!-- Caption of the photo on screen. The phone frame is too narrow
+           for one line to clear the couple, so there it stacks into two
+           short lines tucked into the bottom-left corner. -->
+      <div class="absolute bottom-8 left-2 z-10 flex flex-col rounded-md bg-black/45 px-1.5 py-0.5 text-[8px] leading-tight text-white/90 backdrop-blur-sm sm:bottom-11 sm:left-3 sm:flex-row sm:gap-1 sm:rounded-full sm:px-2 sm:text-[9px] sm:leading-normal xl:bottom-14 xl:left-4 xl:text-[11px] 2xl:bottom-16 3xl:bottom-[4.75rem] 3xl:left-5 3xl:px-3 3xl:py-1 3xl:text-sm 4xl:bottom-[5.5rem] 4xl:left-6 4xl:text-base">
+        <span>{{ t('features.mockup.slideshowCaptionFrom') }}</span>
+        <span aria-hidden="true" class="hidden sm:inline">·</span>
+        <span class="text-white/70 sm:text-white/90">{{ t('features.mockup.slideshowCaptionTime') }}</span>
       </div>
 
       <!-- Bottom strip of thumbs -->
-      <div class="absolute inset-x-3 bottom-2 flex gap-1.5">
+      <div class="absolute inset-x-3 bottom-2 z-10 flex gap-1.5 xl:inset-x-4 xl:bottom-3 xl:gap-2 3xl:inset-x-5 3xl:bottom-4 3xl:gap-3 4xl:inset-x-6">
         <div
-          v-for="(h, i) in [hue + 0, hue + 10, hue + 22, hue - 6, hue + 32]"
-          :key="i"
-          class="relative h-7 flex-1 overflow-hidden rounded-md"
+          v-for="(photo, i) in STRIP"
+          :key="photo"
+          class="relative h-5 flex-1 overflow-hidden rounded-md sm:h-7 xl:h-9 2xl:h-10 3xl:h-12 4xl:h-14"
           :style="{
-            background: `linear-gradient(135deg, oklch(82% 0.1 ${h}), oklch(60% 0.15 ${h + 12}))`,
+            background: `oklch(35% 0.04 ${hue})`,
             outline: i === 0 ? `1.5px solid oklch(92% 0.05 ${hue})` : undefined,
             outlineOffset: i === 0 ? '1px' : undefined,
           }"
         >
-          <span
-            class="absolute rounded-full"
-            :style="{
-              width: `${14 + (i % 2) * 4}px`,
-              height: `${14 + (i % 2) * 4}px`,
-              bottom: '-3px',
-              left: `${6 + i * 2}px`,
-              background: 'oklch(28% 0.04 280 / 0.65)',
-            }"
-          />
+          <MarketingPhoto :name="photo" sizes="(min-width: 2560px) 180px, (min-width: 1920px) 155px, (min-width: 1536px) 125px, (min-width: 1280px) 108px, (min-width: 640px) 86px, 11vw" class="absolute inset-0 h-full w-full object-cover" />
         </div>
       </div>
     </div>
@@ -146,17 +125,15 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
           <Battery class="h-2.5 w-2.5" :stroke-width="2" />
         </div>
       </div>
-      <div class="absolute inset-1.5 top-5 bottom-10 overflow-hidden rounded-lg">
+      <!-- The guest's selfie; anchored at 30 % so her face stays below
+           the REC and timer chips when the screen is short (sm). -->
+      <div class="absolute inset-1.5 top-5 bottom-10 overflow-hidden rounded-lg" :style="{ background: `oklch(35% 0.05 ${hue})` }">
+        <MarketingPhoto name="mock-video-selfie" sizes="93px" position="center 30%" class="absolute inset-0 h-full w-full object-cover" />
         <div
+          aria-hidden="true"
           class="absolute inset-0"
-          :style="{
-            background: `radial-gradient(circle at 50% 38%, oklch(82% 0.13 ${hue + 18}) 0%, oklch(60% 0.16 ${hue + 6}) 55%, oklch(35% 0.1 ${hue - 4}) 100%)`,
-          }"
+          :style="{ background: 'linear-gradient(to bottom, rgb(0 0 0 / 0.3), transparent 22%, transparent 78%, rgb(0 0 0 / 0.4))' }"
         />
-        <svg class="absolute inset-0 h-full w-full" viewBox="0 0 80 100" preserveAspectRatio="xMidYMax slice">
-          <ellipse cx="40" cy="42" rx="13" ry="15" fill="oklch(25% 0.04 280 / 0.85)" />
-          <path d="M18 100 L18 80 Q18 62 40 60 Q62 62 62 80 L62 100 Z" fill="oklch(25% 0.04 280 / 0.85)" />
-        </svg>
         <div class="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-red-500/90 px-1.5 py-0.5 text-[7px] font-bold text-white">
           <span class="block h-1 w-1 animate-pulse rounded-full bg-white" />
           REC
@@ -192,7 +169,7 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
           boxShadow: `0 12px 26px -14px oklch(60% 0.1 ${hue} / 0.45), inset 0 0 0 1px oklch(80% 0.06 ${hue} / 0.3)`,
         }"
       >
-        <button
+        <span
           aria-hidden="true"
           class="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white"
           :style="{
@@ -201,7 +178,7 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
           }"
         >
           <Play class="h-3.5 w-3.5 fill-white" :stroke-width="0" />
-        </button>
+        </span>
         <div class="flex flex-1 flex-col gap-1">
           <div class="flex items-center gap-[2.5px]">
             <span
@@ -226,8 +203,11 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
   </div>
 
   <!-- ───────────── Swipe ───────────── -->
-  <div v-else-if="cardKey === 'swipe'" class="absolute inset-0 grid place-items-center p-4">
-    <div class="relative h-[170px] w-[135px]">
+  <!-- Deck and the ✕/♥ row are one centred column, so the buttons
+       stay inside the stage at every card height. Decorative only:
+       spans, not buttons, so they never take keyboard focus. -->
+  <div v-else-if="cardKey === 'swipe'" class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4" aria-hidden="true">
+    <div class="relative h-[124px] w-[100px] sm:h-[132px] sm:w-[106px] 3xl:h-[160px] 3xl:w-[128px]">
       <div
         class="absolute inset-0 -translate-y-3 scale-[0.9] rounded-xl border border-(--color-border)/60"
         :style="{
@@ -247,18 +227,15 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
           boxShadow: `0 18px 32px -16px oklch(50% 0.08 ${hue} / 0.55)`,
         }"
       >
-        <div
-          class="absolute inset-0"
-          :style="{
-            background: `radial-gradient(120% 100% at 40% 30%, oklch(85% 0.12 ${hue + 16}) 0%, oklch(72% 0.16 ${hue + 6}) 50%, oklch(48% 0.12 ${hue - 6}) 100%)`,
-          }"
+        <!-- Anchored at the top: a squat card crops the bouquet, never
+             the faces under the ✓ badge. -->
+        <div class="absolute inset-0" :style="{ background: `oklch(45% 0.06 ${hue})` }" />
+        <MarketingPhoto
+          name="mock-moderation-card"
+          sizes="(min-width: 120rem) 128px, 106px"
+          position="center top"
+          class="absolute inset-0 h-full w-full object-cover"
         />
-        <svg class="absolute inset-0 h-full w-full" viewBox="0 0 100 120" preserveAspectRatio="xMidYMax slice">
-          <ellipse cx="38" cy="55" rx="10" ry="12" fill="oklch(25% 0.04 280 / 0.85)" />
-          <path d="M22 120 L22 95 Q22 78 38 76 Q54 78 54 95 L54 120 Z" fill="oklch(25% 0.04 280 / 0.85)" />
-          <ellipse cx="64" cy="60" rx="9" ry="11" fill="oklch(25% 0.04 280 / 0.9)" />
-          <path d="M50 120 L50 98 Q50 82 64 80 Q78 82 78 98 L78 120 Z" fill="oklch(25% 0.04 280 / 0.9)" />
-        </svg>
         <div
           aria-hidden="true"
           class="absolute inset-0"
@@ -270,53 +247,47 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
           </svg>
         </div>
       </div>
-      <div class="absolute inset-x-0 -bottom-12 flex justify-center gap-4">
-        <button aria-hidden="true" class="grid h-10 w-10 place-items-center rounded-full bg-white shadow-md ring-1 ring-(--color-border)">
-          <X class="h-4 w-4 text-red-500" :stroke-width="2.5" />
-        </button>
-        <button aria-hidden="true" class="grid h-10 w-10 place-items-center rounded-full bg-white shadow-md ring-1 ring-(--color-border)">
-          <Heart class="h-4 w-4 fill-(--color-primary) text-(--color-primary)" :stroke-width="2" />
-        </button>
-      </div>
+    </div>
+    <div class="flex justify-center gap-4">
+      <span class="grid h-9 w-9 place-items-center rounded-full bg-white shadow-md ring-1 ring-(--color-border)">
+        <X class="h-4 w-4 text-red-500" :stroke-width="2.5" />
+      </span>
+      <span class="grid h-9 w-9 place-items-center rounded-full bg-white shadow-md ring-1 ring-(--color-border)">
+        <Heart class="h-4 w-4 fill-(--color-primary) text-(--color-primary)" :stroke-width="2" />
+      </span>
     </div>
   </div>
 
   <!-- ───────────── Geofence ───────────── -->
+  <!-- Aerial photo of the venue, centred on the pin; a light warm wash
+       pulls the pool towards the page palette without flattening the
+       golden hour. The dashed radius rides on a pale halo so it reads
+       over any part of the photo, even at 1× density. -->
   <div v-else-if="cardKey === 'geofence'" class="absolute inset-0 overflow-hidden">
-    <div
-      class="absolute inset-0"
-      :style="{
-        background: `linear-gradient(160deg, oklch(95% 0.03 ${hue}), oklch(86% 0.07 ${hue + 10}))`,
-      }"
+    <div class="absolute inset-0" :style="{ background: `oklch(86% 0.07 ${hue + 10})` }" />
+    <MarketingPhoto
+      name="mock-venue-map"
+      sizes="(min-width: 1024px) 29vw, (min-width: 640px) 46vw, 64vw"
+      class="absolute inset-0 h-full w-full object-cover"
     />
-    <svg class="absolute inset-0 h-full w-full" viewBox="0 0 300 240" preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <pattern :id="`dots-${hue}`" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
-          <circle cx="1" cy="1" r="0.6" :fill="`oklch(70% 0.06 ${hue})`" opacity="0.35" />
-        </pattern>
-      </defs>
-      <rect width="300" height="240" :fill="`url(#dots-${hue})`" />
-      <path d="M-10 130 Q 80 110, 150 130 T 320 120" :stroke="`oklch(98% 0.01 ${hue})`" stroke-width="14" fill="none" stroke-linecap="round" />
-      <path d="M-10 130 Q 80 110, 150 130 T 320 120" :stroke="`oklch(85% 0.04 ${hue})`" stroke-width="1" fill="none" stroke-dasharray="6 6" />
-      <path d="M180 -10 Q 170 80, 200 150 T 220 260" :stroke="`oklch(98% 0.01 ${hue})`" stroke-width="10" fill="none" stroke-linecap="round" />
-      <g :fill="`oklch(80% 0.06 ${hue})`" opacity="0.55">
-        <rect x="40" y="40" width="35" height="28" rx="3" />
-        <rect x="85" y="48" width="25" height="22" rx="3" />
-        <rect x="40" y="170" width="40" height="32" rx="3" />
-        <rect x="230" y="50" width="30" height="40" rx="3" />
-        <rect x="240" y="180" width="32" height="24" rx="3" />
-      </g>
-    </svg>
+    <div aria-hidden="true" class="absolute inset-0 mix-blend-color" :style="{ background: `oklch(75% 0.09 ${hue + 40})`, opacity: 0.22 }" />
+    <div
+      aria-hidden="true"
+      class="absolute inset-0"
+      :style="{ background: `radial-gradient(closest-side, oklch(97% 0.02 ${hue} / 0.3), oklch(95% 0.03 ${hue} / 0.12))` }"
+    />
     <svg class="absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2" viewBox="0 0 200 200" fill="none">
       <defs>
         <radialGradient :id="`geo-fill-${hue}`" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" :stop-color="`oklch(70% 0.18 ${hue})`" stop-opacity="0.25" />
+          <stop offset="0%" :stop-color="`oklch(70% 0.18 ${hue})`" stop-opacity="0.35" />
           <stop offset="100%" :stop-color="`oklch(70% 0.18 ${hue})`" stop-opacity="0" />
         </radialGradient>
       </defs>
       <circle cx="100" cy="100" r="78" :fill="`url(#geo-fill-${hue})`" />
-      <circle cx="100" cy="100" r="78" :stroke="`oklch(58% 0.18 ${hue})`" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.9" />
-      <circle cx="100" cy="100" r="42" :stroke="`oklch(65% 0.14 ${hue})`" stroke-width="1" stroke-dasharray="2 4" opacity="0.55" />
+      <circle cx="100" cy="100" r="78" :stroke="`oklch(98% 0.01 ${hue})`" stroke-width="3.5" opacity="0.7" />
+      <circle cx="100" cy="100" r="78" :stroke="`oklch(58% 0.18 ${hue})`" stroke-width="2.25" stroke-dasharray="5 5" />
+      <circle cx="100" cy="100" r="42" :stroke="`oklch(98% 0.01 ${hue})`" stroke-width="2.5" opacity="0.5" />
+      <circle cx="100" cy="100" r="42" :stroke="`oklch(58% 0.16 ${hue})`" stroke-width="1.25" stroke-dasharray="2 4" opacity="0.85" />
     </svg>
     <div class="absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center">
       <div class="relative">
@@ -345,9 +316,12 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
   </div>
 
   <!-- ───────────── Telegram ───────────── -->
-  <div v-else-if="cardKey === 'telegram'" class="absolute inset-0 flex flex-col gap-0 p-3">
+  <!-- Tight paddings and leading, and the first bubble's time on its
+       sender line (as Telegram sets it), keep the input row whole in
+       the 12rem stage (sm); the 15rem stage (3xl) gets its padding back. -->
+  <div v-else-if="cardKey === 'telegram'" class="absolute inset-0 flex flex-col gap-0 p-3 sm:p-2 3xl:p-3">
     <div
-      class="flex items-center gap-2 rounded-t-lg px-2.5 py-2"
+      class="flex items-center gap-2 rounded-t-lg px-2.5 py-1.5"
       :style="{ background: `linear-gradient(135deg, oklch(60% 0.18 ${hue}), oklch(52% 0.2 ${hue + 8}))` }"
     >
       <div
@@ -370,45 +344,39 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
       </div>
     </div>
     <div
-      class="relative flex flex-1 flex-col gap-1.5 rounded-b-lg p-2"
+      class="relative flex flex-1 flex-col gap-1 rounded-b-lg p-1.5"
       :style="{
         background: `radial-gradient(120% 100% at 50% 0%, oklch(96% 0.015 ${hue}) 0%, oklch(94% 0.01 240) 100%)`,
       }"
     >
-      <div class="self-start max-w-[85%] rounded-xl rounded-bl-sm bg-white px-2.5 py-1.5 shadow-sm">
+      <div class="self-start max-w-[85%] rounded-xl rounded-bl-sm bg-white px-2.5 py-1 leading-tight shadow-sm">
         <div class="flex items-center gap-1 text-[10px] font-semibold text-(--color-foreground)">
           <span class="grid h-3 w-3 place-items-center rounded-full text-[8px]" :style="{ background: `oklch(85% 0.14 ${hue + 30})` }">📷</span>
           {{ t('features.mockup.botNotifyTitle') }}
         </div>
-        <div class="mt-0.5 text-[9px] text-(--color-muted-foreground)">{{ t('features.mockup.botNotifyBy') }}</div>
-        <div class="mt-0.5 flex items-center justify-end gap-0.5 text-[8px] text-(--color-muted-foreground)">14:38</div>
+        <div class="mt-0.5 flex items-baseline justify-between gap-2 text-(--color-muted-foreground)">
+          <span class="text-[9px]">{{ t('features.mockup.botNotifyBy') }}</span>
+          <span class="text-[8px]">14:38</span>
+        </div>
       </div>
-      <div class="self-start max-w-[90%] rounded-xl rounded-bl-sm bg-white p-1.5 shadow-sm">
-        <div class="grid grid-cols-3 gap-0.5 overflow-hidden rounded-md">
+      <!-- One row of 4 thumbs keeps the whole chat inside a 12rem stage. -->
+      <div class="self-start w-[146px] max-w-[90%] rounded-xl rounded-bl-sm bg-white p-1 shadow-sm">
+        <div class="grid grid-cols-4 gap-0.5 overflow-hidden rounded-md">
           <div
-            v-for="(h, i) in [hue + 0, hue + 14, hue - 6, hue + 22, hue + 6, hue - 12]"
-            :key="i"
+            v-for="photo in ALBUM"
+            :key="photo"
             class="relative aspect-square overflow-hidden"
-            :style="{ background: `linear-gradient(135deg, oklch(82% 0.1 ${h}), oklch(60% 0.15 ${h + 12}))` }"
+            :style="{ background: 'oklch(90% 0.03 60)' }"
           >
-            <span
-              class="absolute rounded-full"
-              :style="{
-                width: `${7 + (i % 2) * 2}px`,
-                height: `${7 + (i % 2) * 2}px`,
-                bottom: '-1px',
-                left: `${2 + (i % 3)}px`,
-                background: 'oklch(25% 0.04 280 / 0.65)',
-              }"
-            />
+            <MarketingPhoto :name="photo" sizes="34px" class="absolute inset-0 h-full w-full object-cover" />
           </div>
         </div>
-        <div class="mt-1 flex items-center justify-between px-0.5 text-[9px]">
+        <div class="mt-1 flex items-center justify-between px-0.5 text-[9px] leading-tight">
           <span class="font-medium text-(--color-foreground)">{{ t('features.mockup.botArchiveCaption') }}</span>
           <span class="text-(--color-muted-foreground)">14:38</span>
         </div>
       </div>
-      <div class="mt-auto flex items-center gap-1.5 rounded-full bg-white px-2 py-1 shadow-inner ring-1 ring-(--color-border)/50">
+      <div class="mt-auto flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 shadow-inner ring-1 ring-(--color-border)/50">
         <span class="text-[9px] text-(--color-muted-foreground)/60">{{ t('features.mockup.botInputPlaceholder') }}</span>
         <div class="ml-auto grid h-4 w-4 place-items-center rounded-full text-white" :style="{ background: `oklch(60% 0.18 ${hue})` }">
           <Send class="h-2 w-2 fill-white" :stroke-width="0" />

@@ -1,0 +1,399 @@
+{
+  "album-sparklers": {
+    "width": 1024,
+    "height": 683,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "bokeh": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "bouquet": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "candles": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "candles-table": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "champagne": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "confetti": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "couple-back": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "cufflink": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "cutting-cake": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "dance-slow": {
+    "width": 1536,
+    "height": 1024,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "embrace": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "fairy-lights": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "feet-dancing": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "first-look": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "guests": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "hand-holding": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "hands-closeup": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "jacket": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "lace-texture": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "mock-album-champagne": {
+    "width": 1024,
+    "height": 1024,
+    "widths": [
+      100
+    ]
+  },
+  "mock-album-couple": {
+    "width": 800,
+    "height": 800,
+    "widths": [
+      100
+    ]
+  },
+  "mock-album-first-look": {
+    "width": 1024,
+    "height": 1024,
+    "widths": [
+      100
+    ]
+  },
+  "mock-album-table": {
+    "width": 900,
+    "height": 900,
+    "widths": [
+      100
+    ]
+  },
+  "mock-moderation-card": {
+    "width": 860,
+    "height": 1075,
+    "widths": [
+      200,
+      320
+    ]
+  },
+  "mock-strip-bouquet": {
+    "width": 1024,
+    "height": 465,
+    "widths": [
+      120,
+      192,
+      320
+    ]
+  },
+  "mock-strip-candles": {
+    "width": 1024,
+    "height": 465,
+    "widths": [
+      120,
+      192,
+      320
+    ]
+  },
+  "mock-strip-dance": {
+    "width": 1034,
+    "height": 470,
+    "widths": [
+      120,
+      192,
+      320
+    ]
+  },
+  "mock-strip-slideshow": {
+    "width": 1056,
+    "height": 480,
+    "widths": [
+      120,
+      192,
+      320
+    ]
+  },
+  "mock-strip-sparklers": {
+    "width": 1024,
+    "height": 465,
+    "widths": [
+      120,
+      192,
+      320
+    ]
+  },
+  "mock-venue-map": {
+    "width": 1172,
+    "height": 732,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "mock-video-selfie": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      200,
+      320
+    ]
+  },
+  "ribbons": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "rings": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "rings-box": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "slideshow-hero-wide": {
+    "width": 1536,
+    "height": 864,
+    "widths": [
+      400,
+      640,
+      832,
+      1152,
+      1536
+    ]
+  },
+  "sparklers": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "stats-deck-champagne": {
+    "width": 1024,
+    "height": 1365,
+    "widths": [
+      120,
+      200,
+      280
+    ]
+  },
+  "stats-deck-confetti": {
+    "width": 1024,
+    "height": 1365,
+    "widths": [
+      120,
+      200,
+      280
+    ]
+  },
+  "stats-deck-dance": {
+    "width": 768,
+    "height": 1024,
+    "widths": [
+      120,
+      200,
+      280
+    ]
+  },
+  "stats-deck-embrace": {
+    "width": 1024,
+    "height": 1365,
+    "widths": [
+      120,
+      200,
+      280
+    ]
+  },
+  "stats-deck-sparklers": {
+    "width": 1024,
+    "height": 1365,
+    "widths": [
+      120,
+      200,
+      280
+    ]
+  },
+  "table-setting": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "vintage-camera": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  },
+  "waiter": {
+    "width": 1024,
+    "height": 1536,
+    "widths": [
+      400,
+      640,
+      832
+    ]
+  }
+}

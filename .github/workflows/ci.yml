@@ -14,10 +14,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # pnpm version comes from package.json "packageManager".
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -31,8 +30,8 @@ jobs:
       - name: Type check
         run: pnpm exec nuxt typecheck
         env:
-          # Stub values so the build doesn't bail in env-check plugin.
-          # Real secrets live in Vercel / production env at deploy time.
+          # Stub values so module setup has something to work with.
+          # Real secrets live in the production env at deploy time.
           NUXT_PUBLIC_SITE_URL: https://memour.uz
           NUXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NUXT_PUBLIC_SUPABASE_KEY: stub-anon-key
@@ -45,3 +44,32 @@ jobs:
           NUXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NUXT_PUBLIC_SUPABASE_KEY: stub-anon-key
           SUPABASE_SERVICE_ROLE_KEY: stub-service-role-key
+
+      # The service-role key is read at runtime (nuxt.config); make sure
+      # a build that had it in the environment didn't bake it in.
+      - name: No secrets in build output
+        run: |
+          if grep -rq "stub-service-role-key" .output; then
+            echo "SUPABASE_SERVICE_ROLE_KEY ended up in .output"
+            exit 1
+          fi
+
+  # Every migration applies to a fresh database and passes the linter,
+  # so a broken or unsafe migration is caught in the PR, not in prod.
+  db:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply all migrations to a fresh database
+        run: supabase db start
+
+      - name: Lint
+        run: supabase db lint --fail-on error

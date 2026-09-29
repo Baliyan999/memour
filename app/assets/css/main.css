@@ -8,7 +8,8 @@
   --color-foreground: oklch(22% 0.03 50);
   --color-muted: oklch(95.5% 0.015 75);
   --color-muted-foreground: oklch(45% 0.025 50);
-  --color-primary: oklch(58% 0.09 35);
+  /* 56% (not 58%) keeps white button labels at WCAG AA (4.7:1). */
+  --color-primary: oklch(56% 0.09 35);
   --color-primary-foreground: oklch(99% 0.005 80);
   --color-accent: oklch(88% 0.045 70);
   --color-accent-foreground: oklch(25% 0.04 35);
@@ -17,8 +18,8 @@
   --color-border: oklch(91% 0.015 70);
   --color-ring: oklch(60% 0.1 35);
 
-  --font-display: "Cormorant Garamond", ui-serif, Georgia, "Times New Roman", serif;
-  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Cormorant Garamond", "Cormorant Garamond Fallback", ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: "Manrope", "Manrope Fallback", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   --radius-sm: 0.5rem;
   --radius-md: 0.875rem;
@@ -27,6 +28,14 @@
 
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -8px rgb(180 130 100 / 0.18);
   --shadow-glow: 0 0 0 1px rgb(255 255 255 / 0.4), 0 24px 60px -20px rgb(180 130 100 / 0.45);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.04), 0 28px 60px -24px rgb(160 110 90 / 0.5);
+
+  /* Motion — CSS twin of SPRING in composables/useMotion.ts. A
+   * critically damped spring (no overshoot) sampled into linear();
+   * the curve is the same for every response, only the duration
+   * changes: duration = response × 1.47 (time to settle within 0.1%). */
+  --ease-spring: linear(0 0%, 0.0151 2%, 0.0535 4%, 0.107 6%, 0.1694 8%, 0.2361 10%, 0.3375 13%, 0.4346 16%, 0.5509 20%, 0.6493 24%, 0.7298 28%, 0.8078 33%, 0.865 38%, 0.9129 44%, 0.9445 50%, 0.9676 57%, 0.9827 65%, 0.9922 75%, 0.9971 87%, 1 100%);
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Custom breakpoints re-declared in ascending order so the cascade
    * works correctly. Tailwind v4 emits variants in token-declaration
@@ -41,8 +50,41 @@
   --breakpoint-4xl: 160rem;
 }
 
+/* Metric-matched fallbacks. Until the web fonts arrive the text is set
+ * in Times / Arial scaled to the same advance width, so the swap
+ * doesn't re-wrap the hero and push the page down (CLS). Values were
+ * measured in Chromium against the loaded Google Fonts (400 weight,
+ * mixed uz/ru sample): width ratio → size-adjust, the web font's
+ * ascent/descent ÷ size-adjust → the overrides. */
+@font-face {
+  font-family: "Cormorant Garamond Fallback";
+  src: local("Times New Roman"), local("TimesNewRomanPSMT"), local("Times");
+  size-adjust: 94.89%;
+  ascent-override: 96.96%;
+  descent-override: 30.56%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Manrope Fallback";
+  src: local("Arial"), local("ArialMT"), local("Helvetica");
+  size-adjust: 101.11%;
+  ascent-override: 105.83%;
+  descent-override: 29.67%;
+  line-gap-override: 0%;
+}
+
+/* prefers-reduced-transparency → frostier, near-solid materials. */
+@custom-variant reduce-transparency (@media (prefers-reduced-transparency: reduce));
+
 @layer base {
   * { border-color: var(--color-border); }
+
+  :root {
+    /* Spring durations for --ease-spring (response 0.22 / 0.35 / 0.5 s). */
+    --spring-snappy: 320ms;
+    --spring-default: 515ms;
+    --spring-gentle: 735ms;
+  }
 
   html {
     scroll-behavior: smooth;
@@ -144,6 +186,14 @@
     background: oklch(85% 0.06 30);
     color: oklch(20% 0.04 35);
   }
+
+  /* Pinch-zoom is allowed now (viewport meta), so: iOS Safari zooms into
+   * any focused field under 16px — keep fields at 16px there — and
+   * controls opt out of double-tap zoom (no 300 ms delay on taps). */
+  @supports (-webkit-touch-callout: none) {
+    input, select, textarea { font-size: max(16px, 1em); }
+  }
+  button, a, [role='button'], label { touch-action: manipulation; }
 }
 
 @utility container-page {
@@ -265,6 +315,20 @@
   90%       { opacity: 0.5; }
   50%       { transform: rotate(-16deg) translateX(-40%); }
 }
+@keyframes pulse-sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.4); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+/* First-paint entrance (hero). Pure CSS so it runs before — and
+ * without — JavaScript: content is never parked at opacity 0 waiting
+ * for hydration. `translate` (not `transform`) so it composes with
+ * any transform a parent or motion sets. */
+@keyframes rise-in {
+  from { opacity: 0; translate: 0 var(--rise, 0.45em); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+}
 @keyframes particle-rise {
   0%   { transform: translateY(0) translateX(0); opacity: 0; }
   10%  { opacity: 1; }
@@ -286,6 +350,36 @@
 @utility animate-light-ray-c { animation: light-ray-c 16s ease-in-out infinite; }
 @utility animate-light-ray-d { animation: light-ray-d 20s ease-in-out infinite; }
 @utility animate-particle-rise { animation: particle-rise linear infinite; }
+@utility animate-sparkle { animation: pulse-sparkle 2.6s ease-in-out infinite; }
+
+/* Hero entrance: rise + fade on the gentle spring, staggered through
+ * --enter-delay (set inline per element). */
+@utility animate-rise-in {
+  animation: rise-in var(--spring-gentle) var(--ease-spring) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+@utility animate-fade-in {
+  animation: fade-in var(--spring-gentle) var(--ease-out-soft) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+/* Press feedback for buttons and CTAs: sinks on pointer-down (fast),
+ * springs back on release. CSS transitions retarget from the current
+ * value, so rapid taps never jump. Owns the element's transition list —
+ * don't combine with Tailwind's transition-* utilities. Large surfaces
+ * sink less: set --press-scale on them. Unlike a JS press gesture it
+ * adds no tab stop, and `scale` composes with a JS-driven transform. */
+@utility press {
+  transition-property: scale, opacity, color, background-color, border-color, box-shadow;
+  transition-duration: var(--spring-default), 200ms, 200ms, 200ms, 200ms, 300ms;
+  transition-timing-function: var(--ease-spring), ease, ease, ease, ease, ease;
+  -webkit-tap-highlight-color: transparent;
+  &:active {
+    scale: var(--press-scale, 0.97);
+    transition-duration: 90ms, 200ms, 200ms, 200ms, 200ms, 300ms;
+  }
+}
 
 /* Locale switcher swap — old code slides left+fades out, new code
  * slides in from the right. Keyed on the active locale via Vue's
@@ -312,6 +406,38 @@
     opacity 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Route transitions (View Transitions API — Nuxt's
+ * experimental.viewTransition; until that flag is on these rules stay
+ * inert). The outgoing page fades quickly; the incoming one settles up
+ * on the default spring. Header and the fixed backdrop carry their own
+ * names so they stay put instead of cross-fading with the page — but
+ * only while a transition runs: a view-transition-name makes its element
+ * a Backdrop Root, and a permanently named header would stop its glass
+ * from blurring the page underneath. */
+:root:active-view-transition .site-header {
+  view-transition-name: site-header;
+}
+:root:active-view-transition .site-backdrop {
+  view-transition-name: site-backdrop;
+}
+::view-transition-old(root) {
+  animation: 160ms ease-out both vt-fade-out;
+}
+::view-transition-new(root) {
+  animation: var(--spring-default) var(--ease-spring) 60ms both vt-settle-in;
+}
+::view-transition-group(site-header),
+::view-transition-group(site-backdrop) {
+  animation-duration: var(--spring-default);
+  animation-timing-function: var(--ease-spring);
+}
+@keyframes vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vt-settle-in {
+  from { opacity: 0; translate: 0 10px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -320,5 +446,18 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Reduced motion keeps meaning, drops travel: entrances become a
+   * short cross-fade with no stagger, route changes a plain fade. */
+  html .animate-rise-in,
+  html .animate-fade-in {
+    animation: fade-in 200ms ease-out both !important;
+  }
+  ::view-transition-new(root) {
+    animation: 180ms ease-out both fade-in;
+  }
+  ::view-transition-old(root) {
+    animation-duration: 180ms;
   }
 }

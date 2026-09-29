@@ -1,17 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useLocalePath } from '#imports'
+import { useI18n, useLocalePath } from '#imports'
+import { RefreshCw } from '@lucide/vue'
+import { formatDate } from '~/utils/format'
 
 definePageMeta({ layout: 'admin' })
 
 /**
  * Admin events list — pulls all events via /api/admin/events (which
  * uses service-role to bypass RLS). The page itself is gated by the
- * global auth middleware that checks the admins table.
+ * global auth middleware that checks the admins table. A failed load
+ * says so (with a retry) instead of "no events yet".
  */
+const { t, te, locale } = useI18n()
 const localePath = useLocalePath()
+const errorMessage = useErrorMessage()
 
-const { data, refresh, pending } = await useFetch<{
+const { data, error, refresh, pending } = await useFetch<{
   events: Array<{
     id: string
     couple_names: string
@@ -28,41 +33,35 @@ const { data, refresh, pending } = await useFetch<{
 // QR customizer modal state — clicking «QR PDF» on any event row
 // opens the modal pre-populated with that event's id + couple names
 // + table count (so the layout summary can say "10 tables → 2 pages").
+// The modal stays mounted after the first open (qrOpen toggles it), so
+// it can play its exit and hand focus back to the button.
 const qrModalEvent = ref<{ id: string; couple_names: string; table_count: number | null } | null>(null)
+const qrOpen = ref(false)
 function openQr(ev: { id: string; couple_names: string; table_count?: number | null }) {
   qrModalEvent.value = {
     id: ev.id,
     couple_names: ev.couple_names,
     table_count: ev.table_count ?? null,
   }
+  qrOpen.value = true
 }
 
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
+const fmtDate = (d: string) => formatDate(d, locale.value)
 
-const STATUS_LABEL: Record<string, string> = {
-  active: 'Активно',
-  draft: 'Черновик',
-  archived: 'Архив',
-}
-function statusLabel(s: string): string {
-  return STATUS_LABEL[s] ?? s
-}
+// Database values → the site's words; an unknown value shows nothing
+// rather than itself.
+const statusLabel = (s: string) => te(`couple.statusBadge.${s}`) ? t(`couple.statusBadge.${s}`) : ''
+const tierLabel = (tier: string | null) => tier && te(`pricing.${tier}.name`) ? t(`pricing.${tier}.name`) : ''
 </script>
 
 <template>
   <div>
     <div class="mb-8 flex items-end justify-between gap-4">
-      <h1 class="heading-display-md">События</h1>
+      <h1 class="heading-display-md">{{ t('admin.events.title') }}</h1>
       <NuxtLink
         :to="localePath('/admin/event/create')"
         class="inline-flex h-10 items-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90"
-      >+ Создать событие</NuxtLink>
+      >{{ t('admin.events.create') }}</NuxtLink>
     </div>
 
     <ul v-if="pending" class="grid gap-3" aria-busy="true">
@@ -77,9 +76,21 @@ function statusLabel(s: string): string {
       </li>
     </ul>
 
+    <div v-else-if="error" class="surface-card rounded-(--radius-xl) p-10 text-center" role="alert">
+      <p class="text-(--color-muted-foreground)">{{ errorMessage(error) }}</p>
+      <button
+        type="button"
+        class="mt-5 inline-flex h-10 items-center gap-2 rounded-full border border-(--color-border) bg-white px-4 text-sm transition-[transform,background-color] duration-150 hover:bg-(--color-muted) active:scale-[0.97]"
+        @click="refresh()"
+      >
+        <RefreshCw class="h-4 w-4" />
+        {{ t('common.retry') }}
+      </button>
+    </div>
+
     <div v-else-if="!data || data.events.length === 0" class="surface-card rounded-(--radius-xl) p-10 text-center">
-      <h2 class="text-xl">Событий ещё нет</h2>
-      <p class="mt-2 text-(--color-muted-foreground)">Создайте первое — оно появится в кабинете пары.</p>
+      <h2 class="text-xl">{{ t('admin.events.emptyTitle') }}</h2>
+      <p class="mt-2 text-(--color-muted-foreground)">{{ t('admin.events.emptyDesc') }}</p>
     </div>
 
     <ul v-else class="grid gap-3">
@@ -98,7 +109,7 @@ function statusLabel(s: string): string {
                       : 'bg-(--color-muted) text-(--color-muted-foreground)',
                 ]"
               >{{ statusLabel(ev.status) }}</span>
-              <span class="rounded-full bg-(--color-muted) px-2 py-0.5 text-[10px] uppercase tracking-wider text-(--color-muted-foreground)">{{ ev.plan_tier }}</span>
+              <span v-if="tierLabel(ev.plan_tier)" class="rounded-full bg-(--color-muted) px-2 py-0.5 text-[10px] uppercase tracking-wider text-(--color-muted-foreground)">{{ tierLabel(ev.plan_tier) }}</span>
             </div>
             <p class="mt-1 text-sm text-(--color-muted-foreground)">
               {{ fmtDate(ev.wedding_date) }}<span v-if="ev.venue_name"> · {{ ev.venue_name }}</span>
@@ -106,9 +117,9 @@ function statusLabel(s: string): string {
             <p
               v-if="!ev.owner_id"
               class="mt-1 text-[11px] text-amber-700"
-              title="Пара ещё не входила в кабинет. После первого SMS-входа аккаунт автоматически привяжется к этому событию."
+              :title="t('admin.events.notClaimedHint')"
             >
-              ⚠ Пара ещё не вошла в кабинет
+              {{ t('admin.events.notClaimed') }}
             </p>
           </div>
           <div class="flex flex-col items-end gap-2">
@@ -116,7 +127,7 @@ function statusLabel(s: string): string {
             <button
               type="button"
               class="inline-flex h-7 items-center gap-1 rounded-full border border-(--color-border) bg-white px-3 text-[11px] text-(--color-foreground) hover:bg-(--color-muted)"
-              title="Открыть настройки QR PDF"
+              :title="t('admin.events.qrHint')"
               @click="openQr(ev)"
             >
               <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -126,6 +137,10 @@ function statusLabel(s: string): string {
               </svg>
               QR PDF
             </button>
+            <NuxtLink
+              :to="localePath(`/admin/event/${ev.id}`)"
+              class="inline-flex h-7 items-center rounded-full border border-(--color-border) bg-white px-3 text-[11px] text-(--color-foreground) hover:bg-(--color-muted)"
+            >{{ t('admin.events.edit') }}</NuxtLink>
           </div>
         </div>
       </li>
@@ -134,11 +149,11 @@ function statusLabel(s: string): string {
     <!-- QR customizer modal -->
     <AdminQrCustomizer
       v-if="qrModalEvent"
-      :open="!!qrModalEvent"
+      :open="qrOpen"
       :event-id="qrModalEvent.id"
       :couple="qrModalEvent.couple_names"
       :table-count="qrModalEvent.table_count ?? undefined"
-      @update:open="qrModalEvent = null"
+      @update:open="qrOpen = $event"
     />
   </div>
 </template>

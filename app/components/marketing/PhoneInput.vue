@@ -7,6 +7,11 @@ import { ref, computed, watch } from 'vue'
  * 9 user digits. As the user types, the field formats live as
  * "+998 XX XXX XX XX". Backspace / Delete are blocked from chewing
  * into the prefix.
+ *
+ * No `required` / `pattern`: the prefix always "fills" the field, and a
+ * pattern mismatch shows the browser's bubble in the browser's
+ * language. The form checks `digits` (9 of them) and says what's wrong
+ * in the site's language.
  */
 const props = defineProps<{
   modelValue: string
@@ -43,15 +48,43 @@ watch(
   { immediate: true },
 )
 
+// A parent that sets `digits` after mount (prefill once data arrives,
+// a reset) still shows it.
+watch(() => props.digits, (d) => {
+  if ((d ?? '') !== digits.value) digits.value = d ?? ''
+})
+
+/**
+ * Pull the national digits (the part after +998) out of whatever
+ * ended up in the field. People paste or type numbers in every shape — "+998 90 123 45 67",
+ * "998901234567", "90 123 45 67" — sometimes right after our own
+ * "+998 " prefix, sometimes over a full selection. We look at the
+ * whole value (not the caret position), drop our prefix if it's still
+ * there, then drop the country code the user brought along. Only a
+ * leading "998" on something longer than a national number, followed
+ * by a digit a Uzbek number can start with (2–9), counts as a country
+ * code — so "99 812 34 56" stays intact.
+ *
+ * Known trade-off: a complete "99 8X…" number (X = 2–9) plus one more
+ * digit typed at the end looks exactly like "998" followed by a number
+ * being typed from scratch, so it collapses to 7 digits. That's visible
+ * and the form refuses it; the reverse (silently keeping "99 8…" when
+ * "998…" was meant) sent SMS codes to a stranger's number.
+ */
+function nationalDigits(value: string, countryCode = true): string {
+  const all = value.replace(/\D/g, '')
+  let d = value.trimStart().startsWith('+998') ? all.slice(3) : all
+  if (countryCode && d.length > 9 && /^998[2-9]/.test(d)) d = d.slice(3)
+  return d
+}
+
 function onInput(e: Event) {
   const target = e.target as HTMLInputElement
-  // Display always starts with "+998 " so the field's digit-only view
-  // always begins with "998" — strip those 3 from the user portion.
-  // If the user managed to delete past the prefix, reset their digits
-  // to empty.
-  const all = target.value.replace(/\D/g, '')
-  const user = all.startsWith('998') ? all.slice(3) : ''
-  digits.value = user.slice(0, 9)
+  // A digit typed into the middle of a complete number is a slip, not
+  // the start of "998…": the number stays as it was.
+  const midEdit = digits.value.length === 9 && (target.selectionEnd ?? 0) < target.value.length
+  const next = nationalDigits(target.value, !midEdit)
+  digits.value = midEdit && next.length > 9 ? digits.value : next.slice(0, 9)
 
   // Force-rewrite the DOM input to the formatted value. Without this,
   // Vue's :value binding only repaints when `digits` actually changes;
@@ -65,6 +98,22 @@ function onInput(e: Event) {
     const caret = formatted.length
     try { target.setSelectionRange(caret, caret) } catch { /* noop */ }
   }
+}
+
+// A pasted full number replaces the field instead of being spliced in
+// at the caret — "+998 90 1" + paste "+998 90 123 45 67" must end up as
+// that number, not as a mix of both. Partial (or foreign) pastes fall
+// through to onInput as usual.
+function onPaste(e: ClipboardEvent) {
+  const text = e.clipboardData?.getData('text') ?? ''
+  const pasted = nationalDigits(text)
+  if (pasted.length !== 9) return
+  e.preventDefault()
+  const target = e.currentTarget as HTMLInputElement
+  digits.value = pasted
+  const formatted = format(pasted)
+  target.value = formatted
+  try { target.setSelectionRange(formatted.length, formatted.length) } catch { /* noop */ }
 }
 
 function onKeyDown(e: KeyboardEvent) {
@@ -85,11 +134,10 @@ function onKeyDown(e: KeyboardEvent) {
     type="tel"
     inputmode="numeric"
     autocomplete="tel"
-    required
     :value="display"
-    pattern="\+998 \d{2} \d{3} \d{2} \d{2}"
-    class="flex h-11 w-full rounded-md border border-(--color-border) bg-white px-3 py-2 text-sm placeholder:text-(--color-muted-foreground)/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) 3xl:h-12 3xl:text-base 4xl:h-14 4xl:px-4 4xl:text-lg"
+    class="flex h-11 w-full rounded-md border border-(--color-border) bg-white px-3 py-2 text-base sm:text-sm placeholder:text-(--color-muted-foreground)/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) 3xl:h-12 3xl:text-base 4xl:h-14 4xl:px-4 4xl:text-lg"
     @input="onInput"
+    @paste="onPaste"
     @keydown="onKeyDown"
   >
 </template>

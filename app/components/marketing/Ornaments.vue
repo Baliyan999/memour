@@ -40,18 +40,19 @@ defineProps<{
     <circle cx="240" cy="100" r="78" stroke="url(#ring-grad)" stroke-width="3.5" fill="none" />
   </svg>
 
-  <!-- Sparkle: 4-point star with absolute positioning, infinite pulse -->
+  <!-- Sparkle: 4-point star with absolute positioning, infinite pulse.
+       Keyframes live in main.css — scoped ones get a hashed name the
+       inline animation couldn't reach. -->
   <svg
     v-else-if="kind === 'sparkle'"
     aria-hidden="true"
     viewBox="0 0 20 20"
     :width="size ?? 14"
     :height="size ?? 14"
-    class="absolute"
+    class="animate-sparkle absolute"
     :style="{
       left: x,
       top: y,
-      animation: `pulse-sparkle 2.6s ease-in-out infinite`,
       animationDelay: `${delay ?? 0}s`,
     }"
   >
@@ -69,10 +70,3 @@ defineProps<{
     :style="{ width: size ?? 6 + 'px', height: size ?? 6 + 'px' }"
   />
 </template>
-
-<style scoped>
-@keyframes pulse-sparkle {
-  0%, 100% { opacity: 0; transform: scale(0.4); }
-  50% { opacity: 1; transform: scale(1.1); }
-}
-</style>

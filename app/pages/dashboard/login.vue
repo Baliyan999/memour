@@ -19,10 +19,22 @@ definePageMeta({ layout: 'dashboard' })
  * The whole experience matches the brand: gold gradient title,
  * polaroid-style card, sliding step transition. A resend countdown
  * prevents accidental double-sends.
+ *
+ * Before a code or link goes out the couple ticks two boxes — the terms
+ * and the privacy policy. Both requests carry them as `consent`; the
+ * server refuses without and records them (server/utils/consent.ts).
+ * The email link is sent by /api/auth/email/send for the same reason.
  */
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const user = useSupabaseUser()
+const { consentFor, live: legalLive } = useLegal()
+
+// motion-v writes `initial` inline, so a server-rendered card sat at
+// opacity 0 until hydration (seconds on slow 4G, forever with JS off).
+// Opened directly, the card paints at rest; the entrance plays only
+// when the couple arrives here by a link inside the app.
+const entrance = !(import.meta.server || useNuxtApp().isHydrating)
 
 // If already logged in, skip straight to dashboard.
 watch(
@@ -38,21 +50,45 @@ watch(
 // page, the access token rides along in the URL hash. We hand it to
 // the Supabase client manually so it sets the session cookie + the
 // reactive user, then the watcher above redirects to /dashboard.
+// (The email link's ?code= never gets here: server/middleware/auth-code.ts
+// turns it into a session first.)
+//
+// A link that didn't log in arrives as #error=…&error_code=… — from
+// Supabase (otp_expired: expired or already used) or from auth-code.ts
+// (no verifier: opened in another browser than the one that asked).
+// Say so on the email tab, where a new link is one tap away.
+const LINK_ERRORS: Record<string, string> = {
+  otp_expired: 'link_expired',
+  flow_state_expired: 'link_expired',
+  pkce_code_verifier_not_found: 'link_other_browser',
+  bad_code_verifier: 'link_other_browser',
+}
 const supabaseAuthClient = useSupabaseClient()
 onMounted(async () => {
   if (typeof window === 'undefined') return
   const hash = window.location.hash
-  if (!hash || !hash.includes('access_token=')) return
+  if (!hash) return
   const params = new URLSearchParams(hash.slice(1))
+  const cleanHash = () => window.history.replaceState({}, '', window.location.pathname + window.location.search)
+  if (params.get('error') || params.get('error_code')) {
+    channel.value = 'email'
+    error.value = errorMessage(LINK_ERRORS[params.get('error_code') ?? ''] ?? 'link_invalid')
+    cleanHash()
+    return
+  }
   const access_token = params.get('access_token')
   const refresh_token = params.get('refresh_token')
   if (!access_token || !refresh_token) return
   try {
-    await supabaseAuthClient.auth.setSession({ access_token, refresh_token })
-    // Clean the hash so a refresh doesn't reapply the (now used) token.
-    window.history.replaceState({}, '', window.location.pathname + window.location.search)
+    const { error: err } = await supabaseAuthClient.auth.setSession({ access_token, refresh_token })
+    if (err) throw err
   } catch (e) {
     console.error('[login] setSession from hash failed', e)
+    channel.value = 'email'
+    error.value = errorMessage('link_invalid')
+  } finally {
+    // Clean the hash so a refresh doesn't reapply the (now used) token.
+    cleanHash()
   }
 })
 
@@ -60,15 +96,32 @@ onMounted(async () => {
 // arrive, or for couples who prefer email).
 type Channel = 'phone' | 'email'
 const channel = ref<Channel>('phone')
+function selectChannel(c: Channel) {
+  channel.value = c
+  error.value = null // the other form's message doesn't belong here
+}
 
 type Step = 'phone' | 'code'
 const step = ref<Step>('phone')
 
+// Terms + privacy policy — one pair of boxes for both channels.
+const acceptTerms = ref(false)
+const acceptPrivacy = ref(false)
+const consentOk = computed(() => acceptTerms.value && acceptPrivacy.value)
+// A send without both boxes marks the unticked ones; ticking them clears that.
+const consentMissing = ref(false)
+watch(consentOk, (ok) => {
+  if (!ok || !consentMissing.value) return
+  consentMissing.value = false
+  error.value = null
+})
+
 // Email-channel state
-const supabase = useSupabaseClient()
 const emailAddr = ref('')
 const emailSent = ref(false)
-const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddr.value))
+// ASCII only: GoTrue refuses Cyrillic addresses anyway, and the browser's
+// own check would answer in the browser's language.
+const emailValid = computed(() => /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(emailAddr.value.trim()))
 
 // Phone-step state — mirrors LeadForm: digits is the raw 9-digit
 // user portion, modelValue is the formatted "+998 XX XXX XX XX".
@@ -88,13 +141,6 @@ const error = ref<string | null>(null)
 const resendIn = ref(0) // seconds until next resend allowed
 let resendTimer: number | undefined
 
-// Test-mode helper: while Eskiz hasn't approved our production
-// template the SMS we send only contains a fixed test string ("Bu
-// Eskiz dan test"). The actual OTP code comes back in the API
-// response so the dev UI can display it. This whole banner goes
-// away as soon as the prod template is live.
-const devCode = ref<string | null>(null)
-
 function startResendCooldown(seconds: number) {
   resendIn.value = seconds
   clearInterval(resendTimer)
@@ -105,39 +151,38 @@ function startResendCooldown(seconds: number) {
 }
 
 /**
- * Map a server error to a localized message. The server always sends
- * `data.code` (a stable string like `invalid_code`); we translate it
- * via i18n. Anything unrecognized falls back to a generic message so
- * the user never sees raw English "Server Error" / stack traces.
+ * Error → localized message: couple-specific wording first
+ * (`couple.errors.<code>`), then the shared `errors.<code>`, then a
+ * generic line. The user never sees raw English "Server Error", stack
+ * traces or Supabase texts.
  */
-function localizedError(e: any): string {
-  const code: string | undefined = e?.data?.data?.code ?? e?.data?.code
-  const key = code ? `couple.errors.${code}` : null
-  if (key) {
-    const translated = t(key)
-    if (translated !== key) return translated
-  }
-  return t('couple.errors.unknown')
-}
+const errorMessage = useErrorMessage('couple')
+
 
 async function sendCode() {
+  if (pending.value) return
+  if (!phoneValid.value) {
+    error.value = errorMessage('phone_incomplete')
+    return
+  }
+  if (!consentOk.value) {
+    consentMissing.value = true
+    error.value = errorMessage('consent_required')
+    return
+  }
   error.value = null
   pending.value = true
   try {
-    const res = await $fetch<{ ok: boolean; dev_code?: string }>(
-      '/api/auth/phone/send',
-      {
-        method: 'POST',
-        body: { phone: `+998${phoneDigits.value}` },
-      },
-    )
-    devCode.value = res.dev_code ?? null
+    await $fetch<{ ok: boolean }>('/api/auth/phone/send', {
+      method: 'POST',
+      body: { phone: `+998${phoneDigits.value}`, consent: consentFor('login') },
+    })
     step.value = 'code'
     startResendCooldown(30)
     await nextTick()
     codeRefs.value?.focus()
   } catch (e: any) {
-    error.value = localizedError(e)
+    error.value = errorMessage(e)
   } finally {
     pending.value = false
   }
@@ -155,6 +200,7 @@ async function verifyCode() {
           phone: `+998${phoneDigits.value}`,
           code: code.value,
           locale: locale.value,
+          consent: consentFor('login'),
         },
       },
     )
@@ -162,7 +208,7 @@ async function verifyCode() {
       window.location.href = res.action_link
     }
   } catch (e: any) {
-    error.value = localizedError(e)
+    error.value = errorMessage(e)
   } finally {
     pending.value = false
   }
@@ -181,22 +227,26 @@ function backToPhone() {
 }
 
 async function sendEmailLink() {
-  if (!emailValid.value) return
+  if (pending.value) return
+  if (!emailValid.value) {
+    error.value = errorMessage('invalid_email')
+    return
+  }
+  if (!consentOk.value) {
+    consentMissing.value = true
+    error.value = errorMessage('consent_required')
+    return
+  }
   error.value = null
   pending.value = true
   try {
-    const redirectTo =
-      typeof window !== 'undefined'
-        ? `${window.location.origin}${localePath('/dashboard')}`
-        : undefined
-    const { error: err } = await supabase.auth.signInWithOtp({
-      email: emailAddr.value,
-      options: { emailRedirectTo: redirectTo },
+    await $fetch<{ ok: boolean }>('/api/auth/email/send', {
+      method: 'POST',
+      body: { email: emailAddr.value.trim(), locale: locale.value, consent: consentFor('login') },
     })
-    if (err) throw err
     emailSent.value = true
   } catch (e: any) {
-    error.value = e?.message ?? t('couple.errors.unknown')
+    error.value = errorMessage(e)
   } finally {
     pending.value = false
   }
@@ -206,7 +256,7 @@ async function sendEmailLink() {
 <template>
   <div class="relative mx-auto max-w-md pt-2 sm:pt-6">
     <motion.div
-      :initial="{ opacity: 0, y: 20, scale: 0.96 }"
+      :initial="entrance ? { opacity: 0, y: 20, scale: 0.96 } : false"
       :animate="{ opacity: 1, y: 0, scale: 1 }"
       :transition="{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }"
     >
@@ -253,7 +303,7 @@ async function sendEmailLink() {
                 ? 'bg-(--color-primary) text-(--color-primary-foreground)'
                 : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
             ]"
-            @click="channel = 'phone'"
+            @click="selectChannel('phone')"
           >
             <Phone class="h-3.5 w-3.5" :stroke-width="1.8" />
             {{ t('couple.channelPhone') }}
@@ -266,7 +316,7 @@ async function sendEmailLink() {
                 ? 'bg-(--color-primary) text-(--color-primary-foreground)'
                 : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
             ]"
-            @click="channel = 'email'"
+            @click="selectChannel('email')"
           >
             <Mail class="h-3.5 w-3.5" :stroke-width="1.8" />
             {{ t('couple.channelEmail') }}
@@ -300,27 +350,50 @@ async function sendEmailLink() {
             v-else-if="channel === 'email'"
             key="email-form"
             class="flex flex-col gap-4"
+            novalidate
             @submit.prevent="sendEmailLink"
           >
             <div class="flex flex-col gap-1.5">
-              <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('couple.emailLabel') }}</label>
+              <label for="login-email" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('couple.emailLabel') }}</label>
               <div class="relative">
                 <Mail class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-muted-foreground)" :stroke-width="1.6" />
                 <input
+                  id="login-email"
                   v-model="emailAddr"
                   type="email"
+                  autocomplete="email"
                   required
+                  :aria-invalid="error && !emailValid ? 'true' : undefined"
                   placeholder="you@example.com"
                   class="flex h-11 w-full rounded-md border border-(--color-border) bg-white pl-10 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
                 >
               </div>
             </div>
 
-            <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+            <div class="flex flex-col gap-2.5">
+              <LegalConsentCheckbox
+                id="login-terms-email"
+                v-model="acceptTerms"
+                keypath="couple.consentTerms"
+                :link-text="t(legalLive ? 'couple.consentTermsLink' : 'couple.consentTermsLinkInterim')"
+                :to="localePath('/terms')"
+                :invalid="consentMissing && !acceptTerms"
+              />
+              <LegalConsentCheckbox
+                id="login-privacy-email"
+                v-model="acceptPrivacy"
+                keypath="couple.consentPrivacy"
+                :link-text="t('couple.consentPrivacyLink')"
+                :to="localePath('/privacy')"
+                :invalid="consentMissing && !acceptPrivacy"
+              />
+            </div>
+
+            <p v-if="error" role="alert" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
 
             <button
               type="submit"
-              :disabled="!emailValid || pending"
+              :disabled="pending"
               class="inline-flex h-12 items-center justify-center rounded-md bg-(--color-primary) px-6 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90 disabled:opacity-50"
             >
               {{ pending ? t('couple.sending') : t('couple.sendMagicLink') }}
@@ -336,6 +409,7 @@ async function sendEmailLink() {
             v-else-if="step === 'phone'"
             key="phone"
             class="flex flex-col gap-4"
+            novalidate
             @submit.prevent="sendCode"
           >
             <div class="flex flex-col gap-1.5">
@@ -357,14 +431,34 @@ async function sendEmailLink() {
               </div>
             </div>
 
+            <div class="flex flex-col gap-2.5">
+              <LegalConsentCheckbox
+                id="login-terms-phone"
+                v-model="acceptTerms"
+                keypath="couple.consentTerms"
+                :link-text="t(legalLive ? 'couple.consentTermsLink' : 'couple.consentTermsLinkInterim')"
+                :to="localePath('/terms')"
+                :invalid="consentMissing && !acceptTerms"
+              />
+              <LegalConsentCheckbox
+                id="login-privacy-phone"
+                v-model="acceptPrivacy"
+                keypath="couple.consentPrivacy"
+                :link-text="t('couple.consentPrivacyLink')"
+                :to="localePath('/privacy')"
+                :invalid="consentMissing && !acceptPrivacy"
+              />
+            </div>
+
             <p
               v-if="error"
+              role="alert"
               class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
             >{{ error }}</p>
 
             <button
               type="submit"
-              :disabled="!phoneValid || pending"
+              :disabled="pending"
               class="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-md bg-(--color-primary) px-7 text-sm font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) transition-colors hover:opacity-95 disabled:opacity-50"
             >
               <span class="relative z-10 flex items-center gap-2">
@@ -384,30 +478,9 @@ async function sendEmailLink() {
             v-else
             key="code"
             class="flex flex-col gap-4"
+            novalidate
             @submit.prevent="verifyCode"
           >
-            <!-- DEV banner: visible only while Eskiz is in test mode
-                 and the API returns the actual code in the response.
-                 Goes away once production template is approved and
-                 ESKIZ_USE_TEST_TEMPLATE flips to false. -->
-            <div
-              v-if="devCode"
-              class="flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5"
-            >
-              <div class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-300/40 text-amber-700">
-                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 9v4M12 17h.01" /><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                </svg>
-              </div>
-              <div class="min-w-0 flex-1">
-                <p class="text-[10px] font-medium uppercase tracking-wider text-amber-800">{{ t('couple.devBannerEyebrow') }}</p>
-                <p class="mt-0.5 text-sm text-amber-900">
-                  {{ t('couple.devBannerText') }}
-                  <span class="ml-1 font-mono text-base font-semibold tracking-widest">{{ devCode }}</span>
-                </p>
-              </div>
-            </div>
-
             <div class="flex flex-col gap-1.5">
               <label
                 for="login-code"
@@ -432,6 +505,7 @@ async function sendEmailLink() {
 
             <p
               v-if="error"
+              role="alert"
               class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
             >{{ error }}</p>
 

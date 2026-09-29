@@ -4,6 +4,7 @@ import {
   serverSupabaseServiceRole,
 } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { fail } from '../../../utils/errors'
 
 /**
  * PATCH /api/couple/photo/[id] — toggle is_hidden / is_highlight on
@@ -14,17 +15,13 @@ import type { Database } from '~/types/database.types'
  * also gate explicitly here so a malicious client can't bypass via
  * server endpoint with the user's JWT.
  */
-function fail(statusCode: number, code: string): never {
-  throw createError({ statusCode, statusMessage: code, data: { code } })
-}
-
 const schema = z.object({
   is_hidden: z.boolean().optional(),
   is_highlight: z.boolean().optional(),
 })
 
 export default defineEventHandler(async (event) => {
-  const user = await serverSupabaseUser(event)
+  const user = await serverSupabaseUser(event).catch(() => null)
   if (!user) fail(401, 'unauthorized')
 
   const id = getRouterParam(event, 'id')

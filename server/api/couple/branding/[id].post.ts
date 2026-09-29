@@ -1,10 +1,13 @@
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
+import sharp from 'sharp'
 import {
   serverSupabaseUser,
   serverSupabaseServiceRole,
 } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { fail, failZod } from '../../../utils/errors'
+import { sniffContainer } from '../../../utils/media-sniff'
 
 /**
  * POST /api/couple/branding/[id] — upsert branding for an event.
@@ -17,16 +20,14 @@ import type { Database } from '~/types/database.types'
  *   - cover_photo     file (optional, replaces existing)
  *
  * Caller must own the event. The cover photo lands in the public
- * `branding` bucket at `branding://{event_id}/cover-{uuid}.{ext}`.
+ * `branding` bucket at `branding://{event_id}/cover-{uuid}.{ext}`,
+ * re-encoded to at most 2000px (EXIF stripped) — every guest downloads
+ * it on a phone, so a raw 8 MB camera original is not an option.
  */
-function fail(statusCode: number, code: string): never {
-  throw createError({ statusCode, statusMessage: code, data: { code } })
-}
-
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 export default defineEventHandler(async (event) => {
-  const user = await serverSupabaseUser(event)
+  const user = await serverSupabaseUser(event).catch(() => null)
   if (!user) fail(401, 'unauthorized')
 
   const id = getRouterParam(event, 'id')
@@ -62,17 +63,48 @@ export default defineEventHandler(async (event) => {
     greeting_text: z.string().max(400).optional(),
   })
   const parsed = schema.safeParse(Object.fromEntries(fields))
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success) {
+    failZod(parsed.error, {
+      bride_name: 'name_too_long',
+      groom_name: 'name_too_long',
+      accent_color: 'invalid_color',
+      greeting_text: 'greeting_too_long',
+    })
+  }
 
   let coverPath: string | null = null
   if (cover) {
     if (!ALLOWED_MIME.has(cover.type ?? '')) fail(415, 'unsupported_mime')
     if (cover.data.length > 8 * 1024 * 1024) fail(413, 'file_too_large')
-    const ext = cover.type === 'image/png' ? 'png' : cover.type === 'image/webp' ? 'webp' : 'jpg'
+    // The declared type is the client's word; only real JPEG / PNG /
+    // WebP bytes reach sharp (no SVG, TIFF, HEIF… renamed to .png),
+    // same allow-list as guest uploads.
+    const container = sniffContainer(cover.data)
+    if (container !== 'jpeg' && container !== 'png' && container !== 'webp') fail(415, 'unsupported_mime')
+    // Opaque JPEG / PNG → JPEG. WebP, and anything with transparency (a
+    // monogram or logo PNG), → WebP, which keeps the alpha channel.
+    // limitInputPixels: a tiny PNG can declare 15000×15000 px and
+    // decode into hundreds of MB.
+    let asWebp = cover.type === 'image/webp'
+    let body: Buffer
+    try {
+      const img = sharp(cover.data, { failOn: 'truncated', limitInputPixels: 40_000_000 })
+      if ((await img.metadata()).hasAlpha) asWebp = true
+      const pipeline = img
+        .rotate()
+        .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
+      body = asWebp
+        ? await pipeline.webp({ quality: 82 }).toBuffer()
+        : await pipeline.jpeg({ quality: 82, mozjpeg: true }).toBuffer()
+    } catch (e) {
+      console.error('[branding] sharp', e)
+      fail(415, 'unsupported_mime')
+    }
+    const ext = asWebp ? 'webp' : 'jpg'
     coverPath = `${ev!.id}/cover-${randomUUID()}.${ext}`
     const { error: upErr } = await admin.storage
       .from('branding')
-      .upload(coverPath, cover.data, { contentType: cover.type, upsert: false })
+      .upload(coverPath, body!, { contentType: asWebp ? 'image/webp' : 'image/jpeg', upsert: false })
     if (upErr) {
       console.error('[branding] upload', upErr)
       fail(500, 'upload_failed')

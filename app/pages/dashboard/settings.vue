@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n, useSwitchLocalePath, useLocalePath } from '#imports'
 import { motion } from 'motion-v'
 import { Globe, MessageSquare, LogOut, ChevronRight } from '@lucide/vue'
@@ -39,8 +39,20 @@ const localeOptions = computed(() =>
 
 const botUsername = 'QRFotografBot'
 
+const { toast } = useToast()
+const signingOut = ref(false)
+
+// scope 'local': the couple often shares one account on two phones —
+// signing out here must not kill the partner's session ("this device").
 async function signOut() {
-  await supabase.auth.signOut()
+  if (signingOut.value) return
+  signingOut.value = true
+  const { error } = await supabase.auth.signOut({ scope: 'local' })
+  if (error) {
+    signingOut.value = false
+    toast.error(t('couple.settings.signOutFailed'))
+    return
+  }
   await router.push(localePath('/dashboard/login'))
 }
 </script>
@@ -61,7 +73,7 @@ async function signOut() {
             <span class="ml-2 font-medium">{{ phone }}</span>
           </p>
           <p v-if="displayEmail">
-            <span class="text-(--color-muted-foreground)">Email:</span>
+            <span class="text-(--color-muted-foreground)">{{ t('couple.settings.emailLabel') }}:</span>
             <span class="ml-2 font-medium">{{ displayEmail }}</span>
           </p>
         </div>
@@ -71,7 +83,7 @@ async function signOut() {
       <div class="surface-card rounded-(--radius-xl) p-6">
         <div class="flex items-center justify-between gap-4">
           <div class="flex items-center gap-3">
-            <div class="grid h-10 w-10 place-items-center rounded-full bg-(--color-accent)/40 text-(--color-primary)">
+            <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-(--color-accent)/40 text-(--color-primary)">
               <Globe class="h-5 w-5" :stroke-width="1.6" />
             </div>
             <div>
@@ -100,10 +112,10 @@ async function signOut() {
         :href="`https://t.me/${botUsername}`"
         target="_blank"
         rel="noopener"
-        class="surface-card group flex items-center justify-between gap-4 rounded-(--radius-xl) p-6 transition-colors hover:bg-(--color-muted)/30"
+        class="surface-card group flex items-center justify-between gap-4 rounded-(--radius-xl) p-6 transition-[background-color,transform] duration-150 hover:bg-(--color-muted)/30 active:scale-[0.99]"
       >
         <div class="flex items-center gap-3">
-          <div class="grid h-10 w-10 place-items-center rounded-full bg-blue-100 text-blue-600">
+          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-600">
             <MessageSquare class="h-5 w-5" :stroke-width="1.6" />
           </div>
           <div>
@@ -119,11 +131,12 @@ async function signOut() {
       <!-- Sign out -->
       <button
         type="button"
-        class="surface-card group flex w-full items-center justify-between gap-4 rounded-(--radius-xl) p-6 text-left transition-colors hover:bg-red-50"
+        :disabled="signingOut"
+        class="surface-card group flex w-full items-center justify-between gap-4 rounded-(--radius-xl) p-6 text-left transition-[background-color,transform] duration-150 hover:bg-red-50 active:scale-[0.99] disabled:opacity-60"
         @click="signOut"
       >
         <div class="flex items-center gap-3">
-          <div class="grid h-10 w-10 place-items-center rounded-full bg-red-100 text-red-600">
+          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-100 text-red-600">
             <LogOut class="h-5 w-5" :stroke-width="1.6" />
           </div>
           <div>

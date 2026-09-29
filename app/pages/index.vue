@@ -6,6 +6,8 @@ const { t } = useI18n()
 useSeoMeta({
   title: () => t('meta.title'),
   description: () => t('meta.description'),
+  ogTitle: () => t('meta.title'),
+  ogDescription: () => t('meta.description'),
 })
 </script>
 
@@ -19,7 +21,8 @@ useSeoMeta({
     <MarketingFeatures />
     <MarketingPricing />
     <section id="lead" class="relative py-2 md:py-4 2xl:py-6 3xl:py-8 4xl:py-10">
-      <div class="relative">
+      <!-- Same side gutter as every other section (was edge-to-edge on phones). -->
+      <div class="container-page relative">
         <MarketingLeadForm />
       </div>
     </section>

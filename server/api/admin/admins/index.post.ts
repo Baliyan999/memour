@@ -4,6 +4,8 @@ import {
   serverSupabaseServiceRole,
 } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { findAuthUserByEmail, isPhoneAccount } from '../../../utils/auth-users'
+import { fail, failZod } from '../../../utils/errors'
 
 /**
  * POST /api/admin/admins — super-admin adds a teammate.
@@ -16,23 +18,31 @@ import type { Database } from '~/types/database.types'
  * at /admin/login with that password and receives the 6-digit code
  * in their Telegram.
  *
- * If a Supabase auth user already exists for the email (e.g. they
- * were a couple before), we just update their password and admin
- * privileges. Otherwise we create a new auth user with the provided
- * password.
+ * Existing accounts are never modified:
+ *   - already an admin → 409 already_admin (role, password and chat
+ *     ID stay as they are — re-adding yourself used to demote a super
+ *     admin and reset their password);
+ *   - an SMS-login couple account (phone+…@phone.memour.local) →
+ *     422 phone_account;
+ *   - any other existing account (e.g. a removed admin coming back)
+ *     gets the admin role but keeps its own password — the response
+ *     says so with `existing_account: true`. Setting someone's
+ *     password here would let an admin take over a couple's account.
  *
  * Role is hardcoded 'admin' — only the schema migration can mint a
  * super-admin, by design (avoids accidentally granting irrevocable
  * power through the UI).
  */
-function fail(statusCode: number, code: string): never {
-  throw createError({ statusCode, statusMessage: code, data: { code } })
-}
+// Admins are the only password users, and the password is their only
+// factor against Supabase's /token endpoint (GoTrue's minimum should
+// be 12 too). admin-auth/login keeps min(6): existing admins with a
+// shorter password must still be able to sign in.
+const MIN_PASSWORD = 12
 
 const schema = z.object({
   email: z.string().email().max(160),
-  password: z.string().min(6).max(200),
-  telegram_chat_id: z.string().regex(/^\d{5,15}$/, 'numeric chat id'),
+  password: z.string().min(MIN_PASSWORD).max(200),
+  telegram_chat_id: z.string().regex(/^\d{5,15}$/),
 })
 
 export default defineEventHandler(async (event) => {
@@ -51,25 +61,32 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success) {
+    failZod(parsed.error, {
+      email: 'invalid_email',
+      password: { too_small: 'password_too_short' },
+      telegram_chat_id: 'invalid_chat_id',
+    })
+  }
 
   const email = parsed.data.email.trim().toLowerCase()
+  if (isPhoneAccount({ email })) fail(422, 'phone_account')
 
-  // Find or create the auth user.
-  let inviteeId: string | null = null
-  const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000, page: 1 })
-  const found = list?.users.find((u) => u.email?.toLowerCase() === email)
+  let found: Awaited<ReturnType<typeof findAuthUserByEmail>> = null
+  try {
+    found = await findAuthUserByEmail(admin, email)
+  } catch (e) {
+    console.error('[admin/admins] lookup', e)
+    fail(500, 'lookup_failed')
+  }
+
+  let inviteeId: string
   if (found) {
+    if (isPhoneAccount(found)) fail(422, 'phone_account')
+    const { data: existingRow } = await admin
+      .from('admins').select('user_id').eq('user_id', found.id).maybeSingle()
+    if (existingRow) fail(409, 'already_admin')
     inviteeId = found.id
-    // Update password so they can log in with the provided one.
-    const { error: pwErr } = await admin.auth.admin.updateUserById(found.id, {
-      password: parsed.data.password,
-      email_confirm: true,
-    })
-    if (pwErr) {
-      console.error('[admin/admins] update password', pwErr)
-      fail(500, 'update_failed')
-    }
   } else {
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
@@ -83,21 +100,20 @@ export default defineEventHandler(async (event) => {
     inviteeId = created.user.id
   }
 
-  // Upsert into admins with role='admin' (never super via UI) + chat_id.
-  const { error: upErr } = await admin
+  // Plain insert (never upsert): an existing row is handled above, so
+  // this can't overwrite anyone's role.
+  const { error: insErr } = await admin
     .from('admins')
-    .upsert(
-      {
-        user_id: inviteeId!,
-        role: 'admin',
-        telegram_chat_id: parsed.data.telegram_chat_id,
-      } as any,
-      { onConflict: 'user_id' },
-    )
-  if (upErr) {
-    console.error('[admin/admins] upsert', upErr)
+    .insert({
+      user_id: inviteeId,
+      role: 'admin',
+      telegram_chat_id: parsed.data.telegram_chat_id,
+    } as any)
+  if (insErr) {
+    console.error('[admin/admins] insert', insErr)
+    if ((insErr as any).code === '23505') fail(409, 'already_admin')
     fail(500, 'storage_error')
   }
 
-  return { ok: true, user_id: inviteeId }
+  return { ok: true, user_id: inviteeId, existing_account: !!found }
 })

@@ -12,8 +12,14 @@
  * an "unauthorized text" error. Once the project's custom template is
  * approved via Eskiz' "Мои тексты" moderation, we can swap in the
  * production message verbatim.
+ *
+ * `sendSms` never throws: missing credentials, network errors and
+ * Eskiz rejections all come back as `{ ok: false, error }` so callers
+ * can answer with their own error code. `error` is for server logs
+ * only — it may echo Eskiz' wording, never show it to users.
  */
 let cachedToken: { value: string; obtainedAt: number } | null = null
+const SEND_TIMEOUT_MS = 10_000
 
 async function login(): Promise<string> {
   const base = process.env.ESKIZ_BASE_URL || 'https://notify.eskiz.uz/api'
@@ -25,7 +31,11 @@ async function login(): Promise<string> {
   const form = new FormData()
   form.append('email', email)
   form.append('password', password)
-  const res = await fetch(`${base}/auth/login`, { method: 'POST', body: form })
+  const res = await fetch(`${base}/auth/login`, {
+    method: 'POST',
+    body: form,
+    signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+  })
   if (!res.ok) {
     throw new Error(`Eskiz auth failed: ${res.status} ${await res.text()}`)
   }
@@ -68,19 +78,24 @@ export async function sendSms(phone: string, message: string): Promise<SendSmsRe
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: form,
+      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     })
   }
 
-  let token = await getToken()
-  let res = await send(token)
-  if (res.status === 401) {
-    cachedToken = null
-    token = await login()
-    res = await send(token)
+  try {
+    let token = await getToken()
+    let res = await send(token)
+    if (res.status === 401) {
+      cachedToken = null
+      token = await login()
+      res = await send(token)
+    }
+    const json: any = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      return { ok: false, error: json?.message || `HTTP ${res.status}` }
+    }
+    return { ok: true, id: json?.id, status: json?.status }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? String(e) }
   }
-  const json: any = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    return { ok: false, error: json?.message || `HTTP ${res.status}` }
-  }
-  return { ok: true, id: json?.id, status: json?.status }
 }

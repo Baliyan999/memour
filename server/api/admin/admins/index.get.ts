@@ -3,6 +3,7 @@ import {
   serverSupabaseServiceRole,
 } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { fail } from '../../../utils/errors'
 
 /**
  * GET /api/admin/admins — list the admin team with role + email.
@@ -11,10 +12,6 @@ import type { Database } from '~/types/database.types'
  * else is in the team). Only super-admins can mutate via the sibling
  * POST / DELETE endpoints.
  */
-function fail(statusCode: number, code: string): never {
-  throw createError({ statusCode, statusMessage: code, data: { code } })
-}
-
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
   if (!user) fail(401, 'unauthorized')
@@ -29,25 +26,25 @@ export default defineEventHandler(async (event) => {
   if (!me) fail(403, 'forbidden')
 
   // Fetch all admin rows
-  const { data: rows } = await admin
+  const { data: rows, error } = await admin
     .from('admins')
     .select('user_id, role, added_at')
     .order('added_at', { ascending: true })
+  if (error) fail(500, 'list_failed')
 
-  // Resolve emails via auth.admin.listUsers (paginated cap should be
-  // enough for a small ops team).
-  const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000, page: 1 })
-  const emailMap = new Map<string, string>()
-  for (const u of list?.users ?? []) {
-    if (u.email) emailMap.set(u.id, u.email)
-  }
+  // Resolve each admin's email by id — the team is small, and the
+  // first page of listUsers() stops covering it once couples sign up.
+  const emails = await Promise.all((rows ?? []).map(async (r) => {
+    const { data } = await admin.auth.admin.getUserById(r.user_id)
+    return data?.user?.email ?? null
+  }))
 
   return {
-    admins: (rows ?? []).map((r) => ({
+    admins: (rows ?? []).map((r, i) => ({
       user_id: r.user_id,
       role: (r as any).role ?? 'admin',
       added_at: r.added_at,
-      email: emailMap.get(r.user_id) ?? null,
+      email: emails[i],
     })),
     me: { user_id: uid, role: (me as any).role ?? 'admin' },
   }

@@ -1,30 +1,31 @@
 <script setup lang="ts">
 import { ref, defineComponent, h, type PropType } from 'vue'
 import { useI18n } from '#imports'
-import { motion, useScroll, useTransform, useReducedMotion, type MotionValue } from 'motion-v'
+import { motion, useScroll, useTransform } from 'motion-v'
+import { useReveal } from '~/composables/useMotion'
+import MarketingPhoto from './Photo.vue'
 
 /**
  * GalleryPreview — photo mosaic showing how guests' shots aggregate
- * into one album. The scene maintains a 2.3:1 aspect ratio so the
+ * into one album. The scene keeps a fixed aspect ratio (2.3:1, 1.75:1
+ * on phones so the tiny tiles there overlap less) so the
  * percentage-positioned tiles never overflow when the page width
- * grows. Each tile fades / rotates in on enter, with subtle scene-wide
- * scale + rotateX driven by the section's scroll progress.
+ * grows. Tiles settle in one after another on the shared spring
+ * reveal, with subtle scene-wide scale + rotateX driven by the
+ * section's scroll progress (off under reduced motion).
  */
 const { t } = useI18n()
-const reduce = useReducedMotion()
 
 const TILES = [
-  { ar: '3/4', hue: 25, x: 4,  y: 6,  w: 20, rot: -2 },
-  { ar: '1/1', hue: 70, x: 28, y: 2,  w: 22, rot: 1 },
-  { ar: '4/5', hue: 45, x: 56, y: 8,  w: 20, rot: -1.5 },
-  { ar: '1/1', hue: 30, x: 80, y: 4,  w: 18, rot: 2 },
-  { ar: '4/3', hue: 55, x: 6,  y: 50, w: 24, rot: 1.5 },
-  { ar: '3/4', hue: 20, x: 36, y: 34, w: 20, rot: -2 },
-  { ar: '1/1', hue: 80, x: 62, y: 50, w: 20, rot: 2 },
-  { ar: '4/5', hue: 35, x: 84, y: 46, w: 14, rot: -1 },
+  { ar: '3/4', photo: 'rings', x: 4,  y: 6,  w: 20, rot: -2 },
+  { ar: '1/1', photo: 'champagne', x: 28, y: 2,  w: 22, rot: 1 },
+  { ar: '4/5', photo: 'bouquet', x: 56, y: 8,  w: 20, rot: -1.5 },
+  { ar: '1/1', photo: 'couple-back', x: 80, y: 4,  w: 18, rot: 2, position: 'center 85%' },
+  { ar: '4/3', photo: 'embrace', x: 6,  y: 50, w: 24, rot: 1.5, position: 'center 30%' },
+  { ar: '3/4', photo: 'guests', x: 36, y: 34, w: 20, rot: -2 },
+  { ar: '1/1', photo: 'candles', x: 62, y: 50, w: 20, rot: 2 },
+  { ar: '4/5', photo: 'table-setting', x: 84, y: 46, w: 14, rot: -1, position: 'center 40%' },
 ] as const
-
-const ICON_TYPES = ['💍', '🥂', '💐', '💌', '💃', '📸', '🌸', '✨'] as const
 
 const sectionRef = ref<HTMLElement | null>(null)
 const { scrollYProgress } = useScroll({
@@ -35,78 +36,80 @@ const { scrollYProgress } = useScroll({
 const sceneScale = useTransform(scrollYProgress, [0, 0.5, 1], [0.95, 1, 0.97])
 const sceneRotateX = useTransform(scrollYProgress, [0, 0.5, 1], [8, 0, -4])
 
-// Single tile component — each subscribes to its own rotate transform.
-const ParallaxTile = defineComponent({
+// Scene max-width per breakpoint (px) → each tile's rendered width is
+// w% of it; below 1064px the scene is the viewport minus gutters.
+const SCENE_WIDTHS: [number, number][] = [[2560, 1920], [1920, 1600], [1536, 1408], [1280, 1152], [1064, 1024]]
+const tileSizes = (w: number) =>
+  [...SCENE_WIDTHS.map(([mq, scene]) => `(min-width: ${mq}px) ${Math.round((scene * w) / 100)}px`), `${w}vw`].join(', ')
+
+// Single tile: positioned box (revealed by the scene's stagger) with
+// the photo frame inside it. The static tilt uses the CSS `rotate`
+// property so it composes with the reveal's transform. The mat is
+// thinner on phones, where a tile is only ~70 px wide; the photo's
+// corner is the mat's corner minus the mat.
+// Photos: none of the album grid in «How it works» right above
+// (HowSceneAlbum), so the two never show the same shot on one screen.
+const Tile = defineComponent({
   props: {
-    index: { type: Number, required: true },
-    progress: { type: Object as PropType<MotionValue<number>>, required: true },
     tile: { type: Object as PropType<(typeof TILES)[number]>, required: true },
-    emoji: { type: String, required: true },
-    reduce: { type: Boolean, required: true },
   },
   setup(p) {
-    // Tile sits at its own static rotation (`tile.rot`, ±2deg per tile)
-    // so the mosaic still has organic variation. Removed the
-    // scroll-linked ±2deg sweep AND the 3D rotateY entrance —
-    // both were making cards look "tilted then straightening" on
-    // first paint, which the user found jarring. Now tiles just
-    // fade in at their final position.
     return () =>
       h(
-        motion.div,
+        'div',
         {
+          'data-tile': '',
+          class: 'absolute',
           style: {
-            rotate: p.tile.rot,
             left: `${p.tile.x}%`,
             top: `${p.tile.y}%`,
             width: `${p.tile.w}%`,
             aspectRatio: p.tile.ar,
           },
-          class: 'absolute',
-          initial: p.reduce ? { opacity: 1 } : { opacity: 0, y: 16 },
-          whileInView: p.reduce ? { opacity: 1 } : { opacity: 1, y: 0 },
-          viewport: { once: true, amount: 0.05, margin: '0px 0px -10% 0px' },
-          transition: { duration: 0.7, delay: p.reduce ? 0 : p.index * 0.06, ease: [0.16, 1, 0.3, 1] },
         },
-        () =>
+        h(
+          'div',
+          {
+            class:
+              'group relative h-full w-full overflow-hidden rounded-[6px] bg-white p-1 sm:rounded-(--radius-md) sm:p-2',
+            style: {
+              rotate: `${p.tile.rot}deg`,
+              border: '1px solid oklch(94% 0.015 70)',
+              boxShadow: 'var(--shadow-soft)',
+            },
+          },
           h(
             'div',
             {
-              class:
-                'group relative h-full w-full overflow-hidden rounded-(--radius-md) bg-white p-2',
-              style: {
-                border: '1px solid oklch(94% 0.015 70)',
-                boxShadow: 'var(--shadow-soft)',
-              },
+              class: 'relative h-full w-full overflow-hidden rounded-[2px] bg-(--color-muted) sm:rounded-[6px]',
             },
-            h(
-              'div',
-              {
-                class: 'relative h-full w-full overflow-hidden rounded-sm',
+            [
+              h(MarketingPhoto, {
+                name: p.tile.photo,
+                sizes: tileSizes(p.tile.w),
+                position: 'position' in p.tile ? p.tile.position : undefined,
+                class: 'absolute inset-0 h-full w-full object-cover',
+              }),
+              h('div', {
+                'aria-hidden': true,
+                class:
+                  'pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100',
                 style: {
-                  background: `linear-gradient(135deg,
-                    oklch(94% 0.05 ${p.tile.hue}) 0%,
-                    oklch(82% 0.08 ${p.tile.hue + 10}) 100%)`,
+                  background:
+                    'linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.5) 50%, transparent 60%)',
                 },
-              },
-              [
-                h('div', {
-                  'aria-hidden': true,
-                  class:
-                    'pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100',
-                  style: {
-                    background:
-                      'linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.5) 50%, transparent 60%)',
-                  },
-                }),
-                h('div', { class: 'absolute inset-0 grid place-items-center text-4xl opacity-80' }, p.emoji),
-                h('div', { class: 'absolute inset-x-2 bottom-2 h-2 rounded-full bg-white/50 backdrop-blur' }),
-              ],
-            ),
+              }),
+            ],
           ),
+        ),
       )
   },
 })
+
+const headRef = ref<HTMLElement | null>(null)
+const sceneRef = ref<HTMLElement | null>(null)
+useReveal(headRef, { items: '[data-reveal]', stagger: 0.08 })
+useReveal(sceneRef, { items: '[data-tile]', stagger: 0.06, y: 24, amount: 0.1 })
 </script>
 
 <template>
@@ -117,47 +120,28 @@ const ParallaxTile = defineComponent({
     <MarketingFloatingOrnaments :count="6" :hue-base="30" />
 
     <div class="container-page relative">
-      <div class="mx-auto mb-8 max-w-2xl text-center md:mb-10 3xl:mb-14 4xl:mb-16">
-        <motion.p
-          :initial="{ opacity: 0, letterSpacing: '0.5em' }"
-          :while-in-view="{ opacity: 1, letterSpacing: '0.3em' }"
-          :viewport="{ once: true, amount: 0.5 }"
-          :transition="{ duration: 1, ease: [0.16, 1, 0.3, 1] }"
-          class="mb-3 text-xs uppercase text-(--color-primary)"
-        >
+      <div ref="headRef" class="mx-auto mb-8 max-w-2xl text-center md:mb-10 3xl:mb-14 4xl:mb-16">
+        <p data-reveal aria-hidden="true" class="mb-3 text-xs uppercase tracking-[0.3em] text-(--color-primary)">
           ⋄ ⋄ ⋄
-        </motion.p>
-        <h2 class="heading-display-lg text-balance">{{ t('gallery.title') }}</h2>
-        <motion.p
-          :initial="{ opacity: 0, y: 12 }"
-          :while-in-view="{ opacity: 1, y: 0 }"
-          :viewport="{ once: true, amount: 0.4 }"
-          :transition="{ duration: 0.8, delay: 0.5, ease: [0.16, 1, 0.3, 1] }"
-          class="mt-4 text-(--color-muted-foreground)"
-        >
+        </p>
+        <h2 data-reveal class="heading-display-lg text-balance">{{ t('gallery.title') }}</h2>
+        <p data-reveal class="mt-4 text-(--color-muted-foreground)">
           {{ t('gallery.subtitle') }}
-        </motion.p>
+        </p>
       </div>
 
       <motion.div
         :style="{
-          scale: reduce ? 1 : sceneScale,
-          rotateX: reduce ? 0 : sceneRotateX,
+          scale: sceneScale,
+          rotateX: sceneRotateX,
           transformPerspective: 1400,
           transformStyle: 'preserve-3d',
-          aspectRatio: '2.3 / 1',
         }"
-        class="relative mx-auto max-w-5xl xl:max-w-6xl 2xl:max-w-[88rem] 3xl:max-w-[100rem] 4xl:max-w-[120rem]"
+        class="relative mx-auto aspect-[1.75/1] max-w-5xl sm:aspect-[2.3/1] xl:max-w-6xl 2xl:max-w-[88rem] 3xl:max-w-[100rem] 4xl:max-w-[120rem] motion-reduce:transform-none!"
       >
-        <ParallaxTile
-          v-for="(tile, i) in TILES"
-          :key="i"
-          :index="i"
-          :progress="scrollYProgress"
-          :tile="tile"
-          :emoji="ICON_TYPES[i] ?? '✨'"
-          :reduce="reduce ?? false"
-        />
+        <div ref="sceneRef" class="absolute inset-0">
+          <Tile v-for="(tile, i) in TILES" :key="i" :tile="tile" />
+        </div>
       </motion.div>
     </div>
   </section>

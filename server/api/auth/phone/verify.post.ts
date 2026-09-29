@@ -1,21 +1,32 @@
 import { z } from 'zod'
 import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
-import { hashCode, normalizePhone } from '../../../utils/phone-otp'
+import { hashCode, maskPhone, normalizePhone } from '../../../utils/phone-otp'
+import { OTP_MAX_ATTEMPTS, consumeOtp, otpHashMatches, spendOtpAttempt } from '../../../utils/otp-store'
+import { checkRateLimit, getTrustedClientIp } from '../../../utils/rate-limit'
+import { fail } from '../../../utils/errors'
+import { consentField, recordConsent, requireConsent } from '../../../utils/consent'
 
 /**
  * POST /api/auth/phone/verify — finalize a phone login.
  *
- *   1. Verify the code matches a non-consumed, non-expired OTP row.
+ *   1. Spend one attempt on the newest open code for the phone, then
+ *      compare (constant time). Five checks per code, right or wrong;
+ *      after that the couple has to request a new code.
  *   2. Mark the OTP consumed (one-shot use).
- *   3. Find or create a Supabase auth user keyed by phone. We use a
- *      synthetic email "phone+998XXXXXXXXX@phone.memour.local" so the
- *      same Supabase email-auth machinery (sessions, RLS, JWTs) can be
- *      reused without us hand-rolling JWT cookies.
- *   4. Generate a one-time magic link via admin.generateLink and
- *      return its `action_link` URL. The client navigates to that URL
- *      and Supabase sets the auth cookies, dropping the couple into
- *      /dashboard with a real session.
+ *   3. Generate a one-time magic link via admin.generateLink for the
+ *      synthetic email "phone+998XXXXXXXXX@phone.memour.local" and
+ *      return its `action_link`. GoTrue creates the user on the first
+ *      login (with our user_metadata) and returns it either way, so no
+ *      user lookup is needed. The client navigates to the link;
+ *      Supabase sets the auth cookies and drops the couple into
+ *      /dashboard with a real session (sessions, JWTs and RLS
+ *      auth.uid() work exactly like email auth).
+ *
+ * The login is also the couple's acceptance of the terms and consent
+ * to the privacy policy: the same `consent` the code request carried is
+ * checked again and written to consent_events with the account id and
+ * method 'checkbox+otp' (the code proves the number is theirs).
  *
  * All thrown errors carry a stable `data.code` field; the client maps
  * it to a localized message in ru/uz. We never leak raw English
@@ -28,83 +39,82 @@ const schema = z.object({
   // redirect lands them back on the same language they started in
   // instead of always bouncing to the default locale.
   locale: z.enum(['ru', 'uz']).optional(),
+  consent: consentField,
 })
 
-const MAX_ATTEMPTS = 5
-
-function fail(statusCode: number, code: string): never {
-  throw createError({ statusCode, statusMessage: code, data: { code } })
-}
+// A person types a code a few times; a script tries thousands.
+const IP_VERIFY_MAX = 30
+const IP_VERIFY_WINDOW_MS = 10 * 60 * 1000
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
   if (!parsed.success) fail(422, 'invalid_input')
 
+  if (!checkRateLimit('otp-verify-ip', getTrustedClientIp(event), IP_VERIFY_MAX, IP_VERIFY_WINDOW_MS)) {
+    fail(429, 'rate_limited')
+  }
+
   const phone = normalizePhone(parsed.data.phone)
   if (!phone) fail(422, 'invalid_phone')
 
-  const code_hash = hashCode(phone, parsed.data.code)
+  const consentDocs = requireConsent('login', parsed.data.consent)
+
   const admin = serverSupabaseServiceRole<Database>(event)
 
-  const { data: otp } = await admin
-    .from('phone_otps')
-    .select('phone, code_hash, expires_at, consumed_at, attempts')
-    .eq('phone', phone)
-    .eq('code_hash', code_hash)
-    .is('consumed_at', null)
-    .maybeSingle()
+  const attempt = await spendOtpAttempt(admin, 'phone_otps', 'phone', phone).catch((e) => {
+    console.error('[phone-otp] attempt lookup failed', e)
+    fail(500, 'storage_error')
+  })
+  if (attempt.status === 'none') fail(410, 'code_expired')
+  if (attempt.status === 'locked') fail(429, 'too_many_attempts')
+  if (attempt.status === 'busy') fail(429, 'rate_limited')
 
-  if (!otp) fail(401, 'invalid_code')
-  if (new Date(otp.expires_at).getTime() < Date.now()) fail(410, 'code_expired')
-  if ((otp.attempts ?? 0) >= MAX_ATTEMPTS) fail(429, 'too_many_attempts')
+  if (!otpHashMatches(hashCode(phone, parsed.data.code), attempt.codeHash)) {
+    if (attempt.attempts >= OTP_MAX_ATTEMPTS) fail(429, 'too_many_attempts')
+    fail(401, 'invalid_code')
+  }
 
-  // One-shot: mark consumed.
-  await admin
-    .from('phone_otps')
-    .update({ consumed_at: new Date().toISOString() })
-    .eq('phone', phone)
-    .eq('code_hash', code_hash)
+  // One-shot: mark consumed. Losing this race means a parallel request
+  // with the same code already logged in.
+  if (!(await consumeOtp(admin, 'phone_otps', 'phone', phone, attempt.codeHash))) {
+    fail(410, 'code_expired')
+  }
 
   // Synthetic email for the Supabase user — keeps existing email-auth
   // plumbing (sessions, JWTs, RLS auth.uid()) working unchanged.
   // E.g. "phone+998901234567@phone.memour.local"
   const syntheticEmail = `phone${phone}@phone.memour.local`
 
-  // Try to create the user; if Supabase says "already registered",
-  // find them via listUsers and reuse. listUsers' filter param accepts
-  // an email but the API ignores it on older versions, so we paginate
-  // through and match in memory — costly only on the first ~50k users.
-  let userId: string | null = null
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email: syntheticEmail,
-    email_confirm: true,
-    user_metadata: { phone, channel: 'phone-otp' },
-  })
-  if (created?.user) {
-    userId = created.user.id
-  } else if (createErr) {
-    const alreadyExists =
-      /already.*registered|already.*exists|duplicate/i.test(createErr.message)
-    if (!alreadyExists) fail(500, 'user_create_failed')
-    const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000, page: 1 })
-    const found = list?.users.find((u) => u.email === syntheticEmail)
-    if (!found) fail(500, 'user_lookup_failed')
-    userId = found!.id
-  } else {
-    fail(500, 'user_create_failed')
-  }
-
   // Generate a one-time magic link the client will navigate to.
   // Honor the caller's current locale so a Russian-speaking user
   // doesn't get bounced into the Uzbek dashboard after sign-in.
   const config = useRuntimeConfig()
   const locale = parsed.data.locale ?? 'uz'
-  const redirectTo = `${config.public.siteUrl}/${locale}/dashboard`
+  const redirectTo = `${config.public.siteUrl.replace(/\/+$/, '')}/${locale}/dashboard`
+  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
+    type: 'magiclink',
+    email: syntheticEmail,
+    // Applied only when GoTrue creates the user (first login).
+    options: { redirectTo, data: { phone, channel: 'phone-otp' } },
+  })
+  const userId = link?.user?.id
+  if (linkErr || !link?.properties?.action_link || !userId) {
+    console.error(`[phone-otp] generateLink for ${maskPhone(phone)} failed`, linkErr)
+    fail(500, 'link_failed')
+  }
+
+  await recordConsent(event, {
+    context: 'login',
+    subject: { type: 'couple', userId, phone },
+    docs: consentDocs,
+    locale,
+    method: 'checkbox+otp',
+    extra: { channel: 'phone' },
+  })
+
   // Auto-claim: link any events that were pre-created by the admin
-  // for this phone (events.owner_phone = phone) to the fresh user_id.
-  // Also link the latest lead with the same phone so admin reports
-  // can track conversion lead → couple-account → event.
+  // for this phone (events.owner_phone = phone) to the user_id.
   try {
     await (admin as any)
       .from('events')
@@ -113,16 +123,6 @@ export default defineEventHandler(async (event) => {
       .is('owner_id', null)
   } catch (e) {
     console.warn('[phone-otp] event claim failed', e)
-  }
-
-  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email: syntheticEmail,
-    options: { redirectTo },
-  })
-  if (linkErr || !link?.properties?.action_link) {
-    console.error('[phone-otp] generateLink failed', linkErr)
-    fail(500, 'link_failed')
   }
 
   return {

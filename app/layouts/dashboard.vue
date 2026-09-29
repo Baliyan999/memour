@@ -16,13 +16,16 @@ const user = useSupabaseUser()
 const router = useRouter()
 
 async function signOut() {
-  await supabase.auth.signOut()
+  // 'local': a shared couple account must stay signed in on the partner's phone.
+  await supabase.auth.signOut({ scope: 'local' })
   await router.push(localePath('/dashboard/login'))
 }
 </script>
 
 <template>
-  <div class="relative min-h-screen">
+  <!-- overflow-x-clip: moderation cards fly past the viewport edge;
+       clip (unlike hidden) keeps the sticky header working. -->
+  <div class="relative min-h-screen overflow-x-clip">
     <MarketingGlobalBackground />
 
     <header class="sticky top-3 z-50 md:top-5">
@@ -40,7 +43,7 @@ async function signOut() {
             <NuxtLink
               :to="localePath('/dashboard/settings')"
               class="grid h-9 w-9 place-items-center rounded-full border border-(--color-border)/60 bg-white/80 text-(--color-muted-foreground) transition-colors hover:bg-white hover:text-(--color-foreground)"
-              :aria-label="'Настройки'"
+              :aria-label="t('couple.nav.settings')"
             >
               <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3" />

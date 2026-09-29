@@ -5,52 +5,38 @@ import {
 import type { Database } from '~/types/database.types'
 import {
   renderStyledQRSVG,
-  getPreset,
-  type QRStyle,
+  resolveQrSettings,
 } from '../../utils/qr-styled'
+import { fail } from '../../utils/errors'
 
 /**
  * GET /api/admin/qr-preview
  *
  * Query params:
- *   style      — preset id (overridden by explicit fields below)
+ *   style      — preset id (a preset is rendered exactly as defined)
  *   text       — what to encode (default: example URL)
  *   fg, bg     — custom hex colors
  *   dot        — square | rounded | circle | classy
  *   corner     — square | rounded | circle | leaf
  *   gFrom, gTo, gAngle — gradient stops + angle
  *
- * Returns an SVG (no logo overlay in preview — would need rasterising
- * to PNG with sharp which is slower; preview already renders fine
- * without it).
+ * Same resolution rules (and validation) as the PDF, so the preview
+ * shows exactly what will be printed. Returns an SVG (no logo overlay
+ * in preview — the customizer overlays the logo image on top).
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) throw createError({ statusCode: 401 })
+  if (!user) fail(401, 'unauthorized')
   const uid = (user as any).id ?? (user as any).sub
   const admin = serverSupabaseServiceRole<Database>(event)
   const { data: adminRow } = await admin
     .from('admins').select('user_id').eq('user_id', uid).maybeSingle()
-  if (!adminRow) throw createError({ statusCode: 403 })
+  if (!adminRow) fail(403, 'forbidden')
 
   const q = getQuery(event)
-  const preset = getPreset(typeof q.style === 'string' ? q.style : null)
-  const style: QRStyle = {
-    dot: (typeof q.dot === 'string' ? q.dot : preset.style.dot) as any,
-    corner: (typeof q.corner === 'string' ? q.corner : preset.style.corner) as any,
-    fg: typeof q.fg === 'string' && /^#[0-9a-fA-F]{6}$/.test(q.fg) ? q.fg : preset.style.fg,
-    bg: typeof q.bg === 'string' && /^#[0-9a-fA-F]{6}$/.test(q.bg) ? q.bg : preset.style.bg,
-    gradient: null,
-  }
-  if (typeof q.gFrom === 'string' && typeof q.gTo === 'string'
-    && /^#[0-9a-fA-F]{6}$/.test(q.gFrom) && /^#[0-9a-fA-F]{6}$/.test(q.gTo)) {
-    const angle = typeof q.gAngle === 'string' ? parseFloat(q.gAngle) : 45
-    style.gradient = { from: q.gFrom, to: q.gTo, angle: Number.isFinite(angle) ? angle : 45 }
-  } else if (preset.style.gradient) {
-    style.gradient = preset.style.gradient
-  }
+  const { style } = resolveQrSettings({}, q)
 
-  const text = typeof q.text === 'string' ? q.text : 'https://memour.uz/preview'
+  const text = typeof q.text === 'string' && q.text.length <= 300 ? q.text : 'https://memour.uz/preview'
   const svg = renderStyledQRSVG(text, style, 400)
   setResponseHeader(event, 'Content-Type', 'image/svg+xml')
   setResponseHeader(event, 'Cache-Control', 'no-store')

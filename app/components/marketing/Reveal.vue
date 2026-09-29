@@ -1,36 +1,32 @@
 <script setup lang="ts">
-import { motion } from 'motion-v'
+import { ref } from 'vue'
+import { useReveal } from '~/composables/useMotion'
 
 /**
- * Reveal — fade-up + opacity entrance on scroll-into-view. Mirrors
- * the Next.js helper used in pricing/lead form. Defaults: 0.7s
- * cubic-bezier, fires once, threshold 0.2 of element visible.
+ * Reveal — content settles up into place when it scrolls into view
+ * (critically damped spring, see useReveal). SSR renders it fully
+ * visible; only content still below the fold at mount is tucked away,
+ * so nothing ever waits for JavaScript.
  */
-withDefaults(
+const props = withDefaults(
   defineProps<{
     delay?: number
     y?: number
-    duration?: number
     amount?: number
-    once?: boolean
   }>(),
   {
     delay: 0,
-    y: 20,
-    duration: 0.7,
+    y: undefined,
     amount: 0.2,
-    once: true,
   },
 )
+
+const el = ref<HTMLElement | null>(null)
+useReveal(el, { delay: props.delay, y: props.y, amount: props.amount })
 </script>
 
 <template>
-  <motion.div
-    :initial="{ opacity: 0, y }"
-    :while-in-view="{ opacity: 1, y: 0 }"
-    :viewport="{ once, amount }"
-    :transition="{ duration, delay, ease: [0.16, 1, 0.3, 1] }"
-  >
+  <div ref="el">
     <slot />
-  </motion.div>
+  </div>
 </template>

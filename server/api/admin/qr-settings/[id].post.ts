@@ -1,47 +1,29 @@
-import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import {
   serverSupabaseUser,
   serverSupabaseServiceRole,
 } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { qrSettingsSchema } from '../../../utils/qr-styled'
+import { fail } from '../../../utils/errors'
 
 /**
  * POST /api/admin/qr-settings/[id]
  *
  * Multipart body:
  *   - settings: JSON string of the QRSettings shape (style, layout,
- *     fg, bg, dot, corner, gradient, etc.)
+ *     lang, fg, bg, dot, corner, gradient) — see qrSettingsSchema.
+ *     Saving a preset keeps the previous custom fields (so the
+ *     "Свой стиль" tab can restore them); the renderer ignores them
+ *     unless style === 'custom'.
  *   - logo: optional File — replaces the existing logo. If omitted
  *     we keep the previously stored logo_path. If `logo_remove=1` is
  *     in the form fields, we clear it.
  *
  * Admin only.
  */
-function fail(statusCode: number, code: string): never {
-  throw createError({ statusCode, statusMessage: code, data: { code } })
-}
-
-const settingsSchema = z.object({
-  style: z.string().max(40).optional(),
-  layout: z.enum(['2x2', '4x2', 'single']).optional(),
-  dot: z.enum(['square', 'rounded', 'circle', 'classy']).optional(),
-  corner: z.enum(['square', 'rounded', 'circle', 'leaf']).optional(),
-  fg: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  bg: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  gradient: z
-    .object({
-      from: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-      to: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-      angle: z.number().min(0).max(360),
-    })
-    .nullable()
-    .optional(),
-  // logo_path is set server-side after upload; we don't accept it
-  // from the client to avoid path injection.
-}).strict()
-
-const ALLOWED_LOGO_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'])
+// Raster only: the branding bucket rejects SVG (public, can carry script).
+const ALLOWED_LOGO_MIME = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
@@ -77,7 +59,7 @@ export default defineEventHandler(async (event) => {
 
   let parsed
   try {
-    parsed = settingsSchema.parse(JSON.parse(settingsJson))
+    parsed = qrSettingsSchema.parse(JSON.parse(settingsJson))
   } catch {
     fail(422, 'invalid_settings')
   }
@@ -91,7 +73,6 @@ export default defineEventHandler(async (event) => {
     if (logoFile.data.length > 4 * 1024 * 1024) fail(413, 'file_too_large')
     const ext = logoFile.type === 'image/jpeg' ? 'jpg'
       : logoFile.type === 'image/webp' ? 'webp'
-      : logoFile.type === 'image/svg+xml' ? 'svg'
       : 'png'
     logoPath = `${id}/qr-logo-${randomUUID()}.${ext}`
     const { error: upErr } = await admin.storage

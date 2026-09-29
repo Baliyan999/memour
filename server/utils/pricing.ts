@@ -12,8 +12,13 @@ export const TIER_PRICES_UZS: Record<string, number> = {
   luxury: 2_990_000,
 }
 
-export function getTierPriceTiyin(tier: string): number {
-  const uzs = TIER_PRICES_UZS[tier] ?? TIER_PRICES_UZS.basic!
-  // Eskiz / Payme / Click expect amounts in tiyin (1 sum = 100 tiyin)
-  return uzs * 100
+/**
+ * Price of a tier in tiyin (1 sum = 100 tiyin) — the unit Payme and our
+ * `payments.amount` use. A missing tier is the column default (basic);
+ * an unknown one returns null so nothing is ever sold at a guessed price.
+ */
+export function getTierPriceTiyin(tier: string | null | undefined): number | null {
+  const key = tier ?? 'basic'
+  if (!Object.hasOwn(TIER_PRICES_UZS, key)) return null
+  return TIER_PRICES_UZS[key]! * 100
 }

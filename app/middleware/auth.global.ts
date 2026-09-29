@@ -2,8 +2,11 @@
  * Global auth guard.
  *
  *   /dashboard/*  → requires any logged-in user (couple).
- *   /admin/*      → requires admin: must be logged in AND have a row
- *                   in public.admins matching their user_id.
+ *   /admin/*      → requires admin: logged in, finished the Telegram
+ *                   2FA step for THIS session, and a row in
+ *                   public.admins. Only the server can tell (the 2FA
+ *                   proof is an httpOnly cookie), so we ask
+ *                   /api/admin-auth/status.
  *
  * Login pages (/dashboard/login, /admin/login) are explicitly excluded
  * so anonymous visitors can reach them. Locale prefix (/ru, /uz) is
@@ -28,19 +31,14 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo(localePath(isAdminRoute ? '/admin/login' : '/dashboard/login'))
   }
 
-  // Admin gate: the logged-in user must also appear in public.admins.
-  // On the server side useSupabaseUser() returns the raw JWT claims
-  // (id lives at `.sub`), on the client it returns the Supabase User
-  // object (with `.id`). Handle both shapes.
+  // Admin gate. A plain Supabase session (email magic link, password
+  // grant made directly against GoTrue) is not enough — the same check
+  // guards every /api/admin/** call on the server. useRequestFetch
+  // forwards the browser's cookies during SSR.
   if (isAdminRoute) {
-    const uid = (user.value as any).id ?? (user.value as any).sub
-    const supabase = useSupabaseClient()
-    const { data, error } = await supabase
-      .from('admins')
-      .select('user_id')
-      .eq('user_id', uid)
-      .maybeSingle()
-    if (error || !data) {
+    try {
+      await useRequestFetch()('/api/admin-auth/status')
+    } catch {
       return navigateTo(localePath('/admin/login'))
     }
   }

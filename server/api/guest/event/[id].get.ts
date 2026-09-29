@@ -1,6 +1,9 @@
 import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
-import { DEVICE_LIMITS } from '../../../utils/guest-quota'
+import { deviceLimitsForTier } from '../../../utils/guest-quota'
+import { uploadWindow, uploadWindowState } from '../../../utils/upload-window'
+import { fail } from '../../../utils/errors'
+import { hasGuestConsent } from '../../../utils/consent'
 
 /**
  * GET /api/guest/event/[id] — public read of an event (no auth).
@@ -19,19 +22,27 @@ import { DEVICE_LIMITS } from '../../../utils/guest-quota'
  *   - show a polite "this device is already locked to table N" wall
  *     (different table — they re-scanned someone else's QR).
  *
- * Returns 404 if the event doesn't exist or is in `archived` status.
+ * Also returns the per-device limits for the event's tier and the
+ * upload window (plus the server clock) so the page can say "opens
+ * at 18:00" / "closed" up front instead of after the guest has shot,
+ * and — with a device_id — whether that device has accepted the
+ * current guest texts (`consented`; the welcome screen asks otherwise).
+ *
+ * Returns 404 if the event doesn't exist, 410 if it is archived.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
-    throw createError({ statusCode: 400, statusMessage: 'invalid event id', data: { code: 'invalid_id' } })
+    fail(400, 'invalid_id')
   }
 
   const query = getQuery(event)
   const rawDeviceId = typeof query.device_id === 'string' ? query.device_id : ''
-  // Accept only well-formed UUIDs — we generate `crypto.randomUUID()`
-  // client-side, so anything else is malformed or hostile.
-  const deviceId = /^[0-9a-f-]{36}$/i.test(rawDeviceId) ? rawDeviceId : null
+  // Accept only well-formed UUIDs — useDeviceId generates v4 UUIDs,
+  // so anything else is malformed or hostile. Strictly 8-4-4-4-12: the
+  // consent lookup compares it with a uuid column, where 36 dashes
+  // would be a database error instead of "no binding".
+  const deviceId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawDeviceId) ? rawDeviceId : null
 
   const admin = serverSupabaseServiceRole<Database>(event)
 
@@ -48,6 +59,7 @@ export default defineEventHandler(async (event) => {
       status,
       plan_tier,
       table_count,
+      archive_expires_at,
       branding ( bride_name, groom_name, cover_photo, accent_color, greeting_text )
     `)
     .eq('id', id)
@@ -55,13 +67,13 @@ export default defineEventHandler(async (event) => {
 
   if (error) {
     console.error('[guest/event] read failed', error)
-    throw createError({ statusCode: 500, statusMessage: 'server error', data: { code: 'server_error' } })
+    fail(500, 'server_error')
   }
   if (!data) {
-    throw createError({ statusCode: 404, statusMessage: 'not found', data: { code: 'event_not_found' } })
+    fail(404, 'event_not_found')
   }
   if (data.status === 'archived') {
-    throw createError({ statusCode: 410, statusMessage: 'event archived', data: { code: 'event_archived' } })
+    fail(410, 'event_archived')
   }
 
   let binding: {
@@ -81,10 +93,21 @@ export default defineEventHandler(async (event) => {
       .maybeSingle()
     if (row) binding = row
   }
+  const consented = deviceId ? await hasGuestConsent(event, id!, deviceId) : false
+
+  const now = Date.now()
+  const window = uploadWindow(data.wedding_date)
 
   return {
     event: data,
     binding,
-    limits: DEVICE_LIMITS,
+    consented,
+    limits: deviceLimitsForTier(data.plan_tier),
+    upload_window: {
+      opens_at: window?.opensAt.toISOString() ?? null,
+      closes_at: window?.closesAt.toISOString() ?? null,
+      state: uploadWindowState(data.wedding_date, now),
+      server_now: new Date(now).toISOString(),
+    },
   }
 })

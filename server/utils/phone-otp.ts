@@ -4,6 +4,7 @@ import { createHash, randomInt } from 'node:crypto'
  * Helpers for phone OTP storage. Codes are hashed with SHA-256 +
  * phone (a coarse "salt") so a leak of the phone_otps table doesn't
  * reveal codes in flight. Codes are 6 digits and expire in 5 minutes.
+ * Attempt counting / invalidation lives in otp-store.ts.
  */
 
 export function generateCode(): string {
@@ -24,4 +25,12 @@ export function normalizePhone(raw: string): string | null {
   const full = digits.startsWith('998') ? digits : `998${digits}`
   if (full.length !== 12) return null
   return `+${full}`
+}
+
+/**
+ * Phone for logs: "+99890***4567". Full numbers are PII and, next to a
+ * code, enough to take over an account — never log them (or codes).
+ */
+export function maskPhone(phone: string): string {
+  return phone.length > 9 ? `${phone.slice(0, 6)}***${phone.slice(-4)}` : '***'
 }

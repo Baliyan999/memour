@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { motion, useScroll, useTransform, useReducedMotion, useMotionValue, useSpring } from 'motion-v'
-import { useMouse, useWindowSize } from '@vueuse/core'
+import { motion, useScroll, useTransform, useMotionValue, useSpring } from 'motion-v'
+import { usePrefersReducedMotion } from '~/composables/useMotion'
 
 /**
  * GlobalBackground — single fixed-position canvas behind every page.
@@ -9,32 +9,37 @@ import { useMouse, useWindowSize } from '@vueuse/core'
  * light rays (×4), drifting particles, scroll-driven hue veil,
  * parallax stars (×35 in 2 depth layers), cursor halo + 3-dot trail,
  * corner vignette. Lives at z-index:-10, pointer-events:none.
+ *
+ * The big colour layers are server-rendered, so the page doesn't change
+ * tone when JS arrives; the small details fade in after mount. Under reduced motion the CSS loops settle and
+ * the scroll parallax is switched off in CSS (motion-reduce:). The
+ * cursor halo exists only for a fine hover pointer, follows viewport
+ * (client) coordinates via pointermove — no idle rAF loop — and moves
+ * by transform, never left/top.
  */
-const reduce = useReducedMotion()
+const reduce = usePrefersReducedMotion()
 const { scrollYProgress } = useScroll()
 const mounted = ref(false)
 onMounted(() => { mounted.value = true })
 
-const { x: mx, y: my } = useMouse({ touch: false })
-const { width: vw, height: vh } = useWindowSize()
-
-// Mouse-tied springs for halo + trail at different lag.
+// Pointer-tied springs for halo + trail at different lag.
 const mxv = useMotionValue(0)
 const myv = useMotionValue(0)
-function syncMouse() {
-  mxv.set(mx.value)
-  myv.set(my.value)
-}
-// Use a small effect to push updates from useMouse refs into motion values.
-let raf = 0
-function tick() {
-  syncMouse()
-  raf = requestAnimationFrame(tick)
+const halo = ref(false)
+const haloSeen = ref(false)
+function onPointerMove(e: PointerEvent) {
+  if (e.pointerType !== 'mouse') return
+  mxv.set(e.clientX)
+  myv.set(e.clientY)
+  haloSeen.value = true
 }
 onMounted(() => {
-  if (!reduce.value) raf = requestAnimationFrame(tick)
+  const fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  if (!fine || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  halo.value = true
+  window.addEventListener('pointermove', onPointerMove, { passive: true })
 })
-onBeforeUnmount(() => cancelAnimationFrame(raf))
+onBeforeUnmount(() => window.removeEventListener('pointermove', onPointerMove))
 
 const haloX = useSpring(mxv, { stiffness: 40, damping: 22, mass: 1.2 })
 const haloY = useSpring(myv, { stiffness: 40, damping: 22, mass: 1.2 })
@@ -105,86 +110,85 @@ const LIGHT_RAYS = [
 <template>
   <div
     aria-hidden="true"
-    class="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+    class="site-backdrop pointer-events-none fixed inset-0 -z-10 overflow-hidden"
   >
-    <template v-if="mounted">
-      <!-- Conic mesh -->
-      <motion.div v-if="!reduce" class="absolute -inset-[10%] will-change-transform" :style="{ rotate: meshRotate }">
-        <div
-          class="animate-conic-spin h-full w-full opacity-80"
-          :style="{
-            background:
-              'conic-gradient(from 0deg at 50% 50%, oklch(82% 0.18 30), oklch(90% 0.14 60), oklch(85% 0.16 90), oklch(78% 0.18 45), oklch(82% 0.18 20), oklch(82% 0.18 30))',
-            filter: 'blur(70px)',
-          }"
-        />
-      </motion.div>
+    <!-- Scroll-linked layers carry motion-reduce:transform-none! so the
+         parallax is off under reduced motion even before hydration. -->
+    <!-- Conic mesh -->
+    <motion.div class="absolute -inset-[10%] will-change-transform motion-reduce:transform-none!" :style="{ rotate: meshRotate }">
+      <div
+        class="animate-conic-spin h-full w-full opacity-80"
+        :style="{
+          background:
+            'conic-gradient(from 0deg at 50% 50%, oklch(82% 0.18 30), oklch(90% 0.14 60), oklch(85% 0.16 90), oklch(78% 0.18 45), oklch(82% 0.18 20), oklch(82% 0.18 30))',
+          filter: 'blur(70px)',
+        }"
+      />
+    </motion.div>
 
-      <!-- Aurora orbs (×6) -->
-      <template v-if="!reduce">
-        <motion.div :style="{ y: orb1Y }" class="absolute -left-40 top-[-10%] h-[640px] w-[640px] will-change-transform">
-          <div class="animate-orb-drift-a h-full w-full rounded-full bg-(--color-rose)/60 blur-3xl" />
-        </motion.div>
-        <motion.div :style="{ y: orb2Y }" class="absolute -right-48 top-[20%] h-[760px] w-[760px] will-change-transform">
-          <div class="animate-orb-drift-b h-full w-full rounded-full bg-(--color-champagne)/60 blur-3xl" />
-        </motion.div>
-        <motion.div :style="{ y: orb3Y }" class="absolute left-[20%] top-[55%] h-[560px] w-[560px] will-change-transform">
-          <div class="animate-orb-drift-c h-full w-full rounded-full bg-(--color-accent)/55 blur-3xl" />
-        </motion.div>
-        <motion.div :style="{ y: orb4Y }" class="absolute -right-32 bottom-[-5%] h-[680px] w-[680px] will-change-transform">
-          <div class="animate-orb-drift-d h-full w-full rounded-full bg-(--color-primary)/40 blur-3xl" />
-        </motion.div>
-        <motion.div :style="{ y: orb5Y }" class="absolute left-[40%] top-[10%] h-[500px] w-[500px] will-change-transform">
-          <div class="animate-orb-drift-b h-full w-full rounded-full bg-(--color-rose)/45 blur-3xl" />
-        </motion.div>
-        <motion.div :style="{ y: orb6Y }" class="absolute left-[-20%] top-[40%] h-[600px] w-[600px] will-change-transform">
-          <div class="animate-orb-drift-c h-full w-full rounded-full bg-(--color-champagne)/50 blur-3xl" />
-        </motion.div>
-      </template>
+    <!-- Aurora orbs (×6) -->
+    <motion.div :style="{ y: orb1Y }" class="motion-reduce:transform-none! absolute -left-40 top-[-10%] h-[640px] w-[640px] will-change-transform">
+      <div class="animate-orb-drift-a h-full w-full rounded-full bg-(--color-rose)/60 blur-3xl" />
+    </motion.div>
+    <motion.div :style="{ y: orb2Y }" class="motion-reduce:transform-none! absolute -right-48 top-[20%] h-[760px] w-[760px] will-change-transform">
+      <div class="animate-orb-drift-b h-full w-full rounded-full bg-(--color-champagne)/60 blur-3xl" />
+    </motion.div>
+    <motion.div :style="{ y: orb3Y }" class="motion-reduce:transform-none! absolute left-[20%] top-[55%] h-[560px] w-[560px] will-change-transform">
+      <div class="animate-orb-drift-c h-full w-full rounded-full bg-(--color-accent)/55 blur-3xl" />
+    </motion.div>
+    <motion.div :style="{ y: orb4Y }" class="motion-reduce:transform-none! absolute -right-32 bottom-[-5%] h-[680px] w-[680px] will-change-transform">
+      <div class="animate-orb-drift-d h-full w-full rounded-full bg-(--color-primary)/40 blur-3xl" />
+    </motion.div>
+    <motion.div :style="{ y: orb5Y }" class="motion-reduce:transform-none! absolute left-[40%] top-[10%] h-[500px] w-[500px] will-change-transform">
+      <div class="animate-orb-drift-b h-full w-full rounded-full bg-(--color-rose)/45 blur-3xl" />
+    </motion.div>
+    <motion.div :style="{ y: orb6Y }" class="motion-reduce:transform-none! absolute left-[-20%] top-[40%] h-[600px] w-[600px] will-change-transform">
+      <div class="animate-orb-drift-c h-full w-full rounded-full bg-(--color-champagne)/50 blur-3xl" />
+    </motion.div>
 
+    <!-- Scroll-driven hue veil — pinned where the page top has it under
+         reduced motion (the !important vars beat motion's inline ones). -->
+    <motion.div
+      class="absolute inset-0 will-change-transform motion-reduce:[--vx:0%]! motion-reduce:[--vy:0%]!"
+      :style="{
+        backgroundImage:
+          'radial-gradient(circle 1100px at var(--vx) var(--vy), oklch(80% 0.15 35 / 0.45), transparent 60%)',
+        '--vx': veilX,
+        '--vy': veilY,
+      }"
+    />
+
+    <!-- Small moving details (rays, particles, stars) are client-only and
+         fade in after mount: they don't change the page's tone, and
+         keeping ~60 inline-styled spans out of the SSR HTML keeps it lean. -->
+    <div v-if="mounted" class="animate-fade-in absolute inset-0">
       <!-- Light rays -->
-      <template v-if="!reduce">
-        <div
-          v-for="(r, i) in LIGHT_RAYS"
-          :key="i"
-          :class="['pointer-events-none absolute left-[-20%] h-[60px] w-[140%] will-change-transform', r.cls]"
-          :style="{
-            top: r.top,
-            transform: `rotate(${r.rot}deg)`,
-            background: 'linear-gradient(90deg, transparent 0%, oklch(95% 0.08 60 / 0.55) 50%, transparent 100%)',
-            filter: 'blur(20px)',
-          }"
-        />
-      </template>
+      <div
+        v-for="(r, i) in LIGHT_RAYS"
+        :key="i"
+        :class="['pointer-events-none absolute left-[-20%] h-[60px] w-[140%] will-change-transform', r.cls]"
+        :style="{
+          top: r.top,
+          transform: `rotate(${r.rot}deg)`,
+          background: 'linear-gradient(90deg, transparent 0%, oklch(95% 0.08 60 / 0.55) 50%, transparent 100%)',
+          filter: 'blur(20px)',
+        }"
+      />
 
       <!-- Drifting particles -->
-      <template v-if="!reduce">
-        <span
-          v-for="(p, i) in PARTICLES"
-          :key="i"
-          class="animate-particle-rise pointer-events-none absolute rounded-full will-change-transform"
-          :style="{
-            left: `${p.x}%`,
-            bottom: '-20px',
-            width: `${p.size}px`,
-            height: `${p.size}px`,
-            background: 'radial-gradient(circle, oklch(92% 0.06 60), oklch(78% 0.1 40) 70%, transparent 100%)',
-            boxShadow: `0 0 ${p.size * 4}px oklch(82% 0.08 45 / 0.6)`,
-            animationDuration: `${p.duration}s`,
-            animationDelay: `${p.delay}s`,
-          }"
-        />
-      </template>
-
-      <!-- Scroll-driven hue veil -->
-      <motion.div
-        v-if="!reduce"
-        class="absolute inset-0 will-change-transform"
+      <span
+        v-for="(p, i) in PARTICLES"
+        :key="i"
+        class="animate-particle-rise pointer-events-none absolute rounded-full will-change-transform"
         :style="{
-          backgroundImage:
-            'radial-gradient(circle 1100px at var(--vx) var(--vy), oklch(80% 0.15 35 / 0.45), transparent 60%)',
-          '--vx': veilX,
-          '--vy': veilY,
+          left: `${p.x}%`,
+          bottom: '-20px',
+          width: `${p.size}px`,
+          height: `${p.size}px`,
+          background: 'radial-gradient(circle, oklch(92% 0.06 60), oklch(78% 0.1 40) 70%, transparent 100%)',
+          boxShadow: `0 0 ${p.size * 4}px oklch(82% 0.08 45 / 0.6)`,
+          animationDuration: `${p.duration}s`,
+          animationDelay: `${p.delay}s`,
         }"
       />
 
@@ -221,45 +225,46 @@ const LIGHT_RAYS = [
           }"
         />
       </div>
+    </div>
 
-      <!-- Cursor halo + trail -->
-      <template v-if="!reduce">
-        <motion.div
-          :style="{
-            left: trail2X,
-            top: trail2Y,
-            translateX: '-50%',
-            translateY: '-50%',
-            background:
-              'radial-gradient(circle, oklch(80% 0.1 30 / 0.88), transparent 70%)',
-          }"
-          class="absolute h-[340px] w-[340px] rounded-full blur-2xl will-change-transform"
-        />
-        <motion.div
-          :style="{
-            left: trail1X,
-            top: trail1Y,
-            translateX: '-50%',
-            translateY: '-50%',
-            background:
-              'radial-gradient(circle, oklch(80% 0.1 40 / 1.12), transparent 70%)',
-          }"
-          class="absolute h-[480px] w-[480px] rounded-full blur-2xl will-change-transform"
-        />
-        <motion.div
-          :style="{ left: haloX, top: haloY, translateX: '-50%', translateY: '-50%' }"
-          class="absolute h-[780px] w-[780px] rounded-full bg-(--color-rose)/45 blur-3xl will-change-transform"
-        />
-      </template>
-
-      <!-- Vignette -->
-      <div
-        class="absolute inset-0"
+    <!-- Cursor halo + trail — fine pointers only, after the first move.
+         Positioned by x/y transforms at the viewport origin, centred
+         with translate (a separate property, so they compose). -->
+    <div
+      v-if="halo && !reduce"
+      :class="['absolute inset-0 transition-opacity duration-700', haloSeen ? 'opacity-100' : 'opacity-0']"
+    >
+      <motion.div
         :style="{
+          x: trail2X,
+          y: trail2Y,
           background:
-            'radial-gradient(ellipse at center, transparent 50%, oklch(60% 0.04 35 / 0.08) 100%)',
+            'radial-gradient(circle, oklch(80% 0.1 30 / 0.88), transparent 70%)',
         }"
+        class="absolute left-0 top-0 h-[340px] w-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl will-change-transform"
       />
-    </template>
+      <motion.div
+        :style="{
+          x: trail1X,
+          y: trail1Y,
+          background:
+            'radial-gradient(circle, oklch(80% 0.1 40 / 1.12), transparent 70%)',
+        }"
+        class="absolute left-0 top-0 h-[480px] w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl will-change-transform"
+      />
+      <motion.div
+        :style="{ x: haloX, y: haloY }"
+        class="absolute left-0 top-0 h-[780px] w-[780px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-(--color-rose)/45 blur-3xl will-change-transform"
+      />
+    </div>
+
+    <!-- Vignette -->
+    <div
+      class="absolute inset-0"
+      :style="{
+        background:
+          'radial-gradient(ellipse at center, transparent 50%, oklch(60% 0.04 35 / 0.08) 100%)',
+      }"
+    />
   </div>
 </template>

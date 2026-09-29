@@ -1,18 +1,6 @@
-<script setup lang="ts">
-import { motion } from 'motion-v'
-</script>
-
 <template>
-  <motion.div
-    :variants="{
-      hidden: { opacity: 0, y: 24 },
-      visible: {
-        opacity: 1,
-        y: 0,
-        transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] },
-      },
-    }"
-  >
+  <!-- Revealed by the parent MarketingStagger. -->
+  <div data-stagger-item>
     <slot />
-  </motion.div>
+  </div>
 </template>

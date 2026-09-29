@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useI18n, useLocalePath } from '#imports'
+import { RefreshCw } from '@lucide/vue'
 import type { Database } from '~/types/database.types'
+import { formatDate } from '~/utils/format'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -8,13 +10,14 @@ definePageMeta({ layout: 'dashboard' })
  * Dashboard home — couple's event list. Lists the events owned by
  * the logged-in user (RLS handles authorization). When the list is
  * empty we show a "no events yet" placeholder pointing the couple
- * back to the lead form if they haven't booked yet.
+ * back to the lead form if they haven't booked yet. A failed query
+ * shows a retry instead — never "no events" to a couple who paid.
  */
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const supabase = useSupabaseClient<Database>()
 
-const { data: events, refresh } = await useAsyncData('couple-events', async () => {
+const { data: events, error, pending, refresh } = await useAsyncData('couple-events', async () => {
   const { data, error } = await supabase
     .from('events')
     .select('id, couple_names, wedding_date, venue_name, status')
@@ -23,14 +26,7 @@ const { data: events, refresh } = await useAsyncData('couple-events', async () =
   return data ?? []
 })
 
-function fmtDate(d: string) {
-  const date = new Date(d)
-  return date.toLocaleDateString(locale.value === 'uz' ? 'uz-UZ' : 'ru-RU', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  })
-}
+const fmtDate = (d: string) => formatDate(d, locale.value)
 </script>
 
 <template>
@@ -39,7 +35,21 @@ function fmtDate(d: string) {
       <h1 class="heading-display-md">{{ t('couple.dashboardTitle') }}</h1>
     </div>
 
-    <div v-if="!events || events.length === 0" class="surface-card rounded-(--radius-xl) p-10 text-center">
+    <div v-if="error" class="surface-card rounded-(--radius-xl) p-10 text-center">
+      <h2 class="text-xl text-(--color-foreground)">{{ t('couple.loadErrorTitle') }}</h2>
+      <p class="mt-3 text-(--color-muted-foreground)">{{ t('couple.loadErrorDesc') }}</p>
+      <button
+        type="button"
+        :disabled="pending"
+        class="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-md border border-(--color-border) bg-white px-6 text-sm font-medium transition-transform duration-150 hover:bg-(--color-muted) active:scale-[0.97] disabled:opacity-60"
+        @click="refresh()"
+      >
+        <RefreshCw class="h-4 w-4" :class="pending ? 'animate-spin' : ''" />
+        {{ t('common.retry') }}
+      </button>
+    </div>
+
+    <div v-else-if="!events || events.length === 0" class="surface-card rounded-(--radius-xl) p-10 text-center">
       <h2 class="text-xl text-(--color-foreground)">{{ t('couple.noEventsTitle') }}</h2>
       <p class="mt-3 text-(--color-muted-foreground)">{{ t('couple.noEventsDesc') }}</p>
       <NuxtLink
@@ -52,7 +62,7 @@ function fmtDate(d: string) {
       <li v-for="ev in events" :key="ev.id">
         <NuxtLink
           :to="localePath(`/dashboard/event/${ev.id}`)"
-          class="surface-card block rounded-(--radius-xl) p-6 transition-transform hover:-translate-y-1"
+          class="surface-card block rounded-(--radius-xl) p-6 transition-transform duration-200 hover:-translate-y-1 active:translate-y-0 active:scale-[0.98] active:duration-100"
         >
           <span
             :class="[

@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { motion } from 'motion-v'
+import { ref } from 'vue'
+import { useReveal } from '~/composables/useMotion'
 
 /**
- * Stagger — staggered fade-up for direct children. Children should use
- * MarketingStaggerItem (or any motion.div consuming the same variants).
+ * Stagger — reveals its MarketingStaggerItem children one after
+ * another when the group scrolls into view. The whole group triggers
+ * together, so cards parked off-screen in a mobile carousel are ready
+ * by the time they're swiped in.
  */
-withDefaults(
+const props = withDefaults(
   defineProps<{
     step?: number
     delay?: number
@@ -13,18 +16,13 @@ withDefaults(
   }>(),
   { step: 0.08, delay: 0, amount: 0.2 },
 )
+
+const el = ref<HTMLElement | null>(null)
+useReveal(el, { items: ':scope > [data-stagger-item]', stagger: props.step, delay: props.delay, amount: props.amount })
 </script>
 
 <template>
-  <motion.div
-    :initial="'hidden'"
-    :while-in-view="'visible'"
-    :viewport="{ once: true, amount }"
-    :variants="{
-      hidden: {},
-      visible: { transition: { staggerChildren: step, delayChildren: delay } },
-    }"
-  >
+  <div ref="el">
     <slot />
-  </motion.div>
+  </div>
 </template>

@@ -4,16 +4,13 @@ import {
   serverSupabaseServiceRole,
 } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { fail } from '../../../utils/errors'
 
 /**
  * PATCH /api/admin/leads/[id] — update status / notes on a lead.
  * Used by /admin/leads to walk leads through the new → contacted →
  * won / lost workflow.
  */
-function fail(statusCode: number, code: string): never {
-  throw createError({ statusCode, statusMessage: code, data: { code } })
-}
-
 const schema = z.object({
   status: z.enum(['new', 'contacted', 'won', 'lost']).optional(),
   notes: z.string().max(2000).optional().nullable(),
@@ -46,6 +43,16 @@ export default defineEventHandler(async (event) => {
 
   const { error } = await admin.from('leads').update(updates).eq('id', id!)
   if (error) fail(500, 'update_failed')
+
+  // Keep the partner's credit in step with the lead: the referral
+  // report counts events through referral_attributions.event_id.
+  if (parsed.data.converted_event_id !== undefined) {
+    const { error: attrErr } = await admin
+      .from('referral_attributions')
+      .update({ event_id: parsed.data.converted_event_id })
+      .eq('lead_id', id!)
+    if (attrErr) console.error('[admin/leads] referral attribution', attrErr)
+  }
 
   return { ok: true }
 })

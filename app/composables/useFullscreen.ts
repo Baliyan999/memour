@@ -1,4 +1,4 @@
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, shallowRef, onMounted, onBeforeUnmount } from 'vue'
 
 /**
  * Opt-in fullscreen for the camera viewport.
@@ -80,4 +80,31 @@ export function useFullscreen() {
   })
 
   return { isFull, enter, exit, toggle }
+}
+
+/**
+ * The element in native fullscreen, or null. While one is, the browser
+ * paints only it and what's inside it, so page-level overlays (the
+ * guest's "sent" pill, the consent sheet) teleport into it to stay
+ * visible.
+ */
+export function useFullscreenElement() {
+  const el = shallowRef<HTMLElement | null>(null)
+
+  function sync() {
+    const anyDoc = document as any
+    el.value = anyDoc.fullscreenElement ?? anyDoc.webkitFullscreenElement ?? null
+  }
+
+  onMounted(() => {
+    sync()
+    document.addEventListener('fullscreenchange', sync)
+    document.addEventListener('webkitfullscreenchange', sync)
+  })
+  onBeforeUnmount(() => {
+    document.removeEventListener('fullscreenchange', sync)
+    document.removeEventListener('webkitfullscreenchange', sync)
+  })
+
+  return el
 }

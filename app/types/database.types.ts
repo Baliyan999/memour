@@ -109,6 +109,78 @@ export type Database = {
           },
         ]
       }
+      consent_events: {
+        Row: {
+          action: string
+          context: string
+          device_id: string | null
+          document: string
+          email: string | null
+          event_id: string | null
+          extra: Json
+          guest_name: string | null
+          id: string
+          ip: string | null
+          lead_id: string | null
+          locale: string | null
+          method: string
+          occurred_at: string
+          payment_id: string | null
+          phone: string | null
+          subject_type: string
+          text_sha256: string | null
+          user_agent: string | null
+          user_id: string | null
+          version: string
+        }
+        Insert: {
+          action?: string
+          context: string
+          device_id?: string | null
+          document: string
+          email?: string | null
+          event_id?: string | null
+          extra?: Json
+          guest_name?: string | null
+          id?: string
+          ip?: string | null
+          lead_id?: string | null
+          locale?: string | null
+          method: string
+          occurred_at?: string
+          payment_id?: string | null
+          phone?: string | null
+          subject_type: string
+          text_sha256?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          version: string
+        }
+        Update: {
+          action?: string
+          context?: string
+          device_id?: string | null
+          document?: string
+          email?: string | null
+          event_id?: string | null
+          extra?: Json
+          guest_name?: string | null
+          id?: string
+          ip?: string | null
+          lead_id?: string | null
+          locale?: string | null
+          method?: string
+          occurred_at?: string
+          payment_id?: string | null
+          phone?: string | null
+          subject_type?: string
+          text_sha256?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          version?: string
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           archive_expires_at: string | null
@@ -119,6 +191,7 @@ export type Database = {
           owner_id: string | null
           owner_phone: string | null
           plan_tier: string | null
+          purged_at: string | null
           qr_pdf_path: string | null
           qr_settings: Json
           status: string
@@ -138,6 +211,7 @@ export type Database = {
           owner_id?: string | null
           owner_phone?: string | null
           plan_tier?: string | null
+          purged_at?: string | null
           qr_pdf_path?: string | null
           qr_settings?: Json
           status?: string
@@ -157,6 +231,7 @@ export type Database = {
           owner_id?: string | null
           owner_phone?: string | null
           plan_tier?: string | null
+          purged_at?: string | null
           qr_pdf_path?: string | null
           qr_settings?: Json
           status?: string
@@ -223,6 +298,7 @@ export type Database = {
           name: string
           notes: string | null
           phone: string
+          plan_tier: string | null
           source: string | null
           status: string
           wedding_date: string | null
@@ -236,6 +312,7 @@ export type Database = {
           name: string
           notes?: string | null
           phone: string
+          plan_tier?: string | null
           source?: string | null
           status?: string
           wedding_date?: string | null
@@ -249,6 +326,7 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string
+          plan_tier?: string | null
           source?: string | null
           status?: string
           wedding_date?: string | null

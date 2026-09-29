@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
-import { useLocalePath } from '#imports'
+import { ref, computed, watch, nextTick } from 'vue'
+import { useI18n, useLocalePath } from '#imports'
 import { motion } from 'motion-v'
 import { ArrowRight, Mail, Lock, Eye, EyeOff, MessageSquare, Shield } from '@lucide/vue'
 
@@ -16,16 +16,17 @@ definePageMeta({ layout: 'admin' })
  *
  *   Step 2: email + password + code → POST /api/admin-auth/verify
  *     The server validates the code AND re-checks the password, then
- *     returns { access_token, refresh_token } as JSON. We call
- *     supabase.auth.setSession() which writes them straight into
- *     httpOnly cookies — no magic-link, no token in the URL fragment.
+ *     writes the Supabase session cookies plus the signed 2FA cookie
+ *     into its response — no magic-link, no token in the URL fragment.
+ *     The admin API and the /admin pages require that 2FA cookie, so a
+ *     Supabase session obtained any other way doesn't open the admin.
  *
  * Sending the password again at step 2 is intentional: it makes 2FA
  * real. A leaked TG code on its own cannot mint a session, and a
  * leaked password on its own cannot either.
  */
+const { t } = useI18n()
 const localePath = useLocalePath()
-const supabase = useSupabaseClient()
 const user = useSupabaseUser()
 
 const step = ref<'creds' | 'code'>('creds')
@@ -52,56 +53,32 @@ function resetDigits() {
   digits.value = ['', '', '', '', '', '']
 }
 
-// Skip the form entirely if already a logged-in admin.
+// Skip the form if this browser already has full admin access
+// (session + Telegram 2FA). Only the server knows — the 2FA proof is an
+// httpOnly cookie — and a session without it must stay on this page,
+// otherwise the route middleware would bounce it straight back here.
 watch(
   user,
   async (u) => {
-    if (!u) return
-    const uid = (u as any).id ?? (u as any).sub
-    const { data } = await supabase
-      .from('admins')
-      .select('user_id')
-      .eq('user_id', uid)
-      .maybeSingle()
-    if (data) navigateTo(localePath('/admin'))
+    if (!u || import.meta.server) return
+    try {
+      await $fetch('/api/admin-auth/status')
+      navigateTo(localePath('/admin'))
+    } catch {
+      // No 2FA yet — show the form.
+    }
   },
   { immediate: true },
 )
 
-// Legacy magic-link landing handler — kept temporarily so anyone
-// holding an old emailed magic link can still complete login. New
-// logins go through setSession directly without touching the URL.
-onMounted(async () => {
-  if (typeof window === 'undefined') return
-  const hash = window.location.hash
-  if (!hash || !hash.includes('access_token=')) return
-  const params = new URLSearchParams(hash.slice(1))
-  const access_token = params.get('access_token')
-  const refresh_token = params.get('refresh_token')
-  if (!access_token || !refresh_token) return
-  try {
-    await supabase.auth.setSession({ access_token, refresh_token })
-    window.history.replaceState({}, '', window.location.pathname + window.location.search)
-  } catch (e) {
-    console.error('[admin/login] setSession from hash', e)
-  }
-})
-
-function mapError(code?: string): string {
-  switch (code) {
-    case 'bad_credentials': return 'Неверный email или пароль'
-    case 'not_admin': return 'Этот аккаунт не имеет прав администратора'
-    case 'no_chat_id': return 'У вашего аккаунта не привязан Telegram. Попросите главного админа добавить chat_id.'
-    case 'too_many_requests': return 'Слишком часто. Подождите 30 секунд.'
-    case 'telegram_failed': return 'Не удалось отправить код в Telegram. Попробуйте позже.'
-    case 'invalid_code': return 'Неверный код'
-    case 'code_expired': return 'Срок действия кода истёк. Запросите новый.'
-    case 'too_many_attempts': return 'Слишком много попыток. Запросите новый код.'
-    case 'link_failed': return 'Не удалось завершить вход. Попробуйте снова.'
-    case 'session_failed': return 'Не удалось завершить вход. Возможно, пароль был изменён — попробуйте начать заново.'
-    default: return 'Ошибка входа'
-  }
-}
+/**
+ * Server errors carry a stable `data.code`; show its translation —
+ * login-specific wording first (`admin.login.errors.<code>`), then the
+ * shared `errors.<code>`, then a generic line — never the server's own
+ * text.
+ */
+const errorMessage = useErrorMessage('admin.login')
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 
 function startResendCooldown(seconds: number) {
   resendIn.value = seconds
@@ -114,7 +91,17 @@ function startResendCooldown(seconds: number) {
 
 async function submitCreds() {
   if (pending.value) return
-  if (!email.value || !password.value) return
+  // Our own checks (the form is novalidate): the browser's bubbles
+  // speak the browser's language. Password length is the server's
+  // business — a wrong one is just bad_credentials.
+  if (!EMAIL_RE.test(email.value.trim())) {
+    error.value = errorMessage('invalid_email')
+    return
+  }
+  if (!password.value) {
+    error.value = t('validation.passwordRequired')
+    return
+  }
   pending.value = true
   error.value = null
   try {
@@ -127,7 +114,7 @@ async function submitCreds() {
     resetDigits()
     focusDigit(0)
   } catch (e: any) {
-    error.value = mapError(e?.data?.data?.code ?? e?.data?.code)
+    error.value = errorMessage(e)
   } finally {
     pending.value = false
   }
@@ -153,8 +140,7 @@ async function submitCode() {
       window.location.href = localePath('/admin')
     }
   } catch (e: any) {
-    console.error('[admin/login] verify failed', e)
-    error.value = mapError(e?.data?.data?.code ?? e?.data?.code)
+    error.value = errorMessage(e)
     resetDigits()
     focusDigit(0)
   } finally {
@@ -227,7 +213,7 @@ function backToCreds() {
 </script>
 
 <template>
-  <div class="relative min-h-[80vh]">
+  <div class="relative min-h-[80vh] overflow-x-clip">
     <div
       aria-hidden="true"
       class="pointer-events-none absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 opacity-40"
@@ -254,7 +240,7 @@ function backToCreds() {
             </div>
             <p class="mt-4 text-[10px] uppercase tracking-[0.4em] text-(--color-muted-foreground)">Memour · admin</p>
             <h1 class="mt-2 font-display italic" style="font-size: 2.5rem; line-height: 1; letter-spacing: -0.02em;">
-              <span class="text-gradient-gold">{{ step === 'creds' ? 'Вход' : 'Код' }}</span>
+              <span class="text-gradient-gold">{{ step === 'creds' ? t('admin.login.titleCreds') : t('admin.login.titleCode') }}</span>
             </h1>
             <div class="mt-3 flex items-center gap-3 text-(--color-muted-foreground)">
               <span class="h-px w-12 bg-(--color-border)" />
@@ -262,9 +248,9 @@ function backToCreds() {
               <span class="h-px w-12 bg-(--color-border)" />
             </div>
             <p class="mt-3 max-w-xs text-center text-sm text-(--color-muted-foreground)">
-              <template v-if="step === 'creds'">Введите email и пароль администратора</template>
+              <template v-if="step === 'creds'">{{ t('admin.login.descCreds') }}</template>
               <template v-else>
-                Код отправлен в Telegram-бот на ваш аккаунт <span class="block text-(--color-foreground) text-xs mt-1">{{ email }}</span>
+                {{ t('admin.login.descCode') }} <span class="block text-(--color-foreground) text-xs mt-1">{{ email }}</span>
               </template>
             </p>
           </div>
@@ -283,13 +269,15 @@ function backToCreds() {
               v-if="step === 'creds'"
               key="creds"
               class="flex flex-col gap-4"
+              novalidate
               @submit.prevent="submitCreds"
             >
               <div class="flex flex-col gap-1.5">
-                <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Email</label>
+                <label for="admin-email" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.login.emailLabel') }}</label>
                 <div class="relative">
                   <Mail class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-muted-foreground)" :stroke-width="1.6" />
                   <input
+                    id="admin-email"
                     v-model="email"
                     type="email"
                     required
@@ -300,20 +288,21 @@ function backToCreds() {
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Пароль</label>
+                <label for="admin-password" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.login.passwordLabel') }}</label>
                 <div class="relative">
                   <Lock class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-muted-foreground)" :stroke-width="1.6" />
                   <input
+                    id="admin-password"
                     v-model="password"
                     :type="showPassword ? 'text' : 'password'"
                     required
                     autocomplete="current-password"
-                    minlength="6"
                     class="flex h-12 w-full rounded-md border border-(--color-border) bg-white pl-10 pr-11 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
                   >
                   <button
                     type="button"
                     class="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-(--color-muted-foreground) hover:text-(--color-foreground)"
+                    :aria-label="showPassword ? t('admin.login.hidePassword') : t('admin.login.showPassword')"
                     @click="showPassword = !showPassword"
                   >
                     <EyeOff v-if="showPassword" class="h-4 w-4" :stroke-width="1.6" />
@@ -322,20 +311,20 @@ function backToCreds() {
                 </div>
               </div>
 
-              <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+              <p v-if="error" role="alert" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
 
               <button
                 type="submit"
                 :disabled="pending || !email || !password"
                 class="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-(--color-primary) px-7 text-sm font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) hover:opacity-95 disabled:opacity-50"
               >
-                <span>{{ pending ? 'Проверяем…' : 'Войти' }}</span>
+                <span>{{ pending ? t('admin.login.checking') : t('admin.login.submit') }}</span>
                 <ArrowRight v-if="!pending" class="h-4 w-4" />
               </button>
 
               <p class="mt-1 flex items-center justify-center gap-1.5 text-center text-[11px] text-(--color-muted-foreground)">
                 <MessageSquare class="h-3 w-3" :stroke-width="1.6" />
-                Код подтверждения придёт в Telegram
+                {{ t('admin.login.telegramNote') }}
               </p>
             </form>
 
@@ -344,10 +333,11 @@ function backToCreds() {
               v-else
               key="code"
               class="flex flex-col gap-4"
+              novalidate
               @submit.prevent="submitCode"
             >
               <div class="flex flex-col gap-2">
-                <label class="text-center text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">Код из Telegram</label>
+                <label class="text-center text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.login.codeLabel') }}</label>
                 <div class="flex justify-center gap-2 sm:gap-3">
                   <input
                     v-for="(_, i) in 6"
@@ -367,7 +357,7 @@ function backToCreds() {
                 </div>
               </div>
 
-              <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+              <p v-if="error" role="alert" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
 
               <button
                 type="submit"
@@ -375,7 +365,7 @@ function backToCreds() {
                 class="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-(--color-primary) px-7 text-sm font-medium text-(--color-primary-foreground) shadow-(--shadow-soft) hover:opacity-95 disabled:opacity-50"
               >
                 <Shield v-if="!pending" class="h-4 w-4" :stroke-width="1.8" />
-                <span>{{ pending ? 'Проверяем…' : 'Подтвердить' }}</span>
+                <span>{{ pending ? t('admin.login.checking') : t('admin.login.confirm') }}</span>
               </button>
 
               <div class="flex items-center justify-between text-xs">
@@ -383,13 +373,13 @@ function backToCreds() {
                   type="button"
                   class="text-(--color-muted-foreground) underline decoration-(--color-muted-foreground)/40 underline-offset-2 hover:text-(--color-foreground)"
                   @click="backToCreds"
-                >Назад</button>
+                >{{ t('admin.login.back') }}</button>
                 <button
                   type="button"
                   :disabled="resendIn > 0 || pending"
                   class="text-(--color-primary) underline decoration-(--color-primary)/40 underline-offset-2 hover:decoration-(--color-primary) disabled:cursor-not-allowed disabled:opacity-50"
                   @click="resend"
-                >{{ resendIn > 0 ? `Запросить ещё раз (${resendIn}с)` : 'Запросить ещё раз' }}</button>
+                >{{ resendIn > 0 ? t('admin.login.resendIn', { sec: resendIn }) : t('admin.login.resend') }}</button>
               </div>
             </form>
           </Transition>

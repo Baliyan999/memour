@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { useLocalePath } from '#imports'
+import { computed, ref, watch } from 'vue'
+import { useI18n, useLocalePath } from '#imports'
 
 /**
  * Admin layout — separate chrome from couple dashboard.
@@ -12,7 +12,13 @@ import { useLocalePath } from '#imports'
  *
  * We check admin status reactively; while the check is in flight the
  * chrome stays minimal (just the logo + back-to-site link).
+ *
+ * Never on /admin/login: a Supabase session without the Telegram step
+ * (the 2FA cookie expires after 8 h, or an email magic link) lands
+ * there, and every nav link would just bounce back to the login. Every
+ * other admin page is behind the full check in middleware/auth.global.
  */
+const { t } = useI18n()
 const localePath = useLocalePath()
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
@@ -46,16 +52,24 @@ watch(
 )
 
 async function signOut() {
+  // The 2FA cookie dies with the Supabase session anyway; don't leave it lying around.
+  await $fetch('/api/admin-auth/logout', { method: 'POST' }).catch(() => {})
   await supabase.auth.signOut()
   await router.push(localePath('/admin/login'))
 }
 
-const navLinks = [
-  { to: '/admin', label: 'События' },
-  { to: '/admin/leads', label: 'Лиды' },
-  { to: '/admin/referrals', label: 'Рефералы' },
-  { to: '/admin/team', label: 'Команда' },
-]
+const route = useRoute()
+const showChrome = computed(() => isAdmin.value && !route.path.replace(/\/$/, '').endsWith('/admin/login'))
+function isCurrent(to: string) {
+  return route.path.replace(/\/$/, '') === localePath(to)
+}
+
+const navLinks = computed(() => [
+  { to: '/admin', label: t('admin.nav.events') },
+  { to: '/admin/leads', label: t('admin.nav.leads') },
+  { to: '/admin/referrals', label: t('admin.nav.referrals') },
+  { to: '/admin/team', label: t('admin.nav.team') },
+])
 </script>
 
 <template>
@@ -72,7 +86,7 @@ const navLinks = [
 
           <!-- Nav only when actually an admin — otherwise the links
                look clickable but middleware would just bounce. -->
-          <nav v-if="isAdmin" class="hidden gap-4 text-sm md:flex">
+          <nav v-if="showChrome" class="hidden gap-4 text-sm md:flex">
             <NuxtLink
               v-for="link in navLinks"
               :key="link.to"
@@ -83,13 +97,13 @@ const navLinks = [
           </nav>
         </div>
 
-        <div v-if="isAdmin" class="flex items-center gap-3">
+        <div v-if="showChrome" class="flex items-center gap-3">
           <span v-if="adminEmail" class="hidden text-xs text-(--color-muted-foreground) sm:inline">{{ adminEmail }}</span>
           <button
             type="button"
             class="rounded-full border border-(--color-border)/60 bg-white px-3 py-1.5 text-xs hover:bg-(--color-muted)"
             @click="signOut"
-          >Выйти</button>
+          >{{ t('admin.nav.signOut') }}</button>
         </div>
         <NuxtLink
           v-else
@@ -100,9 +114,29 @@ const navLinks = [
             <line x1="19" y1="12" x2="5" y2="12" />
             <polyline points="12 19 5 12 12 5" />
           </svg>
-          На сайт
+          {{ t('admin.nav.toSite') }}
         </NuxtLink>
       </div>
+
+      <!-- Phones / small tablets: the nav above is hidden, so the
+           sections live in a scrollable tab strip under the header. -->
+      <nav
+        v-if="showChrome"
+        class="container-page flex gap-1.5 overflow-x-auto border-t border-(--color-border)/60 py-2 text-sm md:hidden"
+        :aria-label="t('admin.nav.sections')"
+      >
+        <NuxtLink
+          v-for="link in navLinks"
+          :key="link.to"
+          :to="localePath(link.to)"
+          :class="[
+            'shrink-0 rounded-full px-3 py-1.5 transition-[transform,background-color,color] duration-150 active:scale-95 motion-reduce:transition-colors motion-reduce:active:scale-100',
+            isCurrent(link.to)
+              ? 'bg-(--color-primary) text-(--color-primary-foreground)'
+              : 'text-(--color-muted-foreground)',
+          ]"
+        >{{ link.label }}</NuxtLink>
+      </nav>
     </header>
 
     <main class="container-page relative py-8 md:py-12">

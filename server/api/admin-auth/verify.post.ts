@@ -5,19 +5,32 @@ import {
   serverSupabaseServiceRole,
 } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { OTP_MAX_ATTEMPTS, consumeOtp, otpHashMatches, spendOtpAttempt } from '../../utils/otp-store'
+import { checkRateLimit, getTrustedClientIp } from '../../utils/rate-limit'
+import {
+  assertAdminSessionConfigured,
+  issueAdminSession,
+  sessionOfAccessToken,
+} from '../../utils/admin-session'
+import { fail } from '../../utils/errors'
 
 /**
  * POST /api/admin-auth/verify — second (and final) step of admin login.
  *
- *   1. Verify the 6-digit Telegram code matches the open OTP row.
+ *   1. Spend one attempt on the newest open OTP for the email, then
+ *      compare (constant time). Five checks per code; after that a new
+ *      code must be requested.
  *   2. Mark the OTP consumed (single use).
  *   3. Re-verify the password via Supabase Auth /token endpoint to
  *      mint a fresh session, then call `setSession` on the server-bound
  *      Supabase client — that writes the session cookies into the
  *      response via `@supabase/ssr`'s cookie adapter in EXACTLY the
  *      format the matching server reader (`serverSupabaseUser`) expects.
- *      The browser stores them on the response, the next request
- *      includes them, the global auth middleware sees the session.
+ *   4. Set the signed `memour-admin-2fa` cookie for that user + session
+ *      (utils/admin-session.ts). /api/admin/** and the /admin pages
+ *      require it, so a session minted any other way — straight from
+ *      GoTrue with the password, or an email magic link — is not
+ *      admin access.
  *
  * The access_token / refresh_token never leave the server — the
  * response body just says `{ ok: true }`. No URL fragment, no JSON
@@ -38,45 +51,44 @@ const schema = z.object({
   code: z.string().regex(/^\d{6}$/),
 })
 
-const MAX_ATTEMPTS = 5
-
-function fail(statusCode: number, code: string): never {
-  throw createError({ statusCode, statusMessage: code, data: { code } })
-}
+const IP_VERIFY_MAX = 20
+const IP_VERIFY_WINDOW_MS = 10 * 60 * 1000
 
 function hashCode(email: string, code: string): string {
   return createHash('sha256').update(`${email}:${code}`).digest('hex')
 }
 
 export default defineEventHandler(async (event) => {
+  assertAdminSessionConfigured()
+  if (!checkRateLimit('admin-verify-ip', getTrustedClientIp(event), IP_VERIFY_MAX, IP_VERIFY_WINDOW_MS)) {
+    fail(429, 'rate_limited')
+  }
+
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
   if (!parsed.success) fail(422, 'invalid_input')
 
   const email = parsed.data.email.trim().toLowerCase()
-  const code_hash = hashCode(email, parsed.data.code)
   const admin = serverSupabaseServiceRole<Database>(event)
 
-  // --- 1. Find the open OTP row matching this code ---
-  const { data: otp } = await admin
-    .from('admin_otps')
-    .select('email, code_hash, expires_at, consumed_at, attempts')
-    .eq('email', email)
-    .eq('code_hash', code_hash)
-    .is('consumed_at', null)
-    .maybeSingle()
-
-  if (!otp) fail(401, 'invalid_code')
-  if (new Date(otp.expires_at).getTime() < Date.now()) fail(410, 'code_expired')
-  if (((otp as any).attempts ?? 0) >= MAX_ATTEMPTS) fail(429, 'too_many_attempts')
+  // --- 1. Spend an attempt on the open code, then compare ---
+  const attempt = await spendOtpAttempt(admin, 'admin_otps', 'email', email).catch((e) => {
+    console.error('[admin-auth/verify] attempt lookup failed', e)
+    fail(500, 'storage_error')
+  })
+  if (attempt.status === 'none') fail(410, 'code_expired')
+  if (attempt.status === 'locked') fail(429, 'too_many_attempts')
+  if (attempt.status === 'busy') fail(429, 'rate_limited')
+  if (!otpHashMatches(hashCode(email, parsed.data.code), attempt.codeHash)) {
+    if (attempt.attempts >= OTP_MAX_ATTEMPTS) fail(429, 'too_many_attempts')
+    fail(401, 'invalid_code')
+  }
 
   // --- 2. Mark consumed before anything else (prevents replay even
   //        if subsequent steps fail) ---
-  await admin
-    .from('admin_otps')
-    .update({ consumed_at: new Date().toISOString() } as any)
-    .eq('email', email)
-    .eq('code_hash', code_hash)
+  if (!(await consumeOtp(admin, 'admin_otps', 'email', email, attempt.codeHash))) {
+    fail(410, 'code_expired')
+  }
 
   // --- 3. Re-verify password + mint session ---
   const supabaseUrl = process.env.NUXT_PUBLIC_SUPABASE_URL!
@@ -85,10 +97,16 @@ export default defineEventHandler(async (event) => {
     method: 'POST',
     headers: { apikey: anonKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password: parsed.data.password }),
+  }).catch((e) => {
+    console.error('[admin-auth/verify] token endpoint unreachable', e)
+    fail(502, 'server_error')
   })
+  if (tokenRes.status === 429) fail(429, 'rate_limited')
   if (!tokenRes.ok) fail(401, 'session_failed')
   const tokenJson = (await tokenRes.json()) as any
   if (!tokenJson?.access_token || !tokenJson?.refresh_token) fail(500, 'session_failed')
+  const minted = sessionOfAccessToken(tokenJson.access_token)
+  if (!minted) fail(500, 'session_failed')
 
   // --- 4. Write session cookies to the response server-side. The
   //        @nuxtjs/supabase server client uses @supabase/ssr's cookie
@@ -104,6 +122,9 @@ export default defineEventHandler(async (event) => {
     console.error('[admin-auth/verify] setSession on server failed', sessErr)
     fail(500, 'session_failed')
   }
+
+  // --- 5. Proof of the second factor for this exact session ---
+  issueAdminSession(event, minted.userId, minted.sessionId)
 
   return { ok: true }
 })

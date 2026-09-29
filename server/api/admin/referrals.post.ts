@@ -4,17 +4,17 @@ import {
   serverSupabaseServiceRole,
 } from '#supabase/server'
 import type { Database } from '~/types/database.types'
+import { fail, failZod } from '../../utils/errors'
 
 /**
  * POST /api/admin/referrals — create a referral code.
  * Body: { code, partner_name?, partner_phone?, commission_pct? }
  */
-function fail(statusCode: number, code: string): never {
-  throw createError({ statusCode, statusMessage: code, data: { code } })
-}
-
+// Max 32: the landing form sends the code as source "ref:<code>", and
+// /api/lead caps source at 40 characters — a longer code would make
+// every lead from that partner's link fail validation.
 const schema = z.object({
-  code: z.string().min(2).max(40).regex(/^[a-z0-9-]+$/i, 'code must be alphanumeric'),
+  code: z.string().min(2).max(32).regex(/^[a-z0-9-]+$/i),
   partner_name: z.string().max(120).optional().nullable(),
   partner_phone: z.string().max(20).optional().nullable(),
   commission_pct: z.number().min(0).max(100).optional().nullable(),
@@ -34,7 +34,9 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody(event)
   const parsed = schema.safeParse(body)
-  if (!parsed.success) fail(422, 'invalid_input')
+  if (!parsed.success) {
+    failZod(parsed.error, { code: 'invalid_referral_code', commission_pct: 'invalid_commission' })
+  }
 
   const { data: created, error } = await admin
     .from('referrals')
@@ -47,7 +49,8 @@ export default defineEventHandler(async (event) => {
     .select()
     .single()
   if (error) {
-    if (/duplicate/i.test(error.message)) fail(409, 'duplicate_code')
+    if (error.code === '23505' || /duplicate/i.test(error.message)) fail(409, 'duplicate_code')
+    console.error('[admin/referrals] insert', error)
     fail(500, 'insert_failed')
   }
 
