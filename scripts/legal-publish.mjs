@@ -4,9 +4,10 @@
  *
  *   node scripts/legal-publish.mjs [--drafts <dir>]
  *
- * Reads {uz,ru}/{privacy,terms,offer}.md from the drafts folder (kept
- * OUTSIDE this public repo; default ../memour-legal-drafts next to the
- * repo, or $LEGAL_DRAFTS_DIR) and writes:
+ * Reads {uz,ru}/{privacy,terms,offer}.md from the drafts folder (never
+ * committed: default _private/legal-drafts, which .gitignore keeps out
+ * of this public repo; the older ../memour-legal-drafts next to the repo
+ * still works; or $LEGAL_DRAFTS_DIR) and writes:
  *
  *   server/assets/legal/{uz,ru}/{doc}.md  — the text as it may be published
  *   shared/legal-meta.json                — version, open placeholders and
@@ -67,7 +68,11 @@ const META_FILE = join(ROOT, 'shared/legal-meta.json')
 
 const argIdx = process.argv.indexOf('--drafts')
 const DRAFTS = resolve(
-  argIdx > 0 ? process.argv[argIdx + 1] : process.env.LEGAL_DRAFTS_DIR || join(ROOT, '..', 'memour-legal-drafts'),
+  argIdx > 0
+    ? process.argv[argIdx + 1]
+    : process.env.LEGAL_DRAFTS_DIR
+      || [join(ROOT, '_private', 'legal-drafts'), join(ROOT, '..', 'memour-legal-drafts')].find((d) => existsSync(d))
+      || join(ROOT, '_private', 'legal-drafts'),
 )
 
 // A heading that marks an internal section (ru / uz wording of the drafts).

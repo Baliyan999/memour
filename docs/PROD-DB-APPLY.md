@@ -313,6 +313,63 @@ notify pgrst, 'reload schema';
 
 Nothing else is left behind. Guest rows the function created stay, as ordinary `guest_devices` rows.
 
+## 20260930000000_telegram_couple_bot (the couple's Telegram bot)
+
+Pro, Premium and Luxury couples can connect their own Telegram chats to the Memour bot from the event page: a digest of guest uploads, «оплата прошла», and the reminders to download the archive 30 and 7 days before deletion (README → Telegram bot). The migration adds three server-only tables and one trigger on `events`:
+
+| Table | What it holds |
+|---|---|
+| `telegram_link_tokens` | one-time deep-link tokens: only the sha256 of the token, the event, the account that asked, the language, 15-minute expiry, `used_at`. Rows expired for a day are deleted by the daily task. |
+| `telegram_chat_links` | which chat follows which event: chat id, the person's first name and username (for the dashboard list), language, `linked_at`; on disconnect `unlinked_at` + reason, and the chat id, name and username are cleared. Unique `(event_id, chat_id)`. Cascades with the event and with the couple's auth user. |
+| `telegram_notifications` | `(event_id, kind)` of one-off messages already sent (`archive_30d`, `archive_7d`, `activated`), so none goes out twice. |
+| trigger `events_telegram_archive_moved` | `AFTER UPDATE` on `events`, only when `archive_expires_at` actually changes (an upgrade to Luxury, a moved wedding, an early purge): deletes that event's `archive_30d` / `archive_7d` rows, so the new date gets its own reminders. Function `telegram_forget_archive_reminders()`: `SECURITY DEFINER`, `search_path = ''`, no `EXECUTE` for `public` / `anon` / `authenticated`. It never blocks the update and touches nothing else. |
+
+RLS on, no policies, no grants to `anon` / `authenticated` — like `consent_events`, only the service role reads and writes. No existing table, column or row changes. Additive and idempotent (`if not exists`, `create or replace`, `drop trigger if exists`): running it twice is harmless.
+
+**Order: migration first, then the app.** The new app reads these tables on every guest upload digest, on payment, in the daily task and on the event page; without them the Telegram card shows "couldn't load" and connecting fails with a server error (uploads, payments and logins are not affected — the notices fail closed and are only logged). The app running now never touches them, so applying the migration early is harmless.
+
+**Pre-checks** (read-only):
+
+```sql
+-- 1. 20260929000000 is applied
+select version from supabase_migrations.schema_migrations where version >= '20260929000000' order by 1;
+-- 2. Nothing of these names yet: expect 0 rows
+select tablename from pg_tables where schemaname = 'public' and tablename like 'telegram\_%';
+```
+
+**Apply.** Option A: `npx supabase db push --dry-run` must list only `20260930000000_telegram_couple_bot.sql` (plus anything above not applied yet), then `npx supabase db push`. Option B: paste the file into the SQL editor, run it, then `npx supabase migration repair --status applied 20260930000000`.
+
+**Post-checks:**
+
+```sql
+-- RLS on for all three: expect 3 rows, all "t"
+select relname, relrowsecurity from pg_class where relname like 'telegram\_%' and relkind = 'r';
+-- No client grants: expect only postgres and service_role
+select distinct grantee from information_schema.role_table_grants where table_name like 'telegram\_%';
+-- Clients can't read them: expect "permission denied for table telegram_chat_links"
+begin; set local role authenticated; select * from public.telegram_chat_links limit 1; rollback;
+-- The trigger is there: expect 1 row, events_telegram_archive_moved
+select tgname from pg_trigger where tgrelid = 'public.events'::regclass and tgname = 'events_telegram_archive_moved';
+```
+
+Then deploy the app, set `TELEGRAM_WEBHOOK_SECRET` and `TELEGRAM_BOT_USERNAME`, and run `scripts/telegram-setup.mjs` (DEPLOY.md §7 → Telegram bot).
+
+**Rollback.** Deploy the previous app first, then:
+
+```sql
+begin;
+drop trigger if exists events_telegram_archive_moved on public.events;
+drop function if exists public.telegram_forget_archive_reminders();
+drop table if exists public.telegram_notifications;
+drop table if exists public.telegram_chat_links;
+drop table if exists public.telegram_link_tokens;
+delete from supabase_migrations.schema_migrations where version = '20260930000000';
+commit;
+notify pgrst, 'reload schema';
+```
+
+Connected chats are lost with it (couples connect again). The webhook can stay: the old app answers it with 404, Telegram retries for a while and then drops those updates.
+
 ## After the migration: operations
 
 - **Login-code trail.** `phone_otps` / `admin_otps` rows older than 7 days are deleted every night by `memour_purge_otps`.

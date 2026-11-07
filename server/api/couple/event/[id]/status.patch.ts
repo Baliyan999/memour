@@ -7,6 +7,7 @@ import type { Database } from '~/types/database.types'
 import { getTierPriceTiyin } from '../../../../utils/pricing'
 import { countsAsPaid, weddingDayStartMs } from '../../../../utils/payments'
 import { uploadWindow } from '../../../../utils/upload-window'
+import { notifyEventActivated } from '../../../../utils/telegram-couple'
 import { fail } from '../../../../utils/errors'
 
 /**
@@ -83,6 +84,9 @@ export default defineEventHandler(async (event) => {
     .select('id')
   if (error) fail(500, 'update_failed')
   if (!updated?.length) fail(409, 'invalid_transition')
+
+  // Paid and now active: the couple's connected chats hear it (once).
+  if (parsed.data.status === 'active') void notifyEventActivated(admin, ev!.id)
 
   return { ok: true }
 })

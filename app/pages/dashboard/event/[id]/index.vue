@@ -24,7 +24,8 @@ definePageMeta({ layout: 'dashboard' })
  *
  * The tier (shared/plans.ts) shows here too: guests so far against the
  * tier's limit, and on Basic the slideshow and branding buttons carry
- * a "Pro" mark and open a note on what a higher tier adds.
+ * a "Pro" mark and open a note on what a higher tier adds — as does the
+ * Telegram card (components/dashboard/TelegramCard.vue).
  */
 const { t, te, locale } = useI18n()
 const localePath = useLocalePath()
@@ -654,6 +655,10 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
         </motion.div>
       </AnimatePresence>
     </section>
+
+    <!-- The couple's own Telegram chats: upload digests, payment notice,
+         archive reminders. Also before payment (Pro+), gone once purged. -->
+    <DashboardTelegramCard v-if="!ev.purged_at" :event-id="ev.id" :plan-tier="ev.plan_tier" />
 
     <!-- Stats -->
     <!-- Two by two until there is room for four cards whose numbers

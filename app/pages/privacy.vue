@@ -55,7 +55,7 @@ useSeoMeta({
             <li><strong>Supabase</strong> — baza va fayl saqlash (serverlar Yaponiyada).</li>
             <li><strong>Eskiz.uz</strong> — SMS-kod yuborish.</li>
             <li><strong>Payme / Click</strong> — toʻlovlar.</li>
-            <li><strong>Telegram</strong> — Memour jamoasiga xizmat bildirishnomalari (shaxsiy maʼlumotlaringizsiz).</li>
+            <li><strong>Telegram</strong> — Memour jamoasiga xizmat bildirishnomalari (shaxsiy maʼlumotlaringizsiz). Agar kabinetda Memour Telegram-botini oʻzingiz ulasangiz, u chatingizga toʻyingiz haqida yozadi: juftlik ismlari, nechta yangi kadr kelgani, toʻlov va arxiv oʻchiriladigan sana. Botni uzmaguningizcha (kabinetdagi «Uzish» tugmasi yoki /stop buyrugʻi) chat identifikatori, Telegramdagi ismingiz va username saqlanadi. Xabarlar Telegram serverlarida, Oʻzbekistondan tashqarida saqlanadi.</li>
           </ul>
 
           <h2>5. Sizning huquqlaringiz</h2>
@@ -97,7 +97,7 @@ useSeoMeta({
             <li><strong>Supabase</strong> — база данных и хранилище файлов (серверы в Японии).</li>
             <li><strong>Eskiz.uz</strong> — отправка SMS с кодом.</li>
             <li><strong>Payme / Click</strong> — обработка платежей.</li>
-            <li><strong>Telegram</strong> — служебные уведомления команде Memour (без ваших персональных данных).</li>
+            <li><strong>Telegram</strong> — служебные уведомления команде Memour (без ваших персональных данных). Если вы сами подключите Telegram-бот Memour в кабинете, он пишет в ваш чат о вашей свадьбе: имена пары, сколько пришло новых кадров, об оплате и о дате удаления архива. Идентификатор чата, имя и username в Telegram мы храним, пока вы не отключите бота (кнопка «Отключить» в кабинете или команда /stop). Сообщения хранятся на серверах Telegram за пределами Узбекистана.</li>
           </ul>
 
           <h2>5. Ваши права</h2>

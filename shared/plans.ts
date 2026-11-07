@@ -19,8 +19,10 @@
  * already in are never turned away, and an upgrade raises the cap at
  * once (it is read from the event's tier on every claim).
  *
- * Features: the live slideshow and the couple's design of the guest
- * page (cover, colour, greeting) start at Pro.
+ * Features: the live slideshow, the couple's design of the guest page
+ * (cover, colour, greeting) and the couple's Telegram bot (digest of
+ * new uploads, payment notice, archive reminders —
+ * server/utils/telegram-couple.ts) start at Pro.
  */
 export const PLAN_TIERS = ['basic', 'pro', 'premium', 'luxury'] as const
 export type PlanTier = (typeof PLAN_TIERS)[number]
@@ -43,13 +45,13 @@ export const GUEST_LIMIT_BY_TIER: Record<PlanTier, number> = {
   luxury: 500,
 }
 
-export type PlanFeature = 'live_slideshow' | 'branding'
+export type PlanFeature = 'live_slideshow' | 'branding' | 'telegram_bot'
 
 export const PLAN_FEATURES: Record<PlanTier, readonly PlanFeature[]> = {
   basic: [],
-  pro: ['live_slideshow', 'branding'],
-  premium: ['live_slideshow', 'branding'],
-  luxury: ['live_slideshow', 'branding'],
+  pro: ['live_slideshow', 'branding', 'telegram_bot'],
+  premium: ['live_slideshow', 'branding', 'telegram_bot'],
+  luxury: ['live_slideshow', 'branding', 'telegram_bot'],
 }
 
 /** The event's tier; a missing or unknown one is Basic. */

@@ -41,7 +41,7 @@ export type ConsentDoc = (typeof CONSENT_DOCS)[number]
 export const CONSENT_CONTEXTS = ['lead', 'login', 'guest_upload', 'checkout'] as const
 export type ConsentContext = (typeof CONSENT_CONTEXTS)[number]
 
-export const INTERIM_VERSIONS = { privacy: 'interim-2026-09-28', terms: 'interim-2026-09-28' } as const
+export const INTERIM_VERSIONS = { privacy: 'interim-2026-09-30', terms: 'interim-2026-09-28' } as const
 export const GUEST_LICENCE_VERSION = '2026-09-28.2'
 
 type Meta = Record<LegalDoc, { version: string; sha256: string; open: Record<string, number>; todo?: Record<string, number> }>

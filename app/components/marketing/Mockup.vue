@@ -33,7 +33,6 @@ const senderInitial = computed(() => t('features.mockup.voiceSender').slice(0, 1
 // Photo slots — crops and sizes in scripts/optimize-images.mjs (MOCK).
 // The first projector thumbnail is the photo on screen.
 const STRIP = ['mock-strip-slideshow', 'mock-strip-dance', 'mock-strip-bouquet', 'mock-strip-sparklers', 'mock-strip-candles'] as const
-const ALBUM = ['mock-album-couple', 'mock-album-table', 'mock-album-first-look', 'mock-album-champagne'] as const
 </script>
 
 <template>
@@ -310,12 +309,13 @@ const ALBUM = ['mock-album-couple', 'mock-album-table', 'mock-album-first-look',
   </div>
 
   <!-- ───────────── Telegram ───────────── -->
-  <!-- A preview of the couple's bot, which isn't live yet: its card and
-       the bot's status line say «скоро». Like the real notices will, it
-       names tables, never guests. -->
-  <!-- Tight paddings and leading, and the first bubble's time on its
-       sender line (as Telegram sets it), keep the input row whole in
-       the 12rem stage (sm); the 15rem stage (3xl) gets its padding back. -->
+  <!-- A preview of the couple's bot (Pro and up), as it really writes:
+       text with a link, no pictures — a digest of the last window's
+       uploads, then the archive reminder. Like the real notices, it
+       counts frames and never names a guest. -->
+  <!-- Tight paddings and leading, and each bubble's time on its link
+       line, keep the input row whole in the 12rem stage (sm); the 15rem
+       stage (3xl) gets its padding back. -->
   <div v-else-if="cardKey === 'telegram'" class="absolute inset-0 flex flex-col gap-0 p-3 sm:p-2 3xl:p-3">
     <div
       class="flex items-center gap-2 rounded-t-lg px-2.5 py-1.5"
@@ -346,31 +346,22 @@ const ALBUM = ['mock-album-couple', 'mock-album-table', 'mock-album-first-look',
         background: `radial-gradient(120% 100% at 50% 0%, oklch(96% 0.015 ${hue}) 0%, oklch(94% 0.01 240) 100%)`,
       }"
     >
-      <div class="self-start max-w-[85%] rounded-xl rounded-bl-sm bg-white px-2.5 py-1 leading-tight shadow-sm">
-        <div class="flex items-center gap-1 text-[10px] font-semibold text-(--color-foreground)">
-          <span class="grid h-3 w-3 place-items-center rounded-full text-[8px]" :style="{ background: `oklch(85% 0.14 ${hue + 30})` }">📷</span>
-          {{ t('features.mockup.botNotifyTitle') }}
+      <div class="self-start max-w-[88%] rounded-xl rounded-bl-sm bg-white px-2.5 py-1 leading-tight shadow-sm">
+        <div class="text-[10px] font-semibold text-(--color-foreground)">
+          <span aria-hidden="true">📸</span> {{ t('features.mockup.botNotifyTitle') }}
         </div>
-        <div class="mt-0.5 flex items-baseline justify-between gap-2 text-(--color-muted-foreground)">
-          <span class="text-[9px]">{{ t('features.mockup.botNotifyBy') }}</span>
-          <span class="text-[8px]">14:38</span>
+        <div class="mt-0.5 flex items-baseline justify-between gap-2">
+          <span class="text-[9px]" :style="{ color: `oklch(52% 0.18 ${hue})` }">{{ t('features.mockup.botNotifyBy') }}</span>
+          <span class="text-[8px] text-(--color-muted-foreground)">14:38</span>
         </div>
       </div>
-      <!-- One row of 4 thumbs keeps the whole chat inside a 12rem stage. -->
-      <div class="self-start w-[146px] max-w-[90%] rounded-xl rounded-bl-sm bg-white p-1 shadow-sm">
-        <div class="grid grid-cols-4 gap-0.5 overflow-hidden rounded-md">
-          <div
-            v-for="photo in ALBUM"
-            :key="photo"
-            class="relative aspect-square overflow-hidden"
-            :style="{ background: 'oklch(90% 0.03 60)' }"
-          >
-            <MarketingPhoto :name="photo" sizes="34px" class="absolute inset-0 h-full w-full object-cover" />
-          </div>
+      <div class="self-start max-w-[88%] rounded-xl rounded-bl-sm bg-white px-2.5 py-1 leading-tight shadow-sm">
+        <div class="text-[10px] font-semibold text-(--color-foreground)">
+          <span aria-hidden="true">⏳</span> {{ t('features.mockup.botArchiveTitle') }}
         </div>
-        <div class="mt-1 flex items-center justify-between px-0.5 text-[9px] leading-tight">
-          <span class="font-medium text-(--color-foreground)">{{ t('features.mockup.botArchiveCaption') }}</span>
-          <span class="text-(--color-muted-foreground)">14:38</span>
+        <div class="mt-0.5 flex items-baseline justify-between gap-2">
+          <span class="text-[9px]" :style="{ color: `oklch(52% 0.18 ${hue})` }">{{ t('features.mockup.botArchiveCaption') }}</span>
+          <span class="text-[8px] text-(--color-muted-foreground)">10:00</span>
         </div>
       </div>
       <div class="mt-auto flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 shadow-inner ring-1 ring-(--color-border)/50">

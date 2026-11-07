@@ -6,6 +6,7 @@ import {
 import type { Database } from '~/types/database.types'
 import { recordManualPayment, cancelManualPayments } from '../../../utils/manual-payment'
 import { fail, failZod } from '../../../utils/errors'
+import { notifyEventActivated } from '../../../utils/telegram-couple'
 
 /**
  * PATCH /api/admin/events/[id] — fix an event after creation.
@@ -83,6 +84,9 @@ export default defineEventHandler(async (event) => {
   // record only affects the referral report, so log it and go on.
   try {
     if (updates.status === 'active' && ev!.status !== 'active') {
+      // A manual payment (cash / transfer): the couple's connected chats
+      // hear "payment received" like after Payme or Click.
+      if (ev!.status === 'draft') void notifyEventActivated(admin, saved!.id)
       await recordManualPayment(admin, saved!, adminId)
     } else if (updates.status === 'draft' && ev!.status !== 'draft') {
       await cancelManualPayments(admin, saved!.id)

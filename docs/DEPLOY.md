@@ -54,9 +54,11 @@ exactly what's missing); **warn** rows only log a warning.
 | `ESKIZ_EMAIL`, `ESKIZ_PASSWORD` | warn | Eskiz SMS gateway credentials (СМС шлюз, not the cabinet password). Without them couples can't log in by SMS. |
 | `ESKIZ_SENDER`, `ESKIZ_BASE_URL` | — | Optional, default `4546` / `https://notify.eskiz.uz/api`. |
 | `OTP_SMS_HOURLY_CAP` | — | Optional, default `200`: login SMS per hour site-wide before SMS login pauses (the founder gets a Telegram alert). Tune to the Eskiz budget. |
-| `TELEGRAM_BOT_TOKEN` | warn | Admin 2FA codes, lead and payment alerts. Without it nobody can log into `/admin`. |
+| `TELEGRAM_BOT_TOKEN` | warn | Admin 2FA codes, lead and payment alerts, the couples' notifications. Without it nobody can log into `/admin`. |
 | `TELEGRAM_LEAD_CHAT_ID` | warn | Chat that receives new-lead and payment alerts. |
-| `TELEGRAM_BOT_USERNAME` | — | Optional, for deep links. |
+| `TELEGRAM_BOT_USERNAME` | warn | The bot's username without `@`: the dashboard's `t.me/<bot>?start=…` link. Without it couples can't connect Telegram. |
+| `TELEGRAM_WEBHOOK_SECRET` | warn | 16–256 characters of `A–Z a–z 0–9 _ -` (`openssl rand -hex 32`): Telegram sends it with every update and `/api/telegram/webhook` refuses anything else (503 while it is unset). Without it the bot can't receive `/start`, so couples can't connect. After setting or changing it, run `scripts/telegram-setup.mjs` (§7). |
+| `TELEGRAM_DIGEST_WINDOW_SECONDS` | — | Optional, default `600`: at most one "new photos" digest per event per this many seconds. Only lowered for tests. |
 | `PAYME_MERCHANT_ID`, `PAYME_MERCHANT_KEY` | fatal if half-set | Payme: set both or neither. Sandbox: the TEST_KEY plus `PAYME_CHECKOUT_URL`. |
 | `PAYME_LOGIN`, `PAYME_CHECKOUT_URL` | — | Optional, default `Paycom` / `https://checkout.paycom.uz` (sandbox: `https://test.paycom.uz`). |
 | `PAYME_IKPU_CODE`, `PAYME_PACKAGE_CODE`, `PAYME_VAT_PERCENT` | warn if Payme is on without them | The receipt line Payme needs for tax rules (ИКПУ, package code, VAT 12 or 0 — ask the accountant). Without all three the webhook sends no `detail`. |
@@ -319,6 +321,7 @@ journalctl -u memour -n 30 --no-pager   # "[memour] env check passed." or the wa
 curl -s  https://memour.uz/api/health           # {"ok":true} — liveness, no DB
 curl -s 'https://memour.uz/api/health?deep=1'  # {"ok":true}; 503 db_unavailable if Supabase is down/paused
 ls /srv/memour/app/.output/server/chunks/tasks/cleanup-archives.mjs   # retention task bundled
+ls /srv/memour/app/.output/server/chunks/tasks/telegram-reminders.mjs  # couple bot's daily reminders bundled
 curl -sI https://memour.uz/uz | grep -iE 'strict-transport|x-frame|content-security|permissions|referrer|x-powered'
 curl -sI https://memour.uz/uz/e/00000000-0000-0000-0000-000000000000 | grep -i x-robots-tag   # noindex
 curl -s  https://memour.uz/robots.txt    # absolute Sitemap line
@@ -332,6 +335,44 @@ Monitoring: point the process watchdog at `https://memour.uz/api/health`
 `https://memour.uz/api/health?deep=1` — **alert only**, never restart on
 it: restarting Node doesn't wake a paused database, it only cuts off
 uploads in progress and resets the rate limits.
+
+### Telegram bot (couples' notifications)
+
+Once, and again whenever `TELEGRAM_WEBHOOK_SECRET`, `NUXT_PUBLIC_SITE_URL`
+or the bot changes — as the app user, from the release directory:
+
+```bash
+cd /srv/memour/app
+node --env-file=/etc/memour/memour.env scripts/telegram-setup.mjs --dry-run   # what it will send; secret and token masked
+node --env-file=/etc/memour/memour.env scripts/telegram-setup.mjs             # setWebhook + name, descriptions, commands (uz, ru)
+node --env-file=/etc/memour/memour.env scripts/telegram-setup.mjs --info      # webhook URL, pending updates, last error
+```
+
+What a re-run touches: `setWebhook` always (the secret can't be read
+back); Telegram's queue of undelivered updates is dropped only on the
+first setup — while the webhook isn't at this URL yet — or with
+`--drop-pending`, so a couple who pressed Start during a restart still
+gets linked. The name, descriptions and commands are read first and set
+only when they differ; Telegram rate-limits these edits, and a `wait …`
+line (429) means the old text stays until you run the script again
+later — the webhook is already set, the exit code is 0.
+
+`--info` must show `webhook: https://memour.uz/api/telegram/webhook`,
+`allowed updates: message, my_chat_member` and no recent `last error`.
+Then check it end to end: open a Pro test event in the dashboard, press
+«Подключить Telegram», press Start in Telegram — the bot answers «Готово!…»
+and the chat appears on the card; «Отключить» removes it. A request without
+the secret is refused:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://memour.uz/api/telegram/webhook   # 401
+```
+
+The setup only changes what the bot receives; the team's alerts and admin
+codes keep working as before (they only send). Archive reminders go out
+daily at 05:00 server time (10:00 in Tashkent on a UTC server); the journal
+shows `[telegram-bot] reminders done {…}`. Pending upload digests are sent
+when the service stops (`[telegram-bot] shutdown: N pending digest(s) sent`).
 
 The retention task runs daily at 03:00 server time. Until
 `RETENTION_PURGE_ENABLED=true` it only logs

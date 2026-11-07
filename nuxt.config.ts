@@ -198,7 +198,12 @@ export default defineNuxtConfig({
     },
     // Retention purge (server/tasks/cleanup-archives.ts): daily at 03:00
     // server time. Dry run until RETENTION_PURGE_ENABLED=true.
-    scheduledTasks: { '0 3 * * *': ['cleanup-archives'] },
+    // The couple bot's archive reminders (server/tasks/telegram-reminders.ts):
+    // daily at 05:00 server time — 10:00 in Tashkent on a UTC server.
+    scheduledTasks: {
+      '0 3 * * *': ['cleanup-archives'],
+      '0 5 * * *': ['telegram-reminders'],
+    },
     // Pre-compressed .gz/.br copies of /_nuxt assets; HTML and API
     // responses are compressed by nginx (docs/DEPLOY.md).
     compressPublicAssets: { gzip: true, brotli: true },

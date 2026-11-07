@@ -25,7 +25,7 @@ const META: Record<CardKey, { hue: number; span: string; soon?: boolean }> = {
   voice: { hue: 75, span: '' },
   swipe: { hue: 35, span: 'sm:col-span-2 lg:col-span-1' },
   geofence: { hue: 15, span: '' },
-  telegram: { hue: 220, span: '', soon: true },
+  telegram: { hue: 220, span: '' },
 }
 
 const cards = computed(() =>

@@ -44,7 +44,7 @@ useSeoMeta({
           <p>Mehmonlar yuborgan suratlar kelin-kuyov muvaffaqiyati uchun yigʻiladi. Suratlar:</p>
           <ul>
             <li>To&apos;y arafasida soat 18:00 dan to&apos;ydan keyingi kun soat 12:00 gacha (Toshkent vaqti) qabul qilinadi.</li>
-            <li>Geofence radiusi ichida boʻlishi kerak.</li>
+            <li>Agar tadbir uchun geozona sozlangan boʻlsa — faqat toʻyxonada yoki uning yaqinida.</li>
             <li>Kelin-kuyov noo&apos;rin suratlarni yashirish (modaratsiya) huquqiga ega.</li>
           </ul>
           <p>Fayllarga mualliflik huquqi mehmonda qoladi. Birinchi yuklashdan oldin mehmon Memour&apos;ga ularga bepul oddiy (nomutlaq) litsenziya beradi: fayllarni saqlash, kelin-kuyov albomida va zaldagi ekranda koʻrsatish hamda shaxsiy notijorat foydalanish uchun kelin-kuyovga berish. Litsenziya fayllar Memour&apos;dan oʻchirilguncha amal qiladi; kelin-kuyovga berilgan nusxalarga — muddatsiz.</p>
@@ -81,7 +81,7 @@ useSeoMeta({
           <p>Фото, отправленные гостями, собираются в альбом пары. Загрузка:</p>
           <ul>
             <li>Доступна с 18:00 накануне свадьбы до 12:00 следующего дня после свадьбы (по времени Ташкента).</li>
-            <li>Только в пределах геофенса (радиус площадки).</li>
+            <li>Если для события настроена геозона — только на площадке или рядом с ней.</li>
             <li>Пара имеет право скрыть (модерировать) неподходящие фото.</li>
           </ul>
           <p>Авторские права на файлы остаются у гостя. Перед первой загрузкой гость даёт Memour бесплатную неисключительную лицензию на них: хранить файлы, показывать их в альбоме пары и на экране в зале, передать паре для личного некоммерческого использования. Лицензия действует, пока файлы хранятся в Memour, а для копий, переданных паре, — бессрочно.</p>

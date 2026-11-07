@@ -5,6 +5,7 @@ import type { H3Event } from 'h3'
 import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
 import { notifyEventUpload } from '../../utils/telegram'
+import { queueUploadDigest } from '../../utils/telegram-couple'
 import { hitRateLimit, getTrustedClientIp } from '../../utils/rate-limit'
 import { deviceLimitsForTier, counterColumn, claimGuestDevice, type GuestMediaKind } from '../../utils/guest-quota'
 import { readMultipartLimited } from '../../utils/multipart'
@@ -526,6 +527,9 @@ export default defineEventHandler(async (event) => {
   // (event id and admin link only — no names). We don't await so the
   // guest gets their upload confirmation fast.
   void notifyEventUpload(ev!.id)
+  // The couple's own chats get a digest when the event's window closes
+  // (Pro and up; counts only, never the guest's name).
+  queueUploadDigest(ev!.id, ev!.plan_tier, kind)
 
   return {
     ok: true,

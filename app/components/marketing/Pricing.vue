@@ -37,7 +37,7 @@ type Tier = {
 
 const TIERS: Tier[] = [
   { key: 'basic', featureCount: 5 },
-  { key: 'pro', featureCount: 6, soon: [6], highlighted: true },
+  { key: 'pro', featureCount: 6, highlighted: true },
   { key: 'premium', featureCount: 6, soon: [5, 6] },
   { key: 'luxury', featureCount: 5, luxe: true },
 ]

@@ -73,6 +73,17 @@ export default defineNitroPlugin(() => {
   if (!env.TELEGRAM_LEAD_CHAT_ID) {
     warn.push('TELEGRAM_LEAD_CHAT_ID is not set — new leads reach the DB but nobody is notified')
   }
+  // The couple bot (server/utils/telegram-couple.ts) needs to hear
+  // "/start <token>": without the secret the webhook refuses everything.
+  const webhookSecret = env.TELEGRAM_WEBHOOK_SECRET ?? ''
+  if (!webhookSecret) {
+    warn.push('TELEGRAM_WEBHOOK_SECRET is not set — the bot cannot receive updates, so couples cannot connect Telegram; set it and run scripts/telegram-setup.mjs')
+  } else if (!/^[A-Za-z0-9_-]{16,256}$/.test(webhookSecret)) {
+    warn.push('TELEGRAM_WEBHOOK_SECRET must be 16–256 characters of A–Z, a–z, 0–9, _ and - (Telegram refuses anything else); generate one with `openssl rand -hex 32`')
+  }
+  if (!env.TELEGRAM_BOT_USERNAME) {
+    warn.push('TELEGRAM_BOT_USERNAME is not set — couples cannot connect Telegram (the dashboard needs it for the t.me link)')
+  }
 
   // --- Payments --------------------------------------------------------
   // A provider is either fully configured or not at all; half a config

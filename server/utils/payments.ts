@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import type { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
 import { adminLink, sendTelegram, shortId } from './telegram'
+import { notifyEventActivated } from './telegram-couple'
 
 /**
  * Shared bits of the payment flow: checkout, the Payme / Click webhooks
@@ -127,7 +128,9 @@ export function withMeta(row: Pick<PaymentRow, 'metadata'>, key: string, value: 
  *
  * The call that actually flips the event tells the team on Telegram
  * (TELEGRAM_LEAD_CHAT_ID): the couple can download their QR codes now.
- * Not awaited — a provider must never wait on Telegram.
+ * Chats the couple connected before paying hear it too ("payment
+ * received", once — server/utils/telegram-couple.ts). Not awaited — a
+ * provider must never wait on Telegram.
  */
 export async function activateEvent(admin: Admin, eventId: string): Promise<boolean> {
   const { data, error } = await admin
@@ -145,6 +148,7 @@ export async function activateEvent(admin: Admin, eventId: string): Promise<bool
       + 'Событие активно, пара может скачать QR-коды.\n'
       + adminLink(`/admin/event/${eventId}`),
     )
+    void notifyEventActivated(admin, eventId)
   }
   return true
 }

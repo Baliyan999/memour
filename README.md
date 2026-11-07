@@ -25,7 +25,7 @@ pnpm dev               # → http://localhost:3000
 Required services:
 - Supabase — the local stack above (recommended), or your own free hosted project with the migrations pushed (see [Database](#database))
 - Eskiz.uz account (optional in dev — `pnpm dev` prints the SMS login code to the server console; the email login lands in Mailpit, http://127.0.0.1:54324)
-- Telegram bot (lead notifications; also the admin 2FA channel — admin login needs it)
+- Telegram bot (lead notifications; also the admin 2FA channel — admin login needs it; and the couples' own notifications, see [Telegram bot](#telegram-bot))
 - Payme / Click merchant (optional — without credentials a provider's checkout is closed (503 `payments_unavailable`); to click through a payment locally, run `pnpm dev` with `PAYMENTS_DEV_MODE=true`)
 
 ### Env vars
@@ -65,8 +65,9 @@ The schema lives in [`supabase/migrations/`](./supabase/migrations) — the sing
 | `20260928000300_payments_unique_paid` | at most one settled provider payment per event, one row per provider transaction |
 | `20260928020000_leads_plan_tier` | `leads.plan_tier`: the tier picked on a Pricing card before the lead form was sent |
 | `20260929000000_claim_guest_device` | `claim_guest_device()`: a new guest phone joins an event only while it has fewer than its tier's guests (Basic 50, Pro 150, Premium 300, Luxury 500 — `shared/plans.ts`), atomically; phones already in are never refused |
+| `20260930000000_telegram_couple_bot` | the couple bot: one-time link tokens (sha256 only), connected chats per event, a log of one-off messages (archive reminders, payment notice; a trigger forgets the reminders when `archive_expires_at` moves) — server only |
 
-**Security model.** The browser holds the anon key and the user's JWT, so anything RLS allows is reachable straight through PostgREST. Clients therefore only *read* their own rows (events, photos, branding, payments; admins read their own `admins` row). Every write goes through a Nitro endpoint on the service role, which is where the checks live (payment gate, zod limits, ownership). Server-only tables (`phone_otps`, `admin_otps`, `guest_devices`, `leads`, `referrals`, `referral_attributions`) are closed to clients entirely. Do not add client-side `.insert/.update/.delete`; if one is ever truly needed, grant the specific columns and add a policy `WITH CHECK` — never `FOR ALL`.
+**Security model.** The browser holds the anon key and the user's JWT, so anything RLS allows is reachable straight through PostgREST. Clients therefore only *read* their own rows (events, photos, branding, payments; admins read their own `admins` row). Every write goes through a Nitro endpoint on the service role, which is where the checks live (payment gate, zod limits, ownership). Server-only tables (`phone_otps`, `admin_otps`, `guest_devices`, `leads`, `referrals`, `referral_attributions`, `telegram_*`) are closed to clients entirely. Do not add client-side `.insert/.update/.delete`; if one is ever truly needed, grant the specific columns and add a policy `WITH CHECK` — never `FOR ALL`.
 
 Deleting a couple's auth user keeps their events and payments (`events.owner_id` becomes NULL) and clears `owner_phone` in the same step, so whoever logs in with that number next doesn't get the wedding (phone login claims unowned events by `owner_phone`).
 
@@ -103,12 +104,21 @@ It is a **dry run** (logs `[retention] dry run, would purge event …`) until `R
 
 ---
 
+### Telegram bot
+
+One bot (`TELEGRAM_BOT_TOKEN`) does three jobs: the team's alerts (leads, payments, uploads — no personal data, `server/utils/telegram.ts`), admin 2FA codes, and — from Pro — the couple's own notifications (`server/utils/telegram-couple.ts`):
+
+- **Connecting.** On the event page (`components/dashboard/TelegramCard.vue`) the owner presses «Подключить Telegram / Telegramni ulash». `POST /api/couple/telegram/link/[eventId]` stores the sha256 of a random 32-byte token (15 minutes, single use) and returns `https://t.me/<TELEGRAM_BOT_USERNAME>?start=<token>`. Telegram delivers `/start <token>` to `POST /api/telegram/webhook` (checked against `TELEGRAM_WEBHOOK_SECRET`), the chat is linked, the bot confirms in the dashboard's language and the card shows the chat. Both partners can connect, a chat can follow several weddings, linking works before payment.
+- **What the couple gets** (only while the tier includes it): a digest of guest uploads — counts only, never a guest's name, at most one message per event per 10 minutes (`TELEGRAM_DIGEST_WINDOW_SECONDS`), kept in memory and flushed on shutdown; «оплата прошла» when the event goes draft → active; «скачайте архив» 30 and 7 days before `archive_expires_at` (`server/tasks/telegram-reminders.ts`, daily 05:00 server time; each message once per expiry date, `telegram_notifications`).
+- **Disconnecting.** «Отключить / Uzish» in the card, `/stop` in the chat, blocking the bot, or a chat Telegram reports as gone. The row keeps no chat id, name or username afterwards.
+- **Setup.** `node --env-file=<env> scripts/telegram-setup.mjs` sets the webhook, name, descriptions and commands (uz + ru); `--info` shows the webhook status, `--dry-run` prints what it would send; waiting updates are kept on a re-run unless `--drop-pending` (docs/DEPLOY.md §7).
+
 ## Legal documents and consents
 
-The full privacy policy, user agreement (with the guest rules) and public offer (with the refund policy) are written as drafts **outside this repo** — the drafts carry internal notes that must never be published. `scripts/legal-publish.mjs` turns them into the publishable texts:
+The full privacy policy, user agreement (with the guest rules) and public offer (with the refund policy) are written as drafts that **never enter git** (`_private/legal-drafts`, ignored) — the drafts carry internal notes that must never be published. `scripts/legal-publish.mjs` turns them into the publishable texts:
 
 ```bash
-node scripts/legal-publish.mjs --drafts ../memour-legal-drafts   # or LEGAL_DRAFTS_DIR=…
+node scripts/legal-publish.mjs   # drafts in _private/legal-drafts (git-ignored), or --drafts <dir> / LEGAL_DRAFTS_DIR=…
 ```
 
 It drops the internal sections and every `[ПРОВЕРИТЬ …]` / `[СДЕЛАТЬ …]` / `[BAJARISH …]` / `[TEKSHIRISH …]` marker (and every "[… ДО ПУБЛИКАЦИИ]" instruction), turns the operator's details into tokens, writes `server/assets/legal/{uz,ru}/{privacy,terms,offer}.md` and `shared/legal-meta.json` (version = the date the text last changed; per language the number of open placeholders and of `todo` items), and prints what it removed and what is still open. Commit only those outputs. Nothing is written if any document fails.
@@ -156,7 +166,7 @@ server/
     photo/[id]            # signed-URL redirect (with ?t=thumb)
     health.get.ts         # liveness; ?deep=1 also checks Supabase
     lead.post.ts
-  tasks/                  # Nitro scheduled tasks (retention purge)
+  tasks/                  # Nitro scheduled tasks (retention purge, Telegram archive reminders)
   utils/                  # eskiz, telegram, phone-otp, rate-limit (+ trusted client IP),
                           # errors (fail()), payments, pricing, upload-window, qr-pdf
   assets/fonts/           # Manrope.ttf (PDF Cyrillic support)
@@ -214,6 +224,7 @@ Done:
 - [x] Swipe moderation
 - [x] Payme + Click checkout + JSON-RPC/REST webhooks
 - [x] Telegram outbound notifications (lead, payment, new photo — debounced)
+- [x] Couple Telegram bot, Pro and up: upload digest, payment notice, archive reminders 30 / 7 days before deletion (see [Telegram bot](#telegram-bot))
 - [x] Sharp-based thumbnail generation + EXIF strip
 - [x] Upload progress UI (XHR-based)
 - [x] Rate limits: guest upload (20/min per device, 600/min per IP), login SMS / codes, admin login, lead form

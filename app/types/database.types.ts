@@ -550,6 +550,117 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_chat_links: {
+        Row: {
+          chat_id: number | null
+          event_id: string
+          first_name: string | null
+          id: string
+          linked_at: string
+          locale: string
+          unlink_reason: string | null
+          unlinked_at: string | null
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          chat_id?: number | null
+          event_id: string
+          first_name?: string | null
+          id?: string
+          linked_at?: string
+          locale?: string
+          unlink_reason?: string | null
+          unlinked_at?: string | null
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          chat_id?: number | null
+          event_id?: string
+          first_name?: string | null
+          id?: string
+          linked_at?: string
+          locale?: string
+          unlink_reason?: string | null
+          unlinked_at?: string | null
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_chat_links_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_link_tokens: {
+        Row: {
+          created_at: string
+          event_id: string
+          expires_at: string
+          locale: string
+          token_hash: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          expires_at: string
+          locale: string
+          token_hash: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          expires_at?: string
+          locale?: string
+          token_hash?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_link_tokens_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_notifications: {
+        Row: {
+          event_id: string
+          kind: string
+          sent_at: string
+        }
+        Insert: {
+          event_id: string
+          kind: string
+          sent_at?: string
+        }
+        Update: {
+          event_id?: string
+          kind?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_notifications_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

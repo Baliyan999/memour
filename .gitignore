@@ -22,3 +22,7 @@ logs
 .env
 .env.*
 !.env.example
+
+# Owner's local files: legal drafts (describe open issues), E2E stand, notes.
+# Never commit — this repo is public.
+_private/

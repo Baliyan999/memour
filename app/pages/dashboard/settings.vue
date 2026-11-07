@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 import { useI18n, useSwitchLocalePath, useLocalePath } from '#imports'
 import { motion } from 'motion-v'
-import { Globe, MessageSquare, LogOut, ChevronRight } from '@lucide/vue'
+import { Globe, Send, LogOut, ChevronRight } from '@lucide/vue'
+import type { Database } from '~/types/database.types'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -11,15 +12,16 @@ definePageMeta({ layout: 'dashboard' })
  *
  * Sections:
  *   • Language (links to the locale-switched copy of this same page)
- *   • Telegram bot — not built yet: a plain card with the «скоро»
- *     pill, no link (the bot doesn't answer /start yet). Make it a
- *     link again once the couple's bot can bind to an account.
+ *   • Telegram bot — chats are connected per wedding, on the event
+ *     page (components/dashboard/TelegramCard.vue). The card leads
+ *     there: straight to the Telegram section when the account has one
+ *     event, to the event list otherwise.
  *   • Sign out
  */
 const { t, locale, locales } = useI18n()
 const localePath = useLocalePath()
 const switchLocalePath = useSwitchLocalePath()
-const supabase = useSupabaseClient()
+const supabase = useSupabaseClient<Database>()
 const user = useSupabaseUser()
 const router = useRouter()
 
@@ -36,6 +38,16 @@ const displayEmail = computed(() => {
 const localeOptions = computed(() =>
   (locales.value as Array<{ code: 'ru' | 'uz'; name: string }>),
 )
+
+// RLS returns only this account's events; two rows are enough to know
+// whether there is a single wedding to go to.
+const { data: eventIds } = await useAsyncData('settings-event-ids', async () => {
+  const { data } = await supabase.from('events').select('id').limit(2)
+  return (data ?? []).map((e) => e.id)
+})
+const telegramTo = computed(() => eventIds.value?.length === 1
+  ? `${localePath(`/dashboard/event/${eventIds.value[0]}`)}#telegram`
+  : localePath('/dashboard'))
 
 const { toast } = useToast()
 const signingOut = ref(false)
@@ -105,18 +117,24 @@ async function signOut() {
         </div>
       </div>
 
-      <!-- Telegram — coming soon, so not a link -->
-      <div class="surface-card flex items-center gap-3 rounded-(--radius-xl) p-6">
-        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-600">
-          <MessageSquare class="h-5 w-5" :stroke-width="1.6" />
+      <!-- Telegram — connected per wedding, on its page -->
+      <NuxtLink
+        :to="telegramTo"
+        class="surface-card group flex items-center justify-between gap-4 rounded-(--radius-xl) p-6 transition-[background-color,transform] duration-150 hover:bg-(--color-muted)/30 active:scale-[0.99]"
+      >
+        <div class="flex items-center gap-3">
+          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sky-100 text-sky-600">
+            <Send class="h-5 w-5" :stroke-width="1.6" />
+          </div>
+          <div>
+            <p class="font-medium">{{ t('couple.settings.telegramTitle') }}</p>
+            <p class="text-xs text-(--color-muted-foreground)">
+              {{ t('couple.settings.telegramHint') }}
+            </p>
+          </div>
         </div>
-        <div>
-          <p class="font-medium"><MarketingSoonBadge :text="t('couple.settings.telegramTitle')" /></p>
-          <p class="text-xs text-(--color-muted-foreground)">
-            {{ t('couple.settings.telegramHint') }}
-          </p>
-        </div>
-      </div>
+        <ChevronRight class="h-5 w-5 shrink-0 text-(--color-muted-foreground) transition-transform group-hover:translate-x-1" />
+      </NuxtLink>
 
       <!-- Sign out -->
       <button

@@ -1,8 +1,9 @@
 /**
  * Telegram helpers — outbound notifications via the Memour bot.
  *
- * - `sendTelegram(text, chatId?)` — send and report the outcome.
- *   chatId defaults to TELEGRAM_LEAD_CHAT_ID (the founder's chat).
+ * - `sendTelegram(text, chatId?, opts?)` — send and report the outcome.
+ *   chatId defaults to TELEGRAM_LEAD_CHAT_ID (the founder's chat). A
+ *   short 429 flood wait is waited out and retried once.
  *   Never throws; notifications can ignore the result, but anything a
  *   user waits for (admin 2FA codes) must check `ok`.
  * - `escapeHtml(s)` — for any user-supplied value in a message.
@@ -13,11 +14,15 @@
  * - `adminLink(path)` / `shortId(uuid)` — what a notification may
  *   carry instead of personal data.
  *
- * No personal data goes to Telegram: no names (guests' or the
+ * No personal data goes to the team's chat: no names (guests' or the
  * couple's), phones, dates or free text from a form. Telegram keeps
  * messages on servers outside Uzbekistan, so every alert is a neutral
  * ping — a short id and a link into the admin panel, where the details
  * are behind a login.
+ *
+ * The same bot also writes to couples who connected their own chat
+ * from the dashboard (server/utils/telegram-couple.ts). Those messages
+ * go only to the couple and name their own wedding — never a guest.
  *
  * In-memory state is per-process, so when we scale to multiple Nitro
  * instances the debounce won't be perfect — that's OK; worst case is
@@ -34,29 +39,58 @@ export interface TelegramResult {
   unreachable?: boolean
 }
 
-export async function sendTelegram(text: string, chatId?: string): Promise<TelegramResult> {
+export interface SendOptions {
+  /**
+   * No link preview under the message. Couple notices link to the
+   * dashboard, which would only preview as the site's generic card.
+   */
+  noPreview?: boolean
+}
+
+// A 429 that asks to wait at most this long is retried once; a longer
+// flood wait fails the message instead of holding up the caller.
+const MAX_RETRY_AFTER_SEC = 10
+
+export async function sendTelegram(
+  text: string,
+  chatId?: string | number,
+  opts: SendOptions = {},
+): Promise<TelegramResult> {
   const token = process.env.TELEGRAM_BOT_TOKEN
   const target = chatId ?? process.env.TELEGRAM_LEAD_CHAT_ID
   if (!token || !target) {
     console.warn('[telegram] not configured (TELEGRAM_BOT_TOKEN / chat id missing)')
     return { ok: false }
   }
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: target, text, parse_mode: 'HTML' }),
-      signal: AbortSignal.timeout(10_000),
-    })
-    if (res.ok) return { ok: true }
-    // Log Telegram's reason, never the text — it may carry a login code.
-    const json: any = await res.json().catch(() => ({}))
-    const reason = String(json?.description ?? '')
-    console.error(`[telegram] send failed: ${res.status} ${reason}`)
-    return { ok: false, unreachable: res.status === 403 || /chat not found/i.test(reason) }
-  } catch (e: any) {
-    console.error('[telegram] send failed:', e?.message ?? e)
-    return { ok: false }
+  const body = JSON.stringify({
+    chat_id: target,
+    text,
+    parse_mode: 'HTML',
+    ...(opts.noPreview ? { link_preview_options: { is_disabled: true } } : {}),
+  })
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (res.ok) return { ok: true }
+      // Log Telegram's reason, never the text — it may carry a login code.
+      const json: any = await res.json().catch(() => ({}))
+      const reason = String(json?.description ?? '')
+      const retryAfter = Number(json?.parameters?.retry_after ?? 0)
+      if (res.status === 429 && attempt === 0 && retryAfter > 0 && retryAfter <= MAX_RETRY_AFTER_SEC) {
+        await new Promise((r) => setTimeout(r, retryAfter * 1000))
+        continue
+      }
+      console.error(`[telegram] send failed: ${res.status} ${reason}`)
+      return { ok: false, unreachable: res.status === 403 || /chat not found/i.test(reason) }
+    } catch (e: any) {
+      console.error('[telegram] send failed:', e?.message ?? e)
+      return { ok: false }
+    }
   }
 }
 
