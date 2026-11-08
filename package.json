@@ -11,7 +11,9 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.2.11",
@@ -28,20 +30,22 @@
     "browser-image-compression": "^2.0.2",
     "date-fns": "^4.2.1",
     "motion-v": "^2.2.1",
-    "nuxt": "^4.5.2",
+    "nuxt": "^4.6.4",
     "pdfkit": "^0.18.0",
     "qrcode": "^1.5.4",
     "sharp": "^0.35.5",
     "tailwindcss": "^4.3.0",
-    "vue": "^3.5.43",
-    "vue-router": "^5.3.1",
-    "zod": "^4.4.3"
+    "vue": "^3.5.45",
+    "vue-router": "^5.4.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "~1.63.0",
     "@types/archiver": "^7.0.0",
     "@types/pdfkit": "^0.17.6",
     "@types/qrcode": "^1.5.6",
     "typescript": "6.0.3",
+    "vitest": "^5.1.0",
     "vue-tsc": "3.3.9"
   }
 }

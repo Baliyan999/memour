@@ -13,6 +13,7 @@ import { sniffContainer, type MediaContainer } from '../../utils/media-sniff'
 import { uploadWindowState } from '../../utils/upload-window'
 import { fail } from '../../utils/errors'
 import { hasGuestConsent } from '../../utils/consent'
+import { GEOFENCE_SLACK_M } from '#shared/geofence'
 
 /**
  * POST /api/guest/upload — accepts a single photo / video / voice blob
@@ -36,6 +37,11 @@ import { hasGuestConsent } from '../../utils/consent'
  *     (magic bytes, not the client's Content-Type)
  *   - Event must exist, be `active`, and be inside its upload window
  *     (see server/utils/upload-window.ts)
+ *   - Uploads not paused by the team (events.uploads_paused) — else
+ *     423 uploads_paused. 423 Locked rather than 403: the event is held
+ *     for a while, not closed to this guest, and the same request goes
+ *     through once the pause is lifted. The client doesn't retry it on
+ *     its own (useUpload), the frame stays in review.
  *   - Soft geofence: only a guest who is clearly far away, even after
  *     allowing for their reported GPS accuracy, is refused
  *   - Per-device quota for the event's plan tier, reserved atomically
@@ -108,10 +114,10 @@ const MAX_ORIGINAL_EDGE = 4096
 const RATE_PER_DEVICE = { limit: 20, windowMs: 60_000 }
 const RATE_PER_IP = { limit: 600, windowMs: 60_000 }
 
-// Geofence slack. Indoor phone fixes are often off by hundreds of
-// metres; the check is advisory (the location comes from the client),
-// so it must never stop a guest who is actually in the hall.
-const GEOFENCE_SLACK_M = 250
+// Geofence slack (GEOFENCE_SLACK_M, shared/geofence.ts — the admin form
+// quotes it). Indoor phone fixes are often off by hundreds of metres;
+// the check is advisory (the location comes from the client), so it
+// must never stop a guest who is actually in the hall.
 const GEOFENCE_MAX_ACCURACY_M = 1500
 
 /**
@@ -357,7 +363,7 @@ export default defineEventHandler(async (event) => {
 
   const { data: ev } = await admin
     .from('events')
-    .select('id, status, wedding_date, venue_lat, venue_lng, geofence_radius, plan_tier, table_count')
+    .select('id, status, wedding_date, venue_lat, venue_lng, geofence_radius, plan_tier, table_count, uploads_paused')
     .eq('id', input.event_id)
     .maybeSingle()
   if (!ev) fail(404, 'event_not_found')
@@ -366,6 +372,7 @@ export default defineEventHandler(async (event) => {
   const windowState = uploadWindowState(ev!.wedding_date)
   if (windowState === 'before') fail(403, 'window_not_open')
   if (windowState === 'after') fail(403, 'window_closed')
+  if (ev!.uploads_paused) fail(423, 'uploads_paused')
 
   if (ev!.table_count && input.guest_table > ev!.table_count) fail(422, 'invalid_table')
 

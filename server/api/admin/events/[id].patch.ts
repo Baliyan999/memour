@@ -7,6 +7,7 @@ import type { Database } from '~/types/database.types'
 import { recordManualPayment, cancelManualPayments } from '../../../utils/manual-payment'
 import { fail, failZod } from '../../../utils/errors'
 import { notifyEventActivated } from '../../../utils/telegram-couple'
+import { geofenceShape, geofenceColumns, GEOFENCE_FIELD_CODES } from '../../../utils/geofence'
 
 /**
  * PATCH /api/admin/events/[id] — fix an event after creation.
@@ -22,7 +23,20 @@ import { notifyEventActivated } from '../../../utils/telegram-couple'
  *
  * Making an event active by hand records a 'manual' payment (the admin
  * is confirming an offline payment); taking it back to draft cancels
- * that record. Archiving leaves payments alone.
+ * that record. Archiving leaves payments alone. An archived event can
+ * be reopened (→ active or draft) until the retention task has deleted
+ * its media (purged_at): after that it stays archived (409
+ * cannot_reopen_purged) — reopening would put an empty album and dead
+ * QR codes back in front of guests.
+ *
+ * The soft geofence (venue point + radius) comes as a group — see
+ * server/utils/geofence.ts.
+ *
+ * `uploads_paused` stops guest uploads (POST /api/guest/upload → 423
+ * uploads_paused) and nothing else: the guest page says so, the live
+ * slideshow keeps running, and turning it off lets guests send again
+ * at once. The admin page sends it on its own, the moment the switch
+ * is flipped.
  */
 const bodySchema = z.object({
   couple_names: z.string().trim().min(2).max(120).optional(),
@@ -32,6 +46,8 @@ const bodySchema = z.object({
   plan_tier: z.enum(['basic', 'pro', 'premium', 'luxury']).optional(),
   status: z.enum(['draft', 'active', 'archived']).optional(),
   owner_phone: z.string().regex(/^\+998\d{9}$/).optional(),
+  ...geofenceShape,
+  uploads_paused: z.boolean().optional(),
 }).strict()
 
 const FIELD_CODES = {
@@ -39,6 +55,7 @@ const FIELD_CODES = {
   wedding_date: 'invalid_date',
   table_count: 'invalid_table_count',
   owner_phone: 'invalid_phone',
+  ...GEOFENCE_FIELD_CODES,
 }
 
 export default defineEventHandler(async (event) => {
@@ -59,13 +76,18 @@ export default defineEventHandler(async (event) => {
 
   const parsed = bodySchema.safeParse(await readBody(event))
   if (!parsed.success) failZod(parsed.error, FIELD_CODES)
-  const updates = parsed.data
+  const { venue_lat, venue_lng, geofence_radius, ...fields } = parsed.data
+  const geofence = geofenceColumns({ venue_lat, venue_lng, geofence_radius })
+  const updates = geofence ? { ...fields, ...geofence } : fields
 
   const { data: ev } = await admin
-    .from('events').select('id, status, plan_tier, owner_id, owner_phone').eq('id', id!).maybeSingle()
+    .from('events').select('id, status, plan_tier, owner_id, owner_phone, purged_at').eq('id', id!).maybeSingle()
   if (!ev) fail(404, 'event_not_found')
   if (updates.owner_phone !== undefined && updates.owner_phone !== ev!.owner_phone && ev!.owner_id) {
     fail(409, 'already_claimed')
+  }
+  if (ev!.purged_at && updates.status !== undefined && updates.status !== 'archived') {
+    fail(409, 'cannot_reopen_purged')
   }
   if (!Object.keys(updates).length) return { ok: true }
 
@@ -73,7 +95,7 @@ export default defineEventHandler(async (event) => {
     .from('events')
     .update(updates)
     .eq('id', id!)
-    .select('id, couple_names, wedding_date, venue_name, status, plan_tier, owner_id, owner_phone, table_count')
+    .select('id, couple_names, wedding_date, venue_name, status, plan_tier, owner_id, owner_phone, table_count, venue_lat, venue_lng, geofence_radius, uploads_paused, purged_at')
     .single()
   if (error || !saved) {
     console.error('[admin/events] update', error)

@@ -19,7 +19,7 @@ export interface LiveFeedResponse {
 }
 
 /** Why the slideshow can't run — each maps to a full-screen state. */
-export type LiveClosedReason = 'not_found' | 'not_active' | 'archived' | 'not_in_plan'
+export type LiveClosedReason = 'not_found' | 'not_active' | 'archived' | 'not_in_plan' | 'bad_link'
 
 const POLL_MS = 4_000
 // Retries back off to this and no further. When the venue router loses
@@ -40,6 +40,8 @@ export function liveClosedReason(e: any): LiveClosedReason | null {
   const code = e?.data?.data?.code ?? e?.data?.code
   const status = e?.statusCode ?? e?.status ?? e?.response?.status
   if (code === 'event_archived' || status === 410) return 'archived'
+  // Before the bare 403 below: a missing or replaced secret is final.
+  if (code === 'live_link_invalid') return 'bad_link'
   if (code === 'not_in_plan') return 'not_in_plan'
   if (code === 'event_not_active' || status === 403) return 'not_active'
   if (code === 'event_not_found' || code === 'invalid_id' || status === 404) return 'not_found'
@@ -48,8 +50,16 @@ export function liveClosedReason(e: any): LiveClosedReason | null {
 
 const ts = (s: string) => Date.parse(s)
 
+/** Closed for good — nothing to wait for, so polling stops. */
+const FINAL: ReadonlySet<LiveClosedReason> = new Set(['archived', 'not_found', 'bad_link'])
+
 /**
  * Server-driven feed for the live slideshow.
+ *
+ * `key` is the event's slideshow secret, the `k` of the private link
+ * the couple shares (live-init answers 403 live_link_invalid without
+ * it, or once the couple replaced it — the page then says to ask the
+ * couple for the link).
  *
  * Polls live-init with an `after` cursor every few seconds instead of
  * Realtime: anon can't read `photos` through RLS, so postgres_changes
@@ -65,6 +75,7 @@ const ts = (s: string) => Date.parse(s)
  */
 export function useLiveFeed(
   eventId: string,
+  key: string,
   opts: {
     initial: LiveFeedResponse | null
     initialError: unknown
@@ -137,7 +148,7 @@ export function useLiveFeed(
     }
     inFlight = true
     const restoring = restore.splice(0, 50)
-    const query: Record<string, string> = {}
+    const query: Record<string, string> = { k: key }
     if (newest) query.after = newest
     if (restoring.length) query.ids = restoring.join(',')
     let next = POLL_MS
@@ -158,7 +169,7 @@ export function useLiveFeed(
       const reason = liveClosedReason(e)
       if (reason) {
         closed.value = reason
-        if (reason === 'archived' || reason === 'not_found') return // nothing to wait for
+        if (FINAL.has(reason)) return // nothing to wait for
         next = NOT_ACTIVE_POLL_MS
       } else {
         failures++
@@ -178,7 +189,7 @@ export function useLiveFeed(
 
   /** Poll now (network back, tab visible again, woke from sleep). */
   function pollNow() {
-    if (disposed || closed.value === 'archived' || closed.value === 'not_found') return
+    if (disposed || (closed.value && FINAL.has(closed.value))) return
     if (inFlight) pollAgain = true
     else schedulePoll(0)
   }
@@ -206,7 +217,7 @@ export function useLiveFeed(
     window.addEventListener('offline', onOffline)
     window.addEventListener('pageshow', onOnline)
     document.addEventListener('visibilitychange', onVisible)
-    if (closed.value === 'archived' || closed.value === 'not_found') return
+    if (closed.value && FINAL.has(closed.value)) return
     schedulePoll(closed.value === 'not_active' || closed.value === 'not_in_plan'
       ? NOT_ACTIVE_POLL_MS
       : opts.initial ? POLL_MS : 0)

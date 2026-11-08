@@ -13,6 +13,11 @@ node_modules
 logs
 *.log
 
+# Test output (Playwright)
+test-results
+playwright-report
+blob-report
+
 # Misc
 .DS_Store
 .fleet
@@ -22,6 +27,8 @@ logs
 .env
 .env.*
 !.env.example
+# scripts/deploy.sh settings (server address)
+scripts/deploy.env
 
 # Owner's local files: legal drafts (describe open issues), E2E stand, notes.
 # Never commit — this repo is public.

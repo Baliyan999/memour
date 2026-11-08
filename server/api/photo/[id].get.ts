@@ -11,9 +11,12 @@ import { fail } from '../../utils/errors'
  *
  * Public: anyone with an item UUID gets the URL while the event is
  * active and the item isn't hidden. UUIDs are cryptographically random
- * so guessing them is infeasible. Used by the live slideshow which is
- * shared via a (couple-controlled) link — so only for tiers that have
+ * so guessing them is infeasible. Used by the live slideshow, which
+ * learns item ids only from its feed — behind the couple's private link
+ * (live-init wants the event's secret) — so only for tiers that have
  * the slideshow (Pro and up); on Basic the answer is 403 not_in_plan.
+ * Someone holding a link the couple has since replaced keeps only the
+ * ids the feed gave them while it worked, never a way to new ones.
  *
  * Owner: the couple also gets hidden items and items of non-active
  * events — the dashboard's Hidden filter and moderation show them so

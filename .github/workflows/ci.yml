@@ -73,3 +73,91 @@ jobs:
 
       - name: Lint
         run: supabase db lint --fail-on error
+
+  # Unit tests for the pure logic: tiers, prices, upload window, error
+  # codes, file sniffing, bot texts, consents (tests/unit).
+  unit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Unit tests
+        run: pnpm test
+
+  # Smoke tests of the built app in Chromium against a local Supabase
+  # started from this repo's config (tests/e2e). Every SMS / Telegram
+  # call the server makes is answered by a mock preloaded into it, so
+  # nothing leaves the runner; auth emails land in the stack's Mailpit.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      E2E_PORT: '3100'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Postgres, Auth, Storage, REST and Mailpit; the dashboard and the
+      # log pipeline aren't needed.
+      - name: Start local Supabase
+        run: supabase start -x studio,edge-runtime,logflare,vector,imgproxy
+
+      # API_URL, ANON_KEY, SERVICE_ROLE_KEY … for the steps below (the
+      # local stack's well-known demo keys, not secrets).
+      - name: Export the local stack's URL and keys
+        run: supabase status -o env | grep -E '^[A-Z0-9_]+=' | sed -E 's/^([A-Z0-9_]+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+        env:
+          NUXT_PUBLIC_SITE_URL: http://localhost:${{ env.E2E_PORT }}
+          NUXT_PUBLIC_SUPABASE_URL: ${{ env.API_URL }}
+          NUXT_PUBLIC_SUPABASE_KEY: ${{ env.ANON_KEY }}
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

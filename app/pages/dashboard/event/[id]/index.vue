@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n, useLocalePath } from '#imports'
 import { motion, AnimatePresence, useReducedMotion } from 'motion-v'
 import {
   QrCode, Copy, Check, ChevronDown, Download, Play, Mic, Star, ArchiveRestore, LoaderCircle, RefreshCw,
+  MonitorPlay, CircleCheck, X,
 } from '@lucide/vue'
 import type { Database } from '~/types/database.types'
 import { formatDate, formatDuration } from '~/utils/format'
@@ -26,10 +27,25 @@ definePageMeta({ layout: 'dashboard' })
  * tier's limit, and on Basic the slideshow and branding buttons carry
  * a "Pro" mark and open a note on what a higher tier adds — as does the
  * Telegram card (components/dashboard/TelegramCard.vue).
+ *
+ * The live slideshow (Pro and up, active events) opens by a private
+ * link, /<locale>/e/<id>/live?k=<events.live_token>: the card below the
+ * QR codes shows and copies it, and "new link" replaces the secret
+ * (POST /api/couple/event/[id]/live-link) so the old link stops.
+ *
+ * Checkout sends the couple back here with ?checkout=1 (server/api/
+ * checkout/[provider].post.ts). The provider's webhook may land a few
+ * seconds later, so instead of "unpaid" the page says the payment is
+ * being confirmed and polls the event's status (every 3 s, at most
+ * 2 minutes, only while the page is open). Paid → a quiet confirmation;
+ * still draft after that → a note that it can take a few minutes, with
+ * our contact, and the pay buttons again. The parameter is then
+ * dropped from the address, so a reload doesn't start it over.
  */
 const { t, te, locale } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
+const router = useRouter()
 const config = useRuntimeConfig()
 const supabase = useSupabaseClient<Database>()
 const requestFetch = useRequestFetch()
@@ -261,6 +277,52 @@ async function copyTableUrl(n: number) {
   }
 }
 
+// ─── Live slideshow link ─────────────────────────────────────────────
+// The event id alone is on every QR card, so the slideshow wants the
+// event's secret too. The link follows the dashboard's language, like
+// the table links above.
+const liveToken = computed(() => ev.value?.live_token ?? '')
+const livePath = computed(() => `/${locale.value}/e/${id}/live?k=${liveToken.value}`)
+const liveUrl = computed(() => `${siteUrl}${livePath.value}`)
+const liveUrlShort = computed(() => `${siteHost}${livePath.value}`)
+const liveCopied = ref(false)
+let liveCopiedTimer: ReturnType<typeof setTimeout> | undefined
+
+async function copyLiveUrl() {
+  if (await copyText(liveUrl.value)) {
+    liveCopied.value = true
+    toast.success(t('couple.event.liveLinkCopied'))
+    clearTimeout(liveCopiedTimer)
+    liveCopiedTimer = setTimeout(() => { liveCopied.value = false }, 1600)
+  } else {
+    toast.error(t('couple.event.copyFailed'))
+  }
+}
+
+const liveRotating = ref(false)
+async function newLiveLink() {
+  if (liveRotating.value || !ev.value) return
+  const ok = await confirmDialog({
+    title: t('couple.event.liveNewTitle'),
+    description: t('couple.event.liveNewConfirm'),
+    confirmLabel: t('couple.event.liveNewButton'),
+    cancelLabel: t('common.cancel'),
+  })
+  if (!ok) return
+  liveRotating.value = true
+  try {
+    const res = await $fetch<{ live_token: string }>(`/api/couple/event/${id}/live-link`, { method: 'POST' })
+    // useAsyncData data is a shallow ref: replace the object, don't patch it.
+    if (ev.value) ev.value = { ...ev.value, live_token: res.live_token }
+    liveCopied.value = false
+    toast.success(t('couple.event.liveNewDone'))
+  } catch (e) {
+    toast.error(errMsg(e))
+  } finally {
+    liveRotating.value = false
+  }
+}
+
 function saveBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -389,9 +451,11 @@ async function startCheckout(provider: 'payme' | 'click') {
       },
     )
     if (res.dev) {
-      // Dev fallback: payment marked paid server-side immediately,
-      // just reload to pick up the new active status.
-      window.location.reload()
+      // Dev fallback: the payment is already marked paid server-side.
+      // Come back the way a provider does (same origin, whatever
+      // siteUrl says), so the return below runs too.
+      const back = new URL(res.url, window.location.origin)
+      window.location.assign(back.pathname + back.search)
       return
     }
     if (typeof window !== 'undefined') window.location.href = res.url
@@ -414,6 +478,121 @@ async function startCheckout(provider: 'payme' | 'click') {
     payPending.value = false
   }
 }
+
+// ─── Back from checkout ──────────────────────────────────────────────
+// `?checkout=…` marks the return (only the key counts: a provider may
+// append its own parameters to the value). Decided during setup, so the
+// server already renders the right card and nothing flashes "unpaid".
+const RETURN_PARAM = 'checkout'
+const PAY_POLL_MS = 3_000
+const PAY_WAIT_MS = 120_000
+type PayState = 'idle' | 'processing' | 'confirmed' | 'slow'
+const returnedFromCheckout = route.query[RETURN_PARAM] !== undefined
+const payState = ref<PayState>(
+  !returnedFromCheckout ? 'idle'
+    : ev.value?.status === 'draft' ? 'processing'
+      : ev.value?.status === 'active' ? 'confirmed'
+        : 'idle',
+)
+let payTimer: ReturnType<typeof setTimeout> | undefined
+let payDeadline = 0
+let payDisposed = false
+
+/** Has the event left draft? Reads it as the couple, through RLS. */
+async function eventPaid(): Promise<boolean> {
+  const { data, error } = await supabase.from('events').select('status').eq('id', id).maybeSingle()
+  if (error) throw error
+  return !!data && data.status !== 'draft'
+}
+
+function stopPayPoll() {
+  clearTimeout(payTimer)
+  payTimer = undefined
+}
+
+function dropReturnParam() {
+  if (route.query[RETURN_PARAM] === undefined) return
+  const { [RETURN_PARAM]: _, ...query } = route.query
+  router.replace({ query, hash: route.hash })
+}
+
+async function payConfirmed() {
+  stopPayPoll()
+  await refreshEv()
+  if (payDisposed) return
+  payState.value = ev.value?.status === 'active' ? 'confirmed' : 'idle'
+  dropReturnParam()
+}
+
+async function pollPayment() {
+  payTimer = undefined
+  let paid = false
+  try {
+    paid = await eventPaid()
+  } catch {
+    // A dropped request is no answer: ask again on the next tick.
+  }
+  if (payDisposed || payState.value !== 'processing') return
+  if (paid) return payConfirmed()
+  if (Date.now() >= payDeadline) {
+    payState.value = 'slow'
+    dropReturnParam()
+    return
+  }
+  payTimer = setTimeout(pollPayment, PAY_POLL_MS)
+}
+
+/** "Payment didn't go through?" — straight back to the pay buttons. */
+function leaveProcessing() {
+  stopPayPoll()
+  payState.value = 'idle'
+  dropReturnParam()
+}
+
+const payChecking = ref(false)
+async function checkPaymentAgain() {
+  if (payChecking.value) return
+  payChecking.value = true
+  try {
+    if (await eventPaid()) await payConfirmed()
+    else toast.info(t('couple.event.payStillPending'))
+  } catch (e) {
+    toast.error(errMsg(e))
+  } finally {
+    payChecking.value = false
+  }
+}
+
+function dismissPaid() {
+  payState.value = 'idle'
+}
+
+onMounted(() => {
+  if (payState.value === 'processing') {
+    payDeadline = Date.now() + PAY_WAIT_MS
+    void pollPayment()
+  } else if (returnedFromCheckout) {
+    dropReturnParam()
+  }
+})
+onBeforeUnmount(() => {
+  payDisposed = true
+  stopPayPoll()
+})
+
+// Who to write to when a payment hangs: the operator's phone once the
+// legal details are configured (NUXT_PUBLIC_LEGAL_PHONE), else the
+// address the rest of the site gives.
+const supportContact = computed(() => {
+  const legal = config.public.legal as { entityPhone?: string; entityEmail?: string } | undefined
+  const phone = String(legal?.entityPhone ?? '').trim()
+  if (phone) return { href: `tel:${phone.replace(/[^\d+]/g, '')}`, label: phone }
+  const email = String(legal?.entityEmail ?? '').trim() || 'hello@memour.uz'
+  return { href: `mailto:${email}`, label: email }
+})
+
+const payCardEnter = computed(() => reduceMotion.value ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 })
+const payCardExit = computed(() => reduceMotion.value ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 })
 
 const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--color-border) bg-white px-4 text-sm transition-[transform,background-color] duration-150 hover:bg-(--color-muted) active:scale-[0.97] disabled:opacity-60'
 </script>
@@ -466,10 +645,11 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
             <!-- Not in this tier: the page itself says what Pro adds. -->
             <span v-if="!brandingInPlan" class="rounded-full bg-(--color-accent)/60 px-1.5 py-px text-[10px] font-medium uppercase tracking-wider text-(--color-primary)">{{ t('pricing.pro.name') }}</span>
           </NuxtLink>
-          <!-- The slideshow only runs for active events; it follows the couple's language. -->
+          <!-- The slideshow only runs for active events; it follows the
+               couple's language and carries its secret (card below). -->
           <a
             v-if="ev.status === 'active' && liveInPlan"
-            :href="localePath(`/e/${ev.id}/live`)"
+            :href="livePath"
             target="_blank"
             rel="noopener"
             :class="btn"
@@ -538,9 +718,102 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
       </AnimatePresence>
     </div>
 
-    <!-- Pay-to-activate banner: shown only for draft events -->
+    <!-- Back from checkout: confirming → paid, or "taking longer" -->
+    <AnimatePresence mode="wait" :initial="false">
+      <motion.section
+        v-if="payState === 'processing'"
+        key="pay-processing"
+        class="mb-6 rounded-(--radius-xl) border border-(--color-primary)/20 bg-gradient-to-br from-(--color-accent)/30 to-(--color-rose)/15 p-6"
+        role="status"
+        aria-live="polite"
+        :initial="payCardEnter"
+        :animate="{ opacity: 1, y: 0, scale: 1 }"
+        :exit="payCardExit"
+        :transition="spring"
+      >
+        <div class="flex items-start gap-4">
+          <div class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/70 text-(--color-primary)">
+            <LoaderCircle class="h-5 w-5 motion-safe:animate-spin" :stroke-width="1.6" aria-hidden="true" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] uppercase tracking-[0.3em] text-(--color-muted-foreground)">{{ t('couple.event.payEyebrow') }}</p>
+            <h2 class="mt-1 font-display text-2xl italic leading-snug">{{ t('couple.event.payProcessingTitle') }}</h2>
+            <p class="mt-2 text-sm text-(--color-muted-foreground)">{{ t('couple.event.payProcessingDesc') }}</p>
+            <button
+              type="button"
+              class="mt-3 -ml-1 rounded-full px-1 py-1 text-left text-sm text-(--color-muted-foreground) underline-offset-4 transition-colors hover:text-(--color-foreground) hover:underline"
+              @click="leaveProcessing"
+            >{{ t('couple.event.payNotFinished') }}</button>
+          </div>
+        </div>
+      </motion.section>
+
+      <motion.section
+        v-else-if="payState === 'confirmed' && ev.status === 'active'"
+        key="pay-confirmed"
+        class="mb-6 rounded-(--radius-xl) border border-emerald-200 bg-gradient-to-br from-emerald-50 to-(--color-accent)/25 p-6"
+        role="status"
+        aria-live="polite"
+        :initial="payCardEnter"
+        :animate="{ opacity: 1, y: 0, scale: 1 }"
+        :exit="payCardExit"
+        :transition="spring"
+      >
+        <div class="flex items-start gap-4">
+          <motion.div
+            class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/80 text-emerald-700"
+            :initial="reduceMotion ? false : { scale: 0.6, opacity: 0 }"
+            :animate="{ scale: 1, opacity: 1 }"
+            :transition="reduceMotion ? { duration: 0 } : { type: 'spring', bounce: 0.25, duration: 0.6, delay: 0.1 }"
+          >
+            <CircleCheck class="h-6 w-6" :stroke-width="1.6" aria-hidden="true" />
+          </motion.div>
+          <div class="min-w-0 flex-1">
+            <h2 class="font-display text-2xl italic leading-snug">{{ t('couple.event.payConfirmedTitle') }}</h2>
+            <p class="mt-1 text-sm text-(--color-muted-foreground)">{{ t('couple.event.payConfirmedDesc') }}</p>
+          </div>
+          <button
+            type="button"
+            class="-mr-2 -mt-2 grid h-9 w-9 shrink-0 place-items-center rounded-full text-(--color-muted-foreground) transition-[transform,background-color] duration-150 hover:bg-white/70 hover:text-(--color-foreground) active:scale-90"
+            :aria-label="t('common.close')"
+            @click="dismissPaid"
+          >
+            <X class="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      </motion.section>
+
+      <motion.section
+        v-else-if="payState === 'slow' && ev.status === 'draft'"
+        key="pay-slow"
+        class="surface-card mb-4 rounded-(--radius-xl) p-6"
+        role="status"
+        aria-live="polite"
+        :initial="payCardEnter"
+        :animate="{ opacity: 1, y: 0, scale: 1 }"
+        :exit="payCardExit"
+        :transition="spring"
+      >
+        <p class="text-[10px] uppercase tracking-[0.3em] text-(--color-muted-foreground)">{{ t('couple.event.payEyebrow') }}</p>
+        <h2 class="mt-1 font-display text-2xl italic leading-snug">{{ t('couple.event.paySlowTitle') }}</h2>
+        <p class="mt-2 text-sm text-(--color-muted-foreground)">{{ t('couple.event.paySlowDesc') }}</p>
+        <i18n-t keypath="couple.event.paySlowContact" tag="p" scope="global" class="mt-2 text-sm text-(--color-muted-foreground)">
+          <template #contact>
+            <a :href="supportContact.href" class="font-medium text-(--color-primary) underline-offset-4 hover:underline">{{ supportContact.label }}</a>
+          </template>
+        </i18n-t>
+        <button type="button" :disabled="payChecking" :aria-busy="payChecking" :class="[btn, 'mt-4']" @click="checkPaymentAgain">
+          <LoaderCircle v-if="payChecking" class="h-4 w-4 animate-spin" aria-hidden="true" />
+          <RefreshCw v-else class="h-4 w-4" aria-hidden="true" />
+          {{ t('couple.event.payCheckAgain') }}
+        </button>
+      </motion.section>
+    </AnimatePresence>
+
+    <!-- Pay-to-activate banner: shown only for draft events (not while
+         a payment we were just sent back from is being confirmed) -->
     <div
-      v-if="ev.status === 'draft'"
+      v-if="ev.status === 'draft' && payState !== 'processing'"
       class="mb-6 flex flex-col gap-4 rounded-(--radius-xl) border border-(--color-primary)/20 bg-gradient-to-br from-(--color-accent)/30 to-(--color-rose)/15 p-6 sm:flex-row sm:items-center sm:justify-between"
     >
       <div>
@@ -654,6 +927,60 @@ const btn = 'inline-flex h-10 items-center gap-2 rounded-full border border-(--c
           </ul>
         </motion.div>
       </AnimatePresence>
+    </section>
+
+    <!-- Live slideshow: the private link for the screen in the hall -->
+    <section v-if="ev.status === 'active' && liveInPlan" id="slideshow" class="surface-card mb-6 rounded-(--radius-xl) p-5 sm:p-6">
+      <div class="flex items-start gap-3">
+        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-(--color-accent)/40 text-(--color-primary)">
+          <MonitorPlay class="h-5 w-5" :stroke-width="1.6" aria-hidden="true" />
+        </div>
+        <div class="min-w-0">
+          <h2 class="font-display text-xl leading-snug">{{ t('couple.event.liveTitle') }}</h2>
+          <p class="mt-1 text-sm text-(--color-muted-foreground)">{{ t('couple.event.liveDesc') }}</p>
+        </div>
+      </div>
+
+      <div class="mt-4 flex min-w-0 items-center gap-2 rounded-md border border-(--color-border) bg-white py-1.5 pl-3 pr-1.5">
+        <AnimatePresence mode="wait" :initial="false">
+          <motion.a
+            :key="liveToken"
+            :href="livePath"
+            target="_blank"
+            rel="noopener"
+            class="min-w-0 flex-1 truncate text-xs text-(--color-muted-foreground) hover:text-(--color-foreground)"
+            :title="liveUrl"
+            :initial="{ opacity: 0 }"
+            :animate="{ opacity: 1 }"
+            :exit="{ opacity: 0 }"
+            :transition="spring"
+          >{{ liveUrlShort }}</motion.a>
+        </AnimatePresence>
+        <button
+          type="button"
+          class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-(--color-primary) px-3.5 text-xs font-medium text-(--color-primary-foreground) transition-[transform,opacity] duration-150 hover:opacity-90 active:scale-[0.96]"
+          @click="copyLiveUrl"
+        >
+          <Check v-if="liveCopied" class="h-3.5 w-3.5" aria-hidden="true" />
+          <Copy v-else class="h-3.5 w-3.5" aria-hidden="true" />
+          {{ t('couple.event.liveCopy') }}
+        </button>
+      </div>
+
+      <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-xs text-(--color-muted-foreground)">{{ t('couple.event.liveHint') }}</p>
+        <button
+          type="button"
+          :disabled="liveRotating"
+          :aria-busy="liveRotating"
+          class="-ml-1 inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-full px-1 text-xs text-(--color-muted-foreground) transition-colors hover:text-(--color-foreground) disabled:opacity-60 sm:ml-0 sm:self-auto"
+          @click="newLiveLink"
+        >
+          <LoaderCircle v-if="liveRotating" class="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          <RefreshCw v-else class="h-3.5 w-3.5" aria-hidden="true" />
+          {{ t('couple.event.liveNewButton') }}
+        </button>
+      </div>
     </section>
 
     <!-- The couple's own Telegram chats: upload digests, payment notice,

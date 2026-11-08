@@ -12,7 +12,8 @@ definePageMeta({ layout: 'admin' })
  * uses service-role to bypass RLS). The page itself is gated by the
  * global auth middleware that checks the admins table. A failed load
  * says so (with a retry) instead of "no events yet". Each row shows its
- * guests against the tier's limit (shared/plans.ts), amber from 90 %.
+ * guests against the tier's limit (shared/plans.ts), amber from 90 %,
+ * and a "paused" badge while guest uploads are paused.
  */
 const { t, te, locale } = useI18n()
 const localePath = useLocalePath()
@@ -29,6 +30,7 @@ const { data, error, refresh, pending } = await useFetch<{
     owner_id: string | null
     created_at: string
     table_count: number | null
+    uploads_paused: boolean
     guests: number
   }>
 }>('/api/admin/events')
@@ -61,7 +63,7 @@ const guestsNear = (ev: { guests: number; plan_tier: string | null }) =>
 
 <template>
   <div>
-    <div class="mb-8 flex items-end justify-between gap-4">
+    <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
       <h1 class="heading-display-md">{{ t('admin.events.title') }}</h1>
       <NuxtLink
         :to="localePath('/admin/event/create')"
@@ -69,9 +71,9 @@ const guestsNear = (ev: { guests: number; plan_tier: string | null }) =>
       >{{ t('admin.events.create') }}</NuxtLink>
     </div>
 
-    <ul v-if="pending" class="grid gap-3" aria-busy="true">
+    <ul v-if="pending" class="grid grid-cols-1 gap-3" aria-busy="true">
       <li v-for="i in 4" :key="i">
-        <div class="surface-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-(--radius-xl) p-5">
+        <div class="surface-card grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-(--radius-xl) p-5">
           <div class="flex-1 space-y-2">
             <Skeleton class="h-5 w-48" />
             <Skeleton class="h-3 w-64" />
@@ -98,15 +100,15 @@ const guestsNear = (ev: { guests: number; plan_tier: string | null }) =>
       <p class="mt-2 text-(--color-muted-foreground)">{{ t('admin.events.emptyDesc') }}</p>
     </div>
 
-    <ul v-else class="grid gap-3">
+    <ul v-else class="grid grid-cols-1 gap-3">
       <li v-for="ev in data.events" :key="ev.id">
-        <div class="surface-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-(--radius-xl) p-5">
+        <div class="surface-card grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-(--radius-xl) p-5">
           <div>
             <div class="flex flex-wrap items-center gap-2">
-              <h2 class="font-display text-lg">{{ ev.couple_names }}</h2>
+              <h2 class="min-w-0 font-display text-lg wrap-break-word">{{ ev.couple_names }}</h2>
               <span
                 :class="[
-                  'rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider',
+                  'rounded-full px-2 py-0.5 text-[0.625rem] uppercase tracking-wider',
                   ev.status === 'active'
                     ? 'bg-green-500/15 text-green-700'
                     : ev.status === 'draft'
@@ -114,30 +116,31 @@ const guestsNear = (ev: { guests: number; plan_tier: string | null }) =>
                       : 'bg-(--color-muted) text-(--color-muted-foreground)',
                 ]"
               >{{ statusLabel(ev.status) }}</span>
-              <span v-if="tierLabel(ev.plan_tier)" class="rounded-full bg-(--color-muted) px-2 py-0.5 text-[10px] uppercase tracking-wider text-(--color-muted-foreground)">{{ tierLabel(ev.plan_tier) }}</span>
+              <span v-if="tierLabel(ev.plan_tier)" class="rounded-full bg-(--color-muted) px-2 py-0.5 text-[0.625rem] uppercase tracking-wider text-(--color-muted-foreground)">{{ tierLabel(ev.plan_tier) }}</span>
+              <span v-if="ev.uploads_paused" class="rounded-full bg-amber-100 px-2 py-0.5 text-[0.625rem] uppercase tracking-wider text-amber-800">{{ t('admin.events.paused') }}</span>
             </div>
-            <p class="mt-1 text-sm text-(--color-muted-foreground)">
+            <p class="mt-1 text-sm text-(--color-muted-foreground) wrap-break-word">
               {{ fmtDate(ev.wedding_date) }}<span v-if="ev.venue_name"> · {{ ev.venue_name }}</span>
             </p>
             <p
-              class="mt-1 text-[11px] tabular-nums"
+              class="mt-1 text-[0.6875rem] tabular-nums"
               :class="guestsNear(ev) ? 'text-amber-700' : 'text-(--color-muted-foreground)'"
             >
               {{ t('admin.events.guests', { n: ev.guests, max: guestLimitForTier(ev.plan_tier) }) }}
             </p>
             <p
               v-if="!ev.owner_id"
-              class="mt-1 text-[11px] text-amber-700"
+              class="mt-1 text-[0.6875rem] text-amber-700"
               :title="t('admin.events.notClaimedHint')"
             >
               {{ t('admin.events.notClaimed') }}
             </p>
           </div>
           <div class="flex flex-col items-end gap-2">
-            <code class="text-[10px] text-(--color-muted-foreground)">{{ ev.id.slice(0, 8) }}</code>
+            <code class="text-[0.625rem] text-(--color-muted-foreground)">{{ ev.id.slice(0, 8) }}</code>
             <button
               type="button"
-              class="inline-flex h-7 items-center gap-1 rounded-full border border-(--color-border) bg-white px-3 text-[11px] text-(--color-foreground) hover:bg-(--color-muted)"
+              class="inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full border border-(--color-border) bg-white px-3 text-[0.6875rem] text-(--color-foreground) hover:bg-(--color-muted)"
               :title="t('admin.events.qrHint')"
               @click="openQr(ev)"
             >
@@ -150,7 +153,7 @@ const guestsNear = (ev: { guests: number; plan_tier: string | null }) =>
             </button>
             <NuxtLink
               :to="localePath(`/admin/event/${ev.id}`)"
-              class="inline-flex h-7 items-center rounded-full border border-(--color-border) bg-white px-3 text-[11px] text-(--color-foreground) hover:bg-(--color-muted)"
+              class="inline-flex min-h-7 items-center whitespace-nowrap rounded-full border border-(--color-border) bg-white px-3 text-[0.6875rem] text-(--color-foreground) hover:bg-(--color-muted)"
             >{{ t('admin.events.edit') }}</NuxtLink>
           </div>
         </div>

@@ -290,7 +290,7 @@ function onKey(e: KeyboardEvent) {
           </div>
 
           <!-- Weekday header -->
-          <div aria-hidden="true" class="mb-1 grid grid-cols-7 text-center text-[10px] uppercase text-(--color-muted-foreground)">
+          <div aria-hidden="true" class="mb-1 grid grid-cols-7 text-center text-[0.625rem] uppercase text-(--color-muted-foreground)">
             <span v-for="(w, i) in weekDayLabels" :key="i" class="py-1">{{ w }}</span>
           </div>
 
@@ -307,7 +307,7 @@ function onKey(e: KeyboardEvent) {
               :aria-pressed="!!selected && isSameDay(d, selected)"
               :aria-current="isSameDay(d, today) ? 'date' : undefined"
               :class="[
-                'h-9 w-9 rounded-md text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) pointer-fine:h-8 pointer-fine:w-8 pointer-fine:text-[12px]',
+                'h-9 w-9 rounded-md text-[0.8125rem] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) pointer-fine:h-8 pointer-fine:w-8 pointer-fine:text-[0.75rem]',
                 isSameMonth(d, cursor) ? '' : 'opacity-40',
                 isDisabled(d) ? 'cursor-not-allowed opacity-30' : 'hover:bg-(--color-accent)/50',
                 selected && isSameDay(d, selected)

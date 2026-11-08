@@ -95,7 +95,7 @@ const statusBadge: Record<string, string> = {
 
 <template>
   <div>
-    <div class="mb-8 flex items-end justify-between gap-4">
+    <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
       <h1 class="heading-display-md">{{ t('admin.leads.title') }}</h1>
       <p class="text-sm text-(--color-muted-foreground)">
         {{ t('admin.leads.total', { n: data?.total ?? 0 }) }}
@@ -109,7 +109,7 @@ const statusBadge: Record<string, string> = {
         :key="s"
         type="button"
         :class="[
-          'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors',
+          'inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors',
           statusFilter === s
             ? 'border-(--color-primary) bg-(--color-primary) text-(--color-primary-foreground)'
             : 'border-(--color-border) bg-white text-(--color-muted-foreground) hover:text-(--color-foreground)',
@@ -118,7 +118,7 @@ const statusBadge: Record<string, string> = {
       >
         <template v-if="s === 'all'">{{ t('admin.leads.all') }}</template>
         <template v-else>{{ statusLabel(s) }}</template>
-        <span v-if="s !== 'all'" class="text-[10px]">{{ counts[s] }}</span>
+        <span v-if="s !== 'all'" class="text-[0.625rem]">{{ counts[s] }}</span>
       </button>
     </div>
 
@@ -143,27 +143,27 @@ const statusBadge: Record<string, string> = {
       <p class="mt-2 text-(--color-muted-foreground)">{{ t('admin.leads.emptyDesc') }}</p>
     </div>
 
-    <ul v-else class="grid gap-3">
+    <ul v-else class="grid grid-cols-1 gap-3">
       <li v-if="data && filtered.length >= data.limit" class="text-xs text-(--color-muted-foreground)">
         {{ t('admin.leads.shownLast', { n: data.limit }) }}
       </li>
       <li v-for="lead in filtered" :key="lead.id">
-        <div class="surface-card flex flex-col gap-3 rounded-(--radius-xl) p-5 sm:grid sm:grid-cols-[1fr_auto] sm:items-start">
-          <div>
+        <div class="surface-card flex flex-col gap-3 rounded-(--radius-xl) p-5 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+          <div class="min-w-0 sm:flex-1 sm:basis-80">
             <div class="flex flex-wrap items-center gap-2">
-              <h2 class="font-display text-lg">{{ lead.name }}</h2>
+              <h2 class="min-w-0 font-display text-lg wrap-break-word">{{ lead.name }}</h2>
               <a
                 :href="`tel:${lead.phone}`"
                 class="text-sm text-(--color-primary) hover:underline"
               >{{ formatPhone(lead.phone) }}</a>
-              <span :class="['rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider', statusBadge[lead.status]]">
+              <span :class="['rounded-full px-2 py-0.5 text-[0.625rem] uppercase tracking-wider', statusBadge[lead.status]]">
                 {{ statusLabel(lead.status) }}
               </span>
-              <span v-if="lead.plan_tier" class="rounded-full bg-(--color-accent)/60 px-2 py-0.5 text-[10px] uppercase tracking-wider text-(--color-primary)">
+              <span v-if="lead.plan_tier" class="rounded-full bg-(--color-accent)/60 px-2 py-0.5 text-[0.625rem] uppercase tracking-wider text-(--color-primary)">
                 {{ t('lead.chosenTier', { tier: t(`pricing.${lead.plan_tier}.name`) }) }}
               </span>
             </div>
-            <p class="mt-1 text-sm text-(--color-muted-foreground)">
+            <p class="mt-1 text-sm text-(--color-muted-foreground) wrap-anywhere">
               {{ fmtDateTime(lead.created_at) }}
               <span v-if="lead.wedding_date"> · {{ t('admin.leads.wedding', { date: fmtDate(lead.wedding_date) }) }}</span>
               <span v-if="lead.guests_estimate"> · {{ t('admin.leads.guests', { n: lead.guests_estimate }) }}</span>
@@ -177,25 +177,25 @@ const statusBadge: Record<string, string> = {
             <button
               v-if="lead.status === 'new'"
               type="button"
-              class="inline-flex h-8 items-center rounded-full bg-amber-100 px-3 text-xs text-amber-800 hover:bg-amber-200"
+              class="inline-flex min-h-8 items-center rounded-full bg-amber-100 px-3 text-xs text-amber-800 hover:bg-amber-200"
               @click="setStatus(lead, 'contacted')"
             >{{ t('admin.leads.markContacted') }}</button>
             <button
               v-if="lead.status !== 'won' && lead.status !== 'lost'"
               type="button"
-              class="inline-flex h-8 items-center rounded-full bg-emerald-100 px-3 text-xs text-emerald-800 hover:bg-emerald-200"
+              class="inline-flex min-h-8 items-center rounded-full bg-emerald-100 px-3 text-xs text-emerald-800 hover:bg-emerald-200"
               @click="createEventFromLead(lead)"
             >{{ t('admin.leads.createEvent') }}</button>
             <button
               v-if="lead.status !== 'lost' && lead.status !== 'won'"
               type="button"
-              class="inline-flex h-8 items-center rounded-full bg-red-100 px-3 text-xs text-red-800 hover:bg-red-200"
+              class="inline-flex min-h-8 items-center rounded-full bg-red-100 px-3 text-xs text-red-800 hover:bg-red-200"
               @click="setStatus(lead, 'lost')"
             >{{ t('admin.leads.markLost') }}</button>
             <button
               v-if="lead.status === 'won' || lead.status === 'lost'"
               type="button"
-              class="inline-flex h-8 items-center rounded-full border border-(--color-border) bg-white px-3 text-xs text-(--color-muted-foreground) hover:bg-(--color-muted)"
+              class="inline-flex min-h-8 items-center rounded-full border border-(--color-border) bg-white px-3 text-xs text-(--color-muted-foreground) hover:bg-(--color-muted)"
               @click="setStatus(lead, 'new')"
             >{{ t('admin.leads.reopen') }}</button>
           </div>

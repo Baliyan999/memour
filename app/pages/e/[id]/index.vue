@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { motion, AnimatePresence, useReducedMotion } from 'motion-v'
-import { Check, Users } from '@lucide/vue'
+import { Check, Pause, Users } from '@lucide/vue'
 import { useI18n, useSwitchLocalePath } from '#imports'
 
 definePageMeta({ layout: 'guest' })
@@ -37,7 +37,13 @@ const otherLocaleLabel = computed(() => (locale.value === 'ru' ? "O'zbekcha" : '
  *      upload counts against a per-device quota for the event's tier
  *      (see server/utils/guest-quota.ts). Modes the tier doesn't
  *      include aren't shown; a used-up mode shows a "done" card.
- *   5. The tier also caps how many phones join the event (shared/
+ *   5. The team can pause uploads (events.uploads_paused, admin event
+ *      page): inside the window the guest gets a "paused" card instead
+ *      of the welcome form or the camera, and the page checks again
+ *      every 30 s (and on "check again"). A frame refused mid-shot
+ *      (423 uploads_paused) stays in review with the message; the card
+ *      follows once it is dropped. The live slideshow isn't affected.
+ *   6. The tier also caps how many phones join the event (shared/
  *      plans.ts). A phone that isn't bound yet while the event is full
  *      (`guests_full`, or the server's 409 guest_limit_reached) gets a
  *      friendly "all places are taken" card instead of the welcome
@@ -93,13 +99,14 @@ type EventResp = {
     couple_names: string
     wedding_date: string
     venue_name: string | null
-    venue_lat: number | null
-    venue_lng: number | null
-    geofence_radius: number | null
+    // The venue has a geofence: ask the phone for its location before a
+    // send (the point itself stays on the server).
+    geofence: boolean
     status: string
     plan_tier: string | null
     table_count: number | null
     archive_expires_at: string | null
+    uploads_paused: boolean
     branding: {
       bride_name: string | null
       groom_name: string | null
@@ -168,8 +175,12 @@ watch(
 )
 
 const isActive = computed(() => ev.value?.status === 'active')
+// Paused by the team; `pausedByServer` covers an upload refused before
+// the page heard about it, until the next fresh event answer.
+const pausedByServer = ref(false)
+const uploadsPaused = computed(() => ev.value?.uploads_paused === true || pausedByServer.value)
 const isDraft = computed(() => ev.value?.status === 'draft')
-const geofenceEnabled = computed(() => ev.value?.venue_lat != null && ev.value?.venue_lng != null)
+const geofenceEnabled = computed(() => ev.value?.geofence === true)
 
 // --- Upload window ----------------------------------------------------
 // The server says where "now" is relative to the window; on the client
@@ -194,7 +205,7 @@ const tableOutOfRange = computed(() => {
   return !!(count && tableParam.value && tableParam.value > count)
 })
 
-type Stage = 'checking' | 'welcome' | 'camera' | 'wrong_table' | 'no_table' | 'quota_full' | 'window_before' | 'window_after' | 'guest_limit'
+type Stage = 'checking' | 'welcome' | 'camera' | 'wrong_table' | 'no_table' | 'quota_full' | 'window_before' | 'window_after' | 'guest_limit' | 'paused'
 // First render (SSR and hydration) only uses what the server sent, so
 // both sides agree; decideStage() refines it on mount. On a full event
 // the server can't know yet whether this phone is already in (camera)
@@ -204,6 +215,7 @@ function initialStage(): Stage {
   const s = uploadWindow.value?.state
   if (s === 'before') return 'window_before'
   if (s === 'after') return 'window_after'
+  if (data.value?.event.uploads_paused) return 'paused'
   if (!tableParam.value || tableOutOfRange.value) return 'no_table'
   if (guestsFull.value) return 'checking'
   return 'welcome'
@@ -284,6 +296,10 @@ function decideStage() {
     stage.value = 'window_after'
     return
   }
+  if (uploadsPaused.value) {
+    stage.value = 'paused'
+    return
+  }
   if (!tableParam.value || tableOutOfRange.value) {
     stage.value = 'no_table'
     return
@@ -334,8 +350,9 @@ async function refreshBinding() {
   })
   serverSkewMs.value = Date.parse(fresh.upload_window.server_now) - Date.now()
   nowTick.value = Date.now()
-  // The event too: decideStage() reads its table count.
+  // The event too: decideStage() reads its table count and the pause.
   data.value = fresh
+  pausedByServer.value = false
   binding.value = fresh.binding
   consented.value = fresh.consented
   guestsFull.value = fresh.guests_full
@@ -388,11 +405,33 @@ onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
 
 onBeforeUnmount(() => {
   clearInterval(tickTimer)
+  clearInterval(pauseTimer)
   clearTimeout(sentTimer)
   window.removeEventListener('beforeunload', onBeforeUnload)
 })
 
-watch([tableParam, binding, windowState, allExhausted], decideStage)
+watch([tableParam, binding, windowState, allExhausted, uploadsPaused], decideStage)
+
+// While paused, look again every 30 s: the camera comes back on its
+// own once the team lifts the pause.
+const PAUSE_POLL_MS = 30_000
+let pauseTimer: ReturnType<typeof setInterval> | undefined
+const checkingPause = ref(false)
+async function checkPauseAgain() {
+  if (checkingPause.value) return
+  checkingPause.value = true
+  try {
+    await refreshBinding()
+  } catch {
+    // Still paused as far as we know; the next tick tries again.
+  } finally {
+    checkingPause.value = false
+  }
+}
+watch(stage, (s) => {
+  clearInterval(pauseTimer)
+  pauseTimer = s === 'paused' ? setInterval(checkPauseAgain, PAUSE_POLL_MS) : undefined
+})
 watch(captureBusy, (busy) => { if (!busy) decideStage() })
 
 const welcomePending = ref(false)
@@ -513,6 +552,11 @@ async function onRejected(code: string) {
     counts.value = { ...counts.value, [col]: Math.max(counts.value[col], limits.value[mode.value]) }
   } else if (code === 'window_closed') {
     windowClosedByServer.value = true
+  } else if (code === 'uploads_paused') {
+    // The frame waits in review with the message; the "paused" card
+    // takes over once the guest lets it go (decideStage on not busy).
+    pausedByServer.value = true
+    return
   } else if (code === 'not_in_plan') {
     // The tier was lowered while the page was open: this mode is gone,
     // and with it the capture component showing why. Say it where it
@@ -1132,6 +1176,26 @@ useSeoMeta({
                 ? t('guest.window.afterDesc', { date: closesLabel.date, time: closesLabel.time })
                 : t('guest.errors.window_closed') }}
             </p>
+          </div>
+        </div>
+
+        <!-- ============== UPLOADS PAUSED BY THE TEAM ============== -->
+        <div v-else-if="stage === 'paused'" key="paused" :class="['text-center', hasCover ? '-mt-10' : 'mt-8']">
+          <div class="surface-card rounded-(--radius-xl) p-8" role="status">
+            <div class="mx-auto grid h-14 w-14 place-items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700">
+              <Pause class="h-6 w-6" :stroke-width="1.6" aria-hidden="true" />
+            </div>
+            <p class="mt-4 text-xs uppercase tracking-[0.3em] text-(--color-muted-foreground)">{{ ev.couple_names }}</p>
+            <h2 class="mt-2 font-display text-2xl italic">{{ t('guest.paused.title') }}</h2>
+            <p class="mt-3 text-sm leading-relaxed text-(--color-muted-foreground)">
+              {{ t('guest.paused.desc') }}
+            </p>
+            <button
+              type="button"
+              :disabled="checkingPause"
+              class="mt-6 inline-flex h-12 w-full touch-manipulation items-center justify-center rounded-full border border-(--color-border) bg-white px-5 text-sm font-medium text-(--color-foreground) transition-transform duration-100 active:scale-[0.98] disabled:opacity-50 motion-reduce:active:scale-100"
+              @click="checkPauseAgain"
+            >{{ checkingPause ? t('guest.state.loading') : t('guest.paused.checkAgain') }}</button>
           </div>
         </div>
 

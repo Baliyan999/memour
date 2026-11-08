@@ -6,7 +6,7 @@ Small team, simple rules.
 
 1. Branch off `main`: `feat/<what>`, `fix/<what>`, `docs/<what>`.
 2. Open a PR to `main` — even for small changes. No direct pushes to `main`.
-3. CI (typecheck + build) must be green before merge.
+3. CI (typecheck + build, migrations, unit and e2e tests) must be green before merge.
 4. One reviewer approval is enough. Keep PRs small and focused.
 
 ## Before you push
@@ -14,9 +14,10 @@ Small team, simple rules.
 ```bash
 pnpm exec nuxt typecheck
 pnpm build
+pnpm test
 ```
 
-Both must pass — CI runs exactly these two.
+All three must pass. CI also applies the migrations to a fresh database and runs the e2e smoke tests ([Tests](#tests)).
 
 ## Conventions
 
@@ -60,3 +61,50 @@ Local URLs: API `http://127.0.0.1:54321`, Studio `http://127.0.0.1:54323`, Mailp
 - **Stop** — `npx supabase stop` (data kept) or `npx supabase stop --no-backup` (wiped).
 
 No shared credentials are needed at any point. A hosted project of your own works too: `npx supabase link --project-ref <your ref>` + `npx supabase db push`. Never link or push to the prod project — the owner applies prod migrations ([docs/PROD-DB-APPLY.md](./docs/PROD-DB-APPLY.md)). Eskiz/Payme/Click are optional in dev (the app falls back gracefully without them).
+
+## Tests
+
+**Tests never touch production.** The e2e harness refuses any Supabase or Mailpit URL that isn't on your machine, the app under test gets fake Telegram/Eskiz credentials, and a fetch mock preloaded into it answers every SMS and Telegram call locally and blocks every other outbound host. Never point `API_URL` or the keys at a hosted project.
+
+### Unit (`tests/unit`, Vitest)
+
+```bash
+pnpm test
+```
+
+Pure logic only: tiers (`shared/plans.ts`, and that the pricing copy matches them), prices, the upload window, the error contract on both sides, file sniffing, bot texts, consents, phone and rate-limit helpers. No database, no network, no Nuxt app: the `#shared` / `~` / `~~` aliases resolve to the real folders, and the few auto-imports the code calls (`createError`, `getRequestHeader`, `useRuntimeConfig`) are shimmed in `tests/unit/setup.ts`. A test that needs the database mocks `#supabase/server` (see `guest-quota.test.ts`).
+
+### E2E (`tests/e2e`, Playwright, Chromium)
+
+They run the **built** app against your local stack:
+
+```bash
+npx supabase start                            # local stack incl. Mailpit (:54324)
+set -a; eval "$(npx supabase status -o env)"; set +a   # API_URL, ANON_KEY, SERVICE_ROLE_KEY
+pnpm build
+pnpm exec playwright install chromium         # once (or E2E_CHROMIUM_CHANNEL=chrome to use your Chrome)
+pnpm test:e2e
+```
+
+- The global setup builds nothing: it fails with a clear message if `.output/` is missing or the variables aren't set, then starts `.output/server/index.mjs` on `E2E_PORT` (default 3100) with `tests/e2e/harness/mock-fetch.mjs` preloaded, and stops it after the run.
+- Logs of the last run: `test-results/e2e-run/server.log` (the app) and `test-results/e2e-run/mock.jsonl` (every SMS / Telegram message the app tried to send). A failed test leaves a trace: `pnpm exec playwright show-trace test-results/<test>/trace.zip`.
+- The browser reaches only `localhost`; fonts and CDNs are blocked.
+
+**Adding a scenario** — a new `tests/e2e/<name>.spec.ts`:
+
+```ts
+import { expect, test } from './harness/fixtures'
+import { t } from './harness/messages'
+import { gotoHydrated } from './harness/pages'
+
+test('…', async ({ page, seed }) => {
+  const event = await seed.event({ plan_tier: 'premium' })   // active, wedding today
+  await gotoHydrated(page, `/uz/e/${event.id}?t=1`)          // waits for hydration before typing
+  await expect(page.getByText(t('uz', 'guest.welcome.eyebrow'))).toBeVisible()
+})
+```
+
+- Seed only through `seed` (`event()`, `user()`, `admin()`), and name things with `seed.name()` / `seed.email()`: every row gets the test's unique `e2e-xxxxxxxx` prefix and is deleted after the test — storage objects, events (photos, guest devices, branding cascade), leads, admin login codes, auth users, emails. `consent_events` is append-only by design, so the consent records a test writes stay.
+- Assert visible text with `t(locale, key)` from `i18n/locales`, never with copied strings.
+- Codes and notifications: `waitForMock(toTelegramChat(chatId))` (`harness/mock-log.ts`); auth emails: `waitForMail(address)` (`harness/mailbox.ts`).
+- Keep scenarios smoke-level, independent of each other and of what else is in the database.

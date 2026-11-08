@@ -2,9 +2,10 @@
 /**
  * Point the Memour bot at this server and set up its profile.
  *
- *   node --env-file=/etc/memour/memour.env scripts/telegram-setup.mjs --dry-run  # print, call nothing
- *   node --env-file=/etc/memour/memour.env scripts/telegram-setup.mjs            # apply
- *   node --env-file=/etc/memour/memour.env scripts/telegram-setup.mjs --info     # read-only status
+ *   cd /var/www/memour     # the live release on the server (docs/DEPLOY.md §7)
+ *   node --env-file=.env scripts/telegram-setup.mjs --dry-run  # print, call nothing
+ *   node --env-file=.env scripts/telegram-setup.mjs            # apply
+ *   node --env-file=.env scripts/telegram-setup.mjs --info     # read-only status
  *
  * Needs TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET and
  * NUXT_PUBLIC_SITE_URL (https — Telegram only calls https webhooks).

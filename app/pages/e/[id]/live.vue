@@ -24,14 +24,21 @@ definePageMeta({ layout: 'guest' })
  *   • Keeps the screen awake; fullscreen + sound controls hide with
  *     the cursor after a few idle seconds.
  *
- * The slideshow is anonymous: anyone with the URL can watch while the
- * event is active. The link is shared by the couple via dashboard.
- * UUIDs are unguessable. It is part of Pro and up: on Basic the feed
- * answers not_in_plan and the page says where the slideshow starts
- * (and checks back, so an upgrade starts it).
+ * No login, but a private link: /<locale>/e/<id>/live?k=<secret>. The
+ * event id alone is printed on every table's QR card, so the feed
+ * wants the event's own secret too (events.live_token), which the
+ * couple copies from the dashboard and can replace there. `k` stays in
+ * the address bar so a reload keeps working; without it, or after the
+ * couple made a new link, the page says calmly to ask the couple for
+ * the link (live_link_invalid → closed 'bad_link') and stops polling.
+ * It is part of Pro and up: on Basic the feed answers not_in_plan and
+ * the page says where the slideshow starts (and checks back, so an
+ * upgrade starts it).
  */
 const route = useRoute()
 const eventId = computed(() => route.params.id as string)
+// ?k=… — a repeated parameter counts as missing rather than guessing.
+const liveKey = typeof route.query.k === 'string' ? route.query.k : ''
 const { t } = useI18n()
 const reduce = useReducedMotion()
 
@@ -39,17 +46,19 @@ const reduce = useReducedMotion()
 // needs no extra round-trip. Polling takes over after mount.
 const { data: initial, error: initialError } = await useFetch<LiveFeedResponse>(
   `/api/guest/live-init/${eventId.value}`,
+  { query: { k: liveKey } },
 )
 
-const { items, hidden, total, coupleNames, connection, closed } = useLiveFeed(eventId.value, {
+const { items, hidden, total, coupleNames, connection, closed } = useLiveFeed(eventId.value, liveKey, {
   initial: initial.value ?? null,
   initialError: initialError.value,
   onFresh,
   onHide,
 })
 
-if (import.meta.server && (closed.value === 'not_found' || closed.value === 'archived')) {
-  setResponseStatus(useRequestEvent()!, closed.value === 'not_found' ? 404 : 410)
+const CLOSED_STATUS = { not_found: 404, archived: 410, bad_link: 403 } as const
+if (import.meta.server && closed.value && closed.value in CLOSED_STATUS) {
+  setResponseStatus(useRequestEvent()!, CLOSED_STATUS[closed.value as keyof typeof CLOSED_STATUS])
 }
 
 // --- Stage -----------------------------------------------------------
@@ -341,7 +350,7 @@ useSeoMeta({
   title: () => (coupleNames.value ? t('guest.live.pageTitle', { couple: coupleNames.value }) : 'Memour Live'),
 })
 
-const CLOSED_KEYS = { archived: 'archived', not_active: 'notActive', not_in_plan: 'notInPlan', not_found: 'notFound' } as const
+const CLOSED_KEYS = { archived: 'archived', not_active: 'notActive', not_in_plan: 'notInPlan', not_found: 'notFound', bad_link: 'badLink' } as const
 const closedKey = computed(() => CLOSED_KEYS[closed.value ?? 'not_found'])
 </script>
 

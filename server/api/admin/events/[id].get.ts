@@ -10,6 +10,11 @@ import { fail } from '../../../utils/errors'
  * `guests`: the guest devices bound to it (what the tier's guest limit
  * counts, shared/plans.ts), and `idle_guests`: those of them that never
  * sent a file — the places DELETE ./[id]/idle-guests can give back.
+ *
+ * Also the soft geofence: venue point + radius (server/utils/geofence.ts),
+ * `uploads_paused`, and `purged_at` — set once the retention task has
+ * deleted the media; such an event can't be reopened (PATCH → 409
+ * cannot_reopen_purged).
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
@@ -28,7 +33,7 @@ export default defineEventHandler(async (event) => {
 
   const { data: ev } = await admin
     .from('events')
-    .select('id, couple_names, wedding_date, venue_name, status, plan_tier, owner_id, owner_phone, table_count')
+    .select('id, couple_names, wedding_date, venue_name, status, plan_tier, owner_id, owner_phone, table_count, venue_lat, venue_lng, geofence_radius, uploads_paused, purged_at')
     .eq('id', id!)
     .maybeSingle()
   if (!ev) fail(404, 'event_not_found')

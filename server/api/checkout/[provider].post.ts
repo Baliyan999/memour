@@ -39,7 +39,9 @@ import { consentField, recordConsent, requireConsent } from '../../utils/consent
  * The URL is the provider's hosted checkout page; we redirect the
  * couple there. The provider then calls back to our webhook
  * (/api/payments/[provider]/webhook) when payment completes, at
- * which point we flip the event to `active`.
+ * which point we flip the event to `active`. Paid or not, the provider
+ * sends the couple back to /<locale>/dashboard/event/<id>?checkout=1,
+ * where the page waits a little for that webhook (see the page's header).
  *
  * Supported providers:
  *   - payme  →  https://checkout.paycom.uz   (PAYME_MERCHANT_ID + PAYME_MERCHANT_KEY)
@@ -47,7 +49,8 @@ import { consentField, recordConsent, requireConsent } from '../../utils/consent
  *
  * A provider without its full set of keys is closed: 503
  * `payments_unavailable`. The only exception is local development with
- * PAYMENTS_DEV_MODE=true, where the payment is marked paid on the spot.
+ * PAYMENTS_DEV_MODE=true, where the payment is marked paid on the spot
+ * and `url` is that same return address (`dev: true`).
  */
 const schema = z.object({
   event_id: z.string().uuid(),
@@ -149,7 +152,12 @@ export default defineEventHandler(async (event) => {
     extra: { event_id: ev!.id, plan: ev!.plan_tier, amount_tiyin: amount, provider, deletion_date: ev!.archive_expires_at },
   })
   const config = useRuntimeConfig()
-  const returnUrl = `${config.public.siteUrl.replace(/\/+$/, '')}/${locale}/dashboard/event/${ev!.id}`
+  // `?checkout=1` tells the dashboard the couple is back from paying: the
+  // webhook can land a few seconds after them, so it shows "confirming
+  // the payment" and polls instead of an alarming "unpaid". The page only
+  // looks for the key — a provider may glue its own parameters onto the
+  // value — and drops it from the address once settled.
+  const returnUrl = `${config.public.siteUrl.replace(/\/+$/, '')}/${locale}/dashboard/event/${ev!.id}?checkout=1`
 
   if (devMode && !providerConfigured(provider!)) {
     await markPaidForDev(admin, payment, ev!.id)
@@ -159,7 +167,10 @@ export default defineEventHandler(async (event) => {
   if (provider === 'payme') {
     // GET checkout: <checkout_url>/base64("k=v;k=v"). See
     // https://developer.help.paycom.uz/initsializatsiya-platezhey/otpravka-cheka-po-metodu-get
-    // `c` goes in raw — Payme splits on ';' and our URL has none.
+    // `c` goes in raw — Payme splits the pairs on ';' and our URL has
+    // none; the '=' of `?checkout=1` sits after the key's own first '='.
+    // If Payme ever cut the value there, `?checkout` alone still marks
+    // the return.
     const checkoutBase = process.env.PAYME_CHECKOUT_URL || 'https://checkout.paycom.uz'
     const params = [
       `m=${process.env.PAYME_MERCHANT_ID}`,
@@ -174,6 +185,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Click pay URL: https://my.click.uz/services/pay?service_id=...&merchant_id=...&amount=N.NN&transaction_param=...&return_url=...
+  // return_url is one query value, so its own '?' and '=' are percent-encoded.
   const amountUzs = (amount! / 100).toFixed(2)
   const url =
     `https://my.click.uz/services/pay?` +

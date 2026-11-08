@@ -188,6 +188,7 @@ export type Database = {
           created_at: string
           geofence_radius: number | null
           id: string
+          live_token: string
           owner_id: string | null
           owner_phone: string | null
           plan_tier: string | null
@@ -197,6 +198,7 @@ export type Database = {
           status: string
           table_count: number | null
           updated_at: string
+          uploads_paused: boolean
           venue_lat: number | null
           venue_lng: number | null
           venue_name: string | null
@@ -208,6 +210,7 @@ export type Database = {
           created_at?: string
           geofence_radius?: number | null
           id?: string
+          live_token?: string
           owner_id?: string | null
           owner_phone?: string | null
           plan_tier?: string | null
@@ -217,6 +220,7 @@ export type Database = {
           status?: string
           table_count?: number | null
           updated_at?: string
+          uploads_paused?: boolean
           venue_lat?: number | null
           venue_lng?: number | null
           venue_name?: string | null
@@ -228,6 +232,7 @@ export type Database = {
           created_at?: string
           geofence_radius?: number | null
           id?: string
+          live_token?: string
           owner_id?: string | null
           owner_phone?: string | null
           plan_tier?: string | null
@@ -237,6 +242,7 @@ export type Database = {
           status?: string
           table_count?: number | null
           updated_at?: string
+          uploads_paused?: boolean
           venue_lat?: number | null
           venue_lng?: number | null
           venue_name?: string | null

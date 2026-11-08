@@ -66,6 +66,9 @@ The schema lives in [`supabase/migrations/`](./supabase/migrations) — the sing
 | `20260928020000_leads_plan_tier` | `leads.plan_tier`: the tier picked on a Pricing card before the lead form was sent |
 | `20260929000000_claim_guest_device` | `claim_guest_device()`: a new guest phone joins an event only while it has fewer than its tier's guests (Basic 50, Pro 150, Premium 300, Luxury 500 — `shared/plans.ts`), atomically; phones already in are never refused |
 | `20260930000000_telegram_couple_bot` | the couple bot: one-time link tokens (sha256 only), connected chats per event, a log of one-off messages (archive reminders, payment notice; a trigger forgets the reminders when `archive_expires_at` moves) — server only |
+| `20261108000000_telegram_fk_indexes` | indexes on the `telegram_*` foreign keys the Supabase performance advisor flagged (user and event deletes cascade without scanning) |
+| `20261108000100_events_live_token` | `events.live_token`: the secret of the live slideshow's private link (32 hex, generated for new rows, backfilled for old ones); read by the owner only, never by guest endpoints |
+| `20261108000200_events_uploads_paused` | `events.uploads_paused` (default false): the team pauses guest uploads for one event from the admin page — uploads get 423 `uploads_paused`, the guest page says so, the live slideshow keeps running |
 
 **Security model.** The browser holds the anon key and the user's JWT, so anything RLS allows is reachable straight through PostgREST. Clients therefore only *read* their own rows (events, photos, branding, payments; admins read their own `admins` row). Every write goes through a Nitro endpoint on the service role, which is where the checks live (payment gate, zod limits, ownership). Server-only tables (`phone_otps`, `admin_otps`, `guest_devices`, `leads`, `referrals`, `referral_attributions`, `telegram_*`) are closed to clients entirely. Do not add client-side `.insert/.update/.delete`; if one is ever truly needed, grant the specific columns and add a policy `WITH CHECK` — never `FOR ALL`.
 
@@ -148,7 +151,7 @@ app/
     terms.vue             # User agreement / terms of use (same)
     offer.vue             # Public offer + refund policy (full document only)
     e/[id]/index.vue      # Guest event page (camera)
-    e/[id]/live.vue       # Live slideshow
+    e/[id]/live.vue       # Live slideshow (private link: ?k=<events.live_token>)
     dashboard/            # Couple area (login, events list, event detail,
                           # branding, settings, moderate)
     admin/                # Admin back office (login, events, leads,
@@ -182,21 +185,25 @@ docs/PROD-DB-APPLY.md     # how the owner applies migrations to prod
 
 ### VPS (production)
 
-memour.uz runs as one Node process (Nitro `node-server` preset) on the owner's VPS behind nginx. The whole runbook — runtime env file, systemd/PM2 unit, nginx config, certbot and the post-deploy checks — is [`docs/DEPLOY.md`](./docs/DEPLOY.md).
+memour.uz runs as one Node process (Nitro `node-server` preset) on a VPS behind nginx: the systemd unit `memour` runs `/var/www/memour` on `127.0.0.1:3300`. Deploys and rollbacks are one command from your machine, [`scripts/deploy.sh`](./scripts/deploy.sh): it builds the release on the server, test-runs it next to the live one, swaps it in, health-checks it and rolls back by itself on failure.
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm build                            # → .output/
-node .output/server/index.mjs         # HOST=127.0.0.1 PORT=3000 in production
+cp scripts/deploy.env.example scripts/deploy.env   # once: DEPLOY_HOST=…
+scripts/deploy.sh deploy --dry-run                 # the plan; changes nothing
+scripts/deploy.sh deploy                           # main (or: deploy <ref>)
+scripts/deploy.sh rollback                         # back to the previous release
+scripts/deploy.sh status
 ```
+
+Server setup (Node, systemd unit, env file, nginx, certbot), the script's settings and exit codes, post-deploy checks and moving servers: [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
 - **One** instance: rate limits and the retention schedule live in-process.
 - Secrets are read at **runtime** only: `NUXT_SUPABASE_SECRET_KEY` (or the legacy `SUPABASE_SERVICE_ROLE_KEY`) and `NUXT_PUBLIC_SITE_URL` must be in the process manager's env, not just at build time. `server/plugins/env-check.ts` refuses to start without them (list in DEPLOY.md → Environment).
-- nginx proxies to `127.0.0.1:3000` and sets `X-Real-IP $remote_addr` + `X-Forwarded-For $proxy_add_x_forwarded_for`: every per-IP limit (login, guest upload, lead form) keys on them, and trusts them only from the local proxy.
+- nginx proxies to `127.0.0.1:3300` and sets `X-Real-IP $remote_addr` + `X-Forwarded-For $proxy_add_x_forwarded_for`: every per-IP limit (login, guest upload, lead form) keys on them, and trusts them only from the local proxy.
 - Health checks:
   - `GET /api/health` → `200 {"ok":true}` whenever the Node process answers; it never touches Supabase. Point the process watchdog here.
   - `GET /api/health?deep=1` → also queries Supabase: `503` (`db_unavailable`) within ~3 s when it is down or paused. Point an external uptime monitor here and **alert only**: restarting Node doesn't bring a paused database back, it only cuts off uploads in progress and resets the rate limits.
-- Database changes ship **before** the app that needs them: `supabase db push` first, then deploy (see [`docs/PROD-DB-APPLY.md`](./docs/PROD-DB-APPLY.md)).
+- Database changes ship **before** the app that needs them: `supabase db push` first, then deploy (see [`docs/PROD-DB-APPLY.md`](./docs/PROD-DB-APPLY.md)). The script refuses a deploy whose `supabase/migrations` changed since the live release until you pass `--migrations-applied`.
 
 ### Domain
 
@@ -216,13 +223,16 @@ The app also builds on Vercel (framework preset **Nuxt**), but that is not how p
 Done:
 - [x] Phone OTP login (Eskiz)
 - [x] Couple/admin auth + RLS
-- [x] Guest camera (photo/video/voice) + soft geofence + upload window (18:00 the evening before → 12:00 the day after, Tashkent)
-- [x] Live slideshow (polls `/api/guest/live-init`, catches up after a dropped connection)
+- [x] Guest camera (photo/video/voice) + upload window (18:00 the evening before → 12:00 the day after, Tashkent)
+- [x] Soft geofence, set per event in the admin form (coordinates or a Google/Yandex Maps link, 100–500 m); guests never receive the venue coordinates
+- [x] Pause guest uploads per event from the admin page (423 `uploads_paused`, the guest page says so, the slideshow keeps running); events whose media were purged can't be reopened
+- [x] Live slideshow (polls `/api/guest/live-init`, catches up after a dropped connection). It opens by a private link, `/<locale>/e/<id>/live?k=<secret>`: the event id alone is printed on every QR card, so the feed also wants the event's `live_token` (403 `live_link_invalid` without it). The couple copies the link on the event page and can replace it there («Новая ссылка / Yangi havola», `POST /api/couple/event/[id]/live-link`); a screen on the old link closes within seconds
 - [x] Tier limits enforced on the server (`shared/plans.ts`): per-phone photo/video/voice quotas, guests per event, live slideshow and guest-page design from Pro
 - [x] QR PDF generation (PDFKit + Manrope Cyrillic)
 - [x] ZIP archive streaming (archiver)
 - [x] Swipe moderation
 - [x] Payme + Click checkout + JSON-RPC/REST webhooks
+- [x] Back from checkout (`?checkout=1`) the event page waits for the webhook with a calm "payment is being confirmed" state instead of showing "unpaid"
 - [x] Telegram outbound notifications (lead, payment, new photo — debounced)
 - [x] Couple Telegram bot, Pro and up: upload digest, payment notice, archive reminders 30 / 7 days before deletion (see [Telegram bot](#telegram-bot))
 - [x] Sharp-based thumbnail generation + EXIF strip
@@ -230,11 +240,15 @@ Done:
 - [x] Rate limits: guest upload (20/min per device, 600/min per IP), login SMS / codes, admin login, lead form
 - [x] Privacy + Terms pages (ru/uz)
 - [x] Branded 404 page
+- [x] Back office usable at 200 % text size and 2× zoom
+- [x] 1200×630 link preview, one for both languages (`public/og-image.jpg`, `summary_large_image`): made by `node scripts/og-image.mjs` from the brand tokens, fonts, logo and landing photos — re-run it instead of editing the file
 - [x] Custom error codes with localized messages
 - [x] Schema, RLS and buckets in `supabase/migrations` (clients read-only)
 - [x] Retention purge task, scheduled daily (`server/tasks/cleanup-archives.ts`, dry run until enabled)
 - [x] `/api/health` for the process watchdog, `?deep=1` for the uptime monitor
-- [x] CI on GitHub Actions (typecheck + build; migrations applied to a fresh database + `db lint`)
+- [x] Tests: unit (Vitest, pure logic) and e2e smoke (Playwright on the built app against a local Supabase, every SMS/Telegram call mocked) — [CONTRIBUTING.md → Tests](./CONTRIBUTING.md#tests)
+- [x] CI on GitHub Actions (typecheck + build; unit + e2e; migrations applied to a fresh database + `db lint`)
+- [x] One-command deploy and rollback with a trial run and automatic rollback (`scripts/deploy.sh`, [docs/DEPLOY.md](./docs/DEPLOY.md))
 
 Pending (require your action — external services):
 - [ ] **Supabase plan.** Prod is on the Free plan: no backups at all, 1 GB file storage and 5 GB egress (one wedding with ~150 active guests is 1–2 GB of photos before any video), and the project is paused after 7 days of low activity (every QR code and login then fails until someone presses Resume). Move to Pro (daily backups, 100 GB storage, no pausing) before the first paid wedding, and keep an off-site copy of the `photos` bucket — database backups do not include Storage files.
@@ -243,11 +257,11 @@ Pending (require your action — external services):
 - [ ] Eskiz alpha sender name `MEMOUR`
 - [ ] Payme merchant — fill `PAYME_MERCHANT_ID/KEY` in `.env`
 - [ ] Click merchant — fill `CLICK_SERVICE_ID/MERCHANT_ID/SECRET_KEY` in `.env`
-- [ ] 1200×630 OG image (currently uses `memour-logo.png`)
 - [ ] Sentry / error tracking (DSN env var)
 - [ ] Turn on the retention purge (`RETENTION_PURGE_ENABLED=true`) after checking its first dry-run log — required: the privacy page, Pricing, the guest screen and checkout promise deletion (docs/DEPLOY.md §8)
-- [ ] Tests (none written; recommended for OTP + payment webhooks)
-- [ ] CD (deploys to the VPS are manual)
+- [ ] More tests: the Payme/Click webhooks and the phone-OTP path (the e2e smoke covers email login only)
+- [ ] A mailbox on the domain: `hello@memour.uz` is in the texts but the domain has no MX. Until it exists, set `NUXT_PUBLIC_LEGAL_ENTITY_PHONE` — the "payment is taking longer" note falls back to that address otherwise
+- [ ] CD (deploys are run by hand with `scripts/deploy.sh`; no pipeline)
 
 ---
 

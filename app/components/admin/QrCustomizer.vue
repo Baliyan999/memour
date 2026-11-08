@@ -346,7 +346,7 @@ async function save(): Promise<boolean> {
             :animate="sheetMotion.animate"
             :exit="sheetMotion.exit"
             :transition="sheetMotion.transition"
-            class="surface-card relative w-full max-w-4xl overflow-hidden rounded-(--radius-xl) shadow-(--shadow-glow) outline-none"
+            class="surface-card @container relative w-full max-w-4xl overflow-hidden rounded-(--radius-xl) shadow-(--shadow-glow) outline-none"
             role="dialog"
             aria-modal="true"
             :aria-labelledby="`${dialogId}-title`"
@@ -361,13 +361,13 @@ async function save(): Promise<boolean> {
               <X class="h-4 w-4" :stroke-width="2" />
             </button>
 
-            <div class="grid grid-cols-1 md:grid-cols-[1fr_1.4fr]">
+            <div class="grid grid-cols-1 @2xl:grid-cols-[1fr_1.4fr]">
               <!-- Preview -->
-              <div class="border-b border-(--color-border) bg-(--color-muted)/20 p-8 md:border-b-0 md:border-r">
-                <p class="text-[10px] uppercase tracking-[0.3em] text-(--color-muted-foreground)">{{ t('admin.qr.preview') }}</p>
+              <div class="border-b border-(--color-border) bg-(--color-muted)/20 p-8 @2xl:border-b-0 @2xl:border-r">
+                <p class="text-[0.625rem] uppercase tracking-[0.3em] text-(--color-muted-foreground)">{{ t('admin.qr.preview') }}</p>
                 <p class="mt-1 font-display text-lg italic">{{ couple }}</p>
                 <div class="relative mt-5 grid place-items-center rounded-(--radius-xl) bg-white p-5 shadow-sm">
-                  <img :src="previewUrl" :alt="t('admin.qr.previewAlt')" class="h-auto w-full max-w-[260px]">
+                  <img :src="previewUrl" :alt="t('admin.qr.previewAlt')" class="h-auto w-full max-w-[16.25rem]">
                   <!-- Logo overlay simulation (centered on top of SVG) -->
                   <img
                     v-if="logoPreview"
@@ -383,7 +383,7 @@ async function save(): Promise<boolean> {
               </div>
 
               <!-- Options -->
-              <div class="flex flex-col gap-6 p-6 sm:p-8 md:max-h-[80vh] md:overflow-y-auto">
+              <div class="@container flex flex-col gap-6 p-6 sm:p-8 @2xl:max-h-[80vh] @2xl:overflow-y-auto">
                 <div>
                   <h2 :id="`${dialogId}-title`" class="heading-display-md" style="font-size: 1.5rem;">QR PDF</h2>
                   <p class="mt-1 text-sm text-(--color-muted-foreground)">
@@ -398,7 +398,7 @@ async function save(): Promise<boolean> {
                     :key="m"
                     type="button"
                     :class="[
-                      'flex-1 rounded-full px-3 py-1.5 text-xs transition-colors',
+                      'min-w-0 flex-1 rounded-full px-3 py-1.5 text-xs transition-colors',
                       mode === m
                         ? 'bg-(--color-primary) text-(--color-primary-foreground)'
                         : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
@@ -410,14 +410,14 @@ async function save(): Promise<boolean> {
                 <!-- Preset mode -->
                 <template v-if="mode === 'preset'">
                   <div>
-                    <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.style') }}</p>
-                    <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    <p class="mb-2 text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.style') }}</p>
+                    <div class="grid grid-cols-2 gap-2 @[13rem]:grid-cols-3 @[18rem]:grid-cols-4">
                       <button
                         v-for="p in PRESETS"
                         :key="p.id"
                         type="button"
                         :class="[
-                          'flex flex-col items-center gap-1.5 rounded-md border bg-white p-2 transition-all',
+                          'flex min-w-0 flex-col items-center gap-1.5 rounded-md border bg-white p-2 transition-all',
                           state.style === p.id
                             ? 'border-(--color-primary) ring-2 ring-(--color-primary)/40'
                             : 'border-(--color-border) hover:border-(--color-primary)/40',
@@ -429,7 +429,7 @@ async function save(): Promise<boolean> {
                           alt=""
                           class="aspect-square w-full"
                         >
-                        <span class="text-[10px] text-(--color-foreground)">{{ t(`admin.qr.presets.${p.key}`) }}</span>
+                        <span class="max-w-full text-center text-[0.625rem] text-(--color-foreground) wrap-break-word">{{ t(`admin.qr.presets.${p.key}`) }}</span>
                       </button>
                     </div>
                   </div>
@@ -437,9 +437,9 @@ async function save(): Promise<boolean> {
 
                 <!-- Custom mode -->
                 <template v-else>
-                  <div class="grid gap-3 sm:grid-cols-2">
+                  <div class="grid gap-3 @xs:grid-cols-2">
                     <div class="flex flex-col gap-1">
-                      <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.dotsLabel') }}</label>
+                      <label class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.dotsLabel') }}</label>
                       <select
                         v-model="state.dot"
                         class="h-10 rounded-md border border-(--color-border) bg-white px-3 text-sm"
@@ -448,7 +448,7 @@ async function save(): Promise<boolean> {
                       </select>
                     </div>
                     <div class="flex flex-col gap-1">
-                      <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.cornersLabel') }}</label>
+                      <label class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.cornersLabel') }}</label>
                       <select
                         v-model="state.corner"
                         class="h-10 rounded-md border border-(--color-border) bg-white px-3 text-sm"
@@ -458,16 +458,16 @@ async function save(): Promise<boolean> {
                     </div>
                   </div>
 
-                  <div class="grid gap-3 sm:grid-cols-2">
+                  <div class="grid gap-3 @xs:grid-cols-2">
                     <div class="flex flex-col gap-1">
-                      <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.fg') }}</label>
+                      <label class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.fg') }}</label>
                       <div class="flex items-center gap-2">
                         <input v-model="state.fg" type="color" class="h-10 w-12 shrink-0 cursor-pointer rounded-md border border-(--color-border) bg-white p-1">
                         <input v-model="state.fg" type="text" maxlength="7" class="h-10 min-w-0 flex-1 rounded-md border border-(--color-border) bg-white px-3 font-mono text-xs">
                       </div>
                     </div>
                     <div class="flex flex-col gap-1">
-                      <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.bg') }}</label>
+                      <label class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.bg') }}</label>
                       <div class="flex items-center gap-2">
                         <input v-model="state.bg" type="color" class="h-10 w-12 shrink-0 cursor-pointer rounded-md border border-(--color-border) bg-white p-1">
                         <input v-model="state.bg" type="text" maxlength="7" class="h-10 min-w-0 flex-1 rounded-md border border-(--color-border) bg-white px-3 font-mono text-xs">
@@ -480,17 +480,17 @@ async function save(): Promise<boolean> {
                       <input v-model="state.useGradient" type="checkbox" class="h-4 w-4 rounded border-(--color-border) accent-(--color-primary)">
                       <span>{{ t('admin.qr.gradient') }}</span>
                     </label>
-                    <div v-if="state.useGradient" class="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                    <div v-if="state.useGradient" class="mt-3 grid gap-3 @xs:grid-cols-[1fr_1fr_auto]">
                       <div class="flex flex-col gap-1">
-                        <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.color1') }}</label>
+                        <label class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.color1') }}</label>
                         <input v-model="state.gFrom" type="color" class="h-10 w-full cursor-pointer rounded-md border border-(--color-border) bg-white p-1">
                       </div>
                       <div class="flex flex-col gap-1">
-                        <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.color2') }}</label>
+                        <label class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.color2') }}</label>
                         <input v-model="state.gTo" type="color" class="h-10 w-full cursor-pointer rounded-md border border-(--color-border) bg-white p-1">
                       </div>
                       <div class="flex flex-col gap-1">
-                        <label class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.angle') }}</label>
+                        <label class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.angle') }}</label>
                         <input v-model.number="state.gAngle" type="number" min="0" max="360" class="h-10 w-20 rounded-md border border-(--color-border) bg-white px-2 text-center text-sm">
                       </div>
                     </div>
@@ -499,7 +499,7 @@ async function save(): Promise<boolean> {
 
                 <!-- Logo -->
                 <div>
-                  <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.logo') }}</p>
+                  <p class="mb-2 text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.logo') }}</p>
                   <div class="flex items-center gap-3">
                     <label class="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-(--color-border) bg-white px-4 text-sm hover:bg-(--color-muted)">
                       <Upload class="h-4 w-4" :stroke-width="1.6" />
@@ -516,21 +516,21 @@ async function save(): Promise<boolean> {
                       {{ t('admin.qr.logoRemove') }}
                     </button>
                   </div>
-                  <p class="mt-2 text-[11px] text-(--color-muted-foreground)">
+                  <p class="mt-2 text-[0.6875rem] text-(--color-muted-foreground)">
                     {{ t('admin.qr.logoHint') }}
                   </p>
                 </div>
 
                 <!-- Card language -->
                 <div>
-                  <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.cardLang') }}</p>
+                  <p class="mb-2 text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.cardLang') }}</p>
                   <div class="flex gap-1 rounded-full border border-(--color-border) bg-white p-0.5">
                     <button
                       v-for="l in LANGS"
                       :key="l.id"
                       type="button"
                       :class="[
-                        'flex-1 rounded-full px-3 py-1.5 text-xs transition-colors',
+                        'min-w-0 flex-1 rounded-full px-3 py-1.5 text-xs transition-colors',
                         state.lang === l.id
                           ? 'bg-(--color-primary) text-(--color-primary-foreground)'
                           : 'text-(--color-muted-foreground) hover:text-(--color-foreground)',
@@ -538,15 +538,15 @@ async function save(): Promise<boolean> {
                       @click="state.lang = l.id"
                     >{{ l.label }}</button>
                   </div>
-                  <p class="mt-2 text-[11px] text-(--color-muted-foreground)">
+                  <p class="mt-2 text-[0.6875rem] text-(--color-muted-foreground)">
                     {{ t('admin.qr.cardLangHint') }}
                   </p>
                 </div>
 
                 <!-- Layout -->
                 <div>
-                  <p class="mb-2 text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.layout') }}</p>
-                  <p v-if="tableCount" class="mb-2 text-[11px] text-(--color-muted-foreground)">
+                  <p class="mb-2 text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.qr.layout') }}</p>
+                  <p v-if="tableCount" class="mb-2 text-[0.6875rem] text-(--color-muted-foreground)">
                     {{ t('admin.qr.pagesSummary', { tables: tableCount, pages: totalPages }) }}
                     <template v-if="pageSummary"> {{ pageSummary }}</template>
                   </p>
@@ -582,23 +582,23 @@ async function save(): Promise<boolean> {
                 </div>
 
                 <!-- Actions -->
-                <div class="mt-auto flex gap-2">
+                <div class="mt-auto flex flex-wrap gap-2">
                   <button
                     type="button"
                     :disabled="saving || !loaded"
-                    class="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-(--color-border) bg-white text-sm hover:bg-(--color-muted) disabled:opacity-60"
+                    class="inline-flex min-h-11 grow basis-40 items-center justify-center gap-2 rounded-md border border-(--color-border) bg-white px-4 py-2 text-sm hover:bg-(--color-muted) disabled:opacity-60"
                     @click="save"
                   >
-                    <Save class="h-4 w-4" :stroke-width="1.8" />
+                    <Save class="h-4 w-4 shrink-0" :stroke-width="1.8" />
                     {{ saving ? t('admin.qr.saving') : t('admin.qr.save') }}
                   </button>
                   <button
                     type="button"
                     :disabled="downloading || saving || !loaded"
-                    class="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-95 disabled:opacity-60"
+                    class="inline-flex min-h-11 grow basis-40 items-center justify-center gap-2 rounded-md bg-(--color-primary) px-5 py-2 text-sm font-medium text-(--color-primary-foreground) hover:opacity-95 disabled:opacity-60"
                     @click="downloadPdf"
                   >
-                    <Download class="h-4 w-4" :stroke-width="1.8" />
+                    <Download class="h-4 w-4 shrink-0" :stroke-width="1.8" />
                     {{ downloading ? t('admin.qr.downloading') : t('admin.qr.download') }}
                   </button>
                 </div>

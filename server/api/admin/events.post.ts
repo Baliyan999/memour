@@ -8,6 +8,7 @@ import { sendSms } from '../../utils/eskiz'
 import { findAuthUserByEmail, isPhoneAccount } from '../../utils/auth-users'
 import { recordManualPayment } from '../../utils/manual-payment'
 import { fail, failZod } from '../../utils/errors'
+import { geofenceShape, geofenceColumns, GEOFENCE_FIELD_CODES } from '../../utils/geofence'
 
 /**
  * POST /api/admin/events — admin creates an event for a couple.
@@ -43,9 +44,8 @@ const bodySchema = z.object({
   couple_names: z.string().trim().min(2).max(120),
   wedding_date: z.string().date(),
   venue_name: z.string().max(160).optional().nullable(),
-  venue_lat: z.number().optional().nullable(),
-  venue_lng: z.number().optional().nullable(),
-  geofence_radius: z.number().int().min(20).max(2000).default(120),
+  // Soft geofence (server/utils/geofence.ts): point + radius, or none.
+  ...geofenceShape,
   table_count: z.number().int().min(1).max(200).default(10),
   plan_tier: z.enum(['basic', 'pro', 'premium', 'luxury']).default('basic'),
   status: z.enum(['draft', 'active', 'archived']).default('draft'),
@@ -61,6 +61,7 @@ const FIELD_CODES = {
   table_count: 'invalid_table_count',
   owner_phone: 'invalid_phone',
   owner_email: 'invalid_email',
+  ...GEOFENCE_FIELD_CODES,
 }
 
 export default defineEventHandler(async (event) => {
@@ -82,6 +83,8 @@ export default defineEventHandler(async (event) => {
   const parsed = bodySchema.safeParse(body)
   if (!parsed.success) failZod(parsed.error, FIELD_CODES)
   const input = parsed.data
+  // Off unless the form sent a point and a radius.
+  const geofence = geofenceColumns(input) ?? { venue_lat: null, venue_lng: null, geofence_radius: null }
 
   // Email-only couples: resolve (or create) the owner account up front,
   // so a failure here leaves nothing half-created.
@@ -119,9 +122,7 @@ export default defineEventHandler(async (event) => {
       couple_names: input.couple_names,
       wedding_date: input.wedding_date,
       venue_name: input.venue_name ?? null,
-      venue_lat: input.venue_lat ?? null,
-      venue_lng: input.venue_lng ?? null,
-      geofence_radius: input.geofence_radius,
+      ...geofence,
       table_count: input.table_count,
       plan_tier: input.plan_tier,
       status: input.status,

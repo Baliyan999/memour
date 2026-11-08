@@ -2,6 +2,8 @@
 import { ref, computed } from 'vue'
 import { useI18n, useLocalePath } from '#imports'
 import { GUEST_LIMIT_WARN_AT, guestLimitForTier } from '#shared/plans'
+import { GEOFENCE_DEFAULT_RADIUS, formatLatLng, parseVenueLocation } from '#shared/geofence'
+import { formatDate } from '~/utils/format'
 
 definePageMeta({ layout: 'admin' })
 
@@ -21,8 +23,18 @@ definePageMeta({ layout: 'admin' })
  * is saved. Places held by phones that never sent a file can be given
  * back (DELETE …/idle-guests): the way out when a script or idle
  * phones filled the event and real guests are turned away.
+ *
+ * The soft geofence (<AdminGeofenceField>): switching it off clears the
+ * venue point and the radius on the server.
+ *
+ * Above the form, "guest uploads" pauses and resumes guest uploads the
+ * moment it is flipped (PATCH uploads_paused alone, not with Save): the
+ * guest page shows a "paused" card, uploads get 423, the live slideshow
+ * keeps running. An event whose media the retention task deleted
+ * (purged_at) can't leave the archive: the other statuses are disabled
+ * and the server refuses them too (409 cannot_reopen_purged).
  */
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const router = useRouter()
 const route = useRoute()
@@ -40,6 +52,11 @@ interface AdminEvent {
   owner_id: string | null
   owner_phone: string | null
   table_count: number | null
+  venue_lat: number | null
+  venue_lng: number | null
+  geofence_radius: number | null
+  uploads_paused: boolean
+  purged_at: string | null
   guests: number
   idle_guests: number
 }
@@ -57,6 +74,32 @@ const initialDigits = ev?.owner_phone?.replace(/^\+998/, '') ?? ''
 const owner_phone_digits = ref(initialDigits)
 const owner_phone = ref(`+998 ${initialDigits}`)
 const claimed = !!ev?.owner_id
+const hadGeofence = ev?.venue_lat != null && ev?.venue_lng != null
+const geoEnabled = ref(hadGeofence)
+const geoLocation = ref(hadGeofence ? formatLatLng({ lat: ev!.venue_lat!, lng: ev!.venue_lng! }) : '')
+const geoRadius = ref<number>(ev?.geofence_radius ?? GEOFENCE_DEFAULT_RADIUS)
+const purgedOn = ev?.purged_at ? formatDate(ev.purged_at, locale.value) : null
+
+// Guest uploads: saved on its own as soon as it is flipped. The switch
+// reads like its heading — on means guests can send, off means paused —
+// moves at once and goes back if the server refuses.
+const uploadsPaused = ref(ev?.uploads_paused ?? false)
+const savingPause = ref(false)
+async function togglePause() {
+  if (savingPause.value) return
+  const next = !uploadsPaused.value
+  uploadsPaused.value = next
+  savingPause.value = true
+  try {
+    await $fetch(`/api/admin/events/${id}`, { method: 'PATCH', body: { uploads_paused: next } })
+    toast.success(t(next ? 'admin.eventForm.uploadsPausedToast' : 'admin.eventForm.uploadsResumedToast'))
+  } catch (e) {
+    uploadsPaused.value = !next
+    toast.error(errorMessage(e))
+  } finally {
+    savingPause.value = false
+  }
+}
 
 const guests = ref(ev?.guests ?? 0)
 const idleGuests = ref(ev?.idle_guests ?? 0)
@@ -102,6 +145,10 @@ function validate(): string | null {
   const tables = Number(table_count.value)
   if ((table_count.value as unknown) === '' || !Number.isInteger(tables) || tables < 1 || tables > 200) return 'invalid_table_count'
   if (!claimed && owner_phone_digits.value.length > 0 && owner_phone_digits.value.length < 9) return 'phone_incomplete'
+  if (geoEnabled.value) {
+    const venue = parseVenueLocation(geoLocation.value)
+    if (!venue.ok) return venue.reason === 'empty' ? 'geofence_location_required' : 'geofence_location_invalid'
+  }
   return null
 }
 
@@ -126,6 +173,12 @@ async function submit() {
     if (!claimed && owner_phone_digits.value.length === 9) {
       body.owner_phone = `+998${owner_phone_digits.value}`
     }
+    const venue = parseVenueLocation(geoLocation.value)
+    if (geoEnabled.value && venue.ok) {
+      Object.assign(body, { venue_lat: venue.point.lat, venue_lng: venue.point.lng, geofence_radius: geoRadius.value })
+    } else if (hadGeofence) {
+      Object.assign(body, { venue_lat: null, venue_lng: null, geofence_radius: null })
+    }
     await $fetch(`/api/admin/events/${id}`, { method: 'PATCH', body })
     toast.success(t('admin.eventForm.saved'))
     router.push(localePath('/admin'))
@@ -149,7 +202,43 @@ async function submit() {
       >{{ t('admin.eventForm.backToEvents') }}</NuxtLink>
     </div>
 
-    <form v-else class="surface-card flex flex-col gap-5 rounded-(--radius-xl) p-7" novalidate @submit.prevent="submit">
+    <section
+      v-if="ev && !loadError"
+      class="surface-card mb-4 flex items-start justify-between gap-4 rounded-(--radius-xl) px-7 py-5"
+      aria-labelledby="ev-uploads-title"
+    >
+      <div class="min-w-0 flex-1">
+        <h2 id="ev-uploads-title" class="font-sans text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('admin.eventForm.uploads') }}</h2>
+        <p
+          class="mt-1 text-sm leading-relaxed"
+          :class="uploadsPaused ? 'text-amber-800' : 'text-(--color-muted-foreground)'"
+          role="status"
+        >{{ uploadsPaused ? t('admin.eventForm.uploadsPausedDesc') : t('admin.eventForm.uploadsOpenDesc') }}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        data-testid="pause-switch"
+        :aria-checked="!uploadsPaused"
+        :aria-label="t('admin.eventForm.uploadsSwitchLabel')"
+        :aria-busy="savingPause"
+        :class="[
+          'relative mt-0.5 inline-flex h-7 w-12 shrink-0 items-center rounded-full p-0.5 transition-colors duration-(--spring-snappy) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) focus-visible:ring-offset-2',
+          uploadsPaused ? 'bg-(--color-muted-foreground)/30' : 'bg-(--color-primary)',
+        ]"
+        @click="togglePause"
+      >
+        <span
+          aria-hidden="true"
+          :class="[
+            'block h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgb(0_0_0_/_0.2)] transition-transform duration-(--spring-snappy) ease-(--ease-spring) motion-reduce:transition-none',
+            uploadsPaused ? 'translate-x-0' : 'translate-x-5',
+          ]"
+        />
+      </button>
+    </section>
+
+    <form v-if="ev && !loadError" class="surface-card flex flex-col gap-5 rounded-(--radius-xl) p-7" novalidate @submit.prevent="submit">
       <div class="flex flex-col gap-1.5">
         <label for="ev-names" class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('admin.eventForm.coupleNames') }}</label>
         <input
@@ -191,6 +280,12 @@ async function submit() {
         >
       </div>
 
+      <AdminGeofenceField
+        v-model:enabled="geoEnabled"
+        v-model:location="geoLocation"
+        v-model:radius="geoRadius"
+      />
+
       <div class="flex flex-col gap-1.5">
         <label for="ev-phone" class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('admin.eventForm.couplePhone') }}</label>
         <template v-if="!claimed">
@@ -199,7 +294,7 @@ async function submit() {
             v-model="owner_phone"
             v-model:digits="owner_phone_digits"
           />
-          <p class="text-[11px] text-(--color-muted-foreground)">
+          <p class="text-[0.6875rem] text-(--color-muted-foreground)">
             {{ t('admin.eventForm.phoneNotClaimedHint') }}
           </p>
         </template>
@@ -219,7 +314,7 @@ async function submit() {
             <option v-for="tier in (['basic', 'pro', 'premium', 'luxury'] as const)" :key="tier" :value="tier">{{ t(`pricing.${tier}.name`) }}</option>
           </select>
           <p
-            class="text-[11px] tabular-nums"
+            class="text-[0.6875rem] tabular-nums"
             :class="guestsState === 'ok' ? 'text-(--color-muted-foreground)' : 'text-amber-700'"
             role="status"
           >
@@ -230,7 +325,7 @@ async function submit() {
             v-if="idleGuests > 0"
             type="button"
             :disabled="freeing"
-            class="self-start text-left text-[11px] text-(--color-foreground) underline decoration-(--color-border) underline-offset-2 hover:decoration-current disabled:opacity-60"
+            class="self-start text-left text-[0.6875rem] text-(--color-foreground) underline decoration-(--color-border) underline-offset-2 hover:decoration-current disabled:opacity-60"
             @click="freeIdleGuests"
           >{{ t('admin.eventForm.freeIdle', { n: idleGuests }) }}</button>
         </div>
@@ -241,10 +336,13 @@ async function submit() {
             v-model="status"
             class="h-11 rounded-md border border-(--color-border) bg-white px-3 text-sm"
           >
-            <option value="draft">{{ t('admin.eventForm.statusDraft') }}</option>
-            <option value="active">{{ t('admin.eventForm.statusActive') }}</option>
+            <option value="draft" :disabled="!!purgedOn">{{ t('admin.eventForm.statusDraft') }}</option>
+            <option value="active" :disabled="!!purgedOn">{{ t('admin.eventForm.statusActive') }}</option>
             <option value="archived">{{ t('admin.eventForm.statusArchived') }}</option>
           </select>
+          <p v-if="purgedOn" class="text-[0.6875rem] text-(--color-muted-foreground)">
+            {{ t('admin.eventForm.purgedHint', { date: purgedOn }) }}
+          </p>
         </div>
       </div>
 

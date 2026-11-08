@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { MotionConfig } from 'motion-v'
-import { useHead, useLocaleHead, useRuntimeConfig } from '#imports'
+import { useHead, useI18n, useLocaleHead, useRuntimeConfig } from '#imports'
 
 /**
  * Root shell. Two app-wide concerns live here:
@@ -9,26 +9,33 @@ import { useHead, useLocaleHead, useRuntimeConfig } from '#imports'
  *   og:url / og:locale for the current page, all from @nuxtjs/i18n
  *   (absolute thanks to runtimeConfig.public.i18n.baseUrl). og:image
  *   needs the absolute site URL too, so it's set here rather than in
- *   nuxt.config.
+ *   nuxt.config: the 1200×630 banner public/og-image.jpg (made by
+ *   scripts/og-image.mjs — re-run it, don't edit the file). It carries
+ *   no words to translate, so both languages share it; only its alt
+ *   text follows the page's language.
  * - Motion: every motion-v animation honours the OS "Reduce motion"
  *   setting — transforms settle instantly, opacity still cross-fades,
  *   nothing stays hidden.
  * - iOS viewport: see below.
  */
 const i18nHead = useLocaleHead({ seo: true })
+const { t } = useI18n()
 const siteUrl = String(useRuntimeConfig().public.siteUrl ?? '').replace(/\/+$/, '')
-const ogImage = `${siteUrl}/memour-logo.png`
+const ogImage = `${siteUrl}/og-image.jpg`
 
 useHead(() => ({
   htmlAttrs: { lang: i18nHead.value.htmlAttrs?.lang },
   link: [...(i18nHead.value.link ?? [])],
   meta: [
     ...(i18nHead.value.meta ?? []),
-    // Square logo until a 1200×630 banner exists — hence `summary`,
-    // which previews a square image without cropping it.
     { property: 'og:image', content: ogImage },
-    { name: 'twitter:card', content: 'summary' },
+    { property: 'og:image:type', content: 'image/jpeg' },
+    { property: 'og:image:width', content: '1200' },
+    { property: 'og:image:height', content: '630' },
+    { property: 'og:image:alt', content: t('meta.ogImageAlt') },
+    { name: 'twitter:card', content: 'summary_large_image' },
     { name: 'twitter:image', content: ogImage },
+    { name: 'twitter:image:alt', content: t('meta.ogImageAlt') },
   ],
 }))
 

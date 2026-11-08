@@ -12,9 +12,11 @@ import { hasGuestConsent } from '../../../utils/consent'
  * RLS keeps events private to their owner, so the guest page can't
  * read the table directly. This server endpoint uses the service-role
  * client to bypass RLS and returns a SANITIZED subset — only fields
- * needed to render the guest landing (names, status, geofence center,
- * wedding date) + branding. Sensitive fields (owner_id, etc.) never
- * leave the server.
+ * needed to render the guest landing (names, status, wedding date) +
+ * branding. Sensitive fields (owner_id, etc.) never leave the server.
+ * Nor does the venue point: the privacy policy promises it is only used
+ * for the server-side geofence check, so the page just gets `geofence`
+ * (whether to ask the phone for its location before a send).
  *
  * Optional `?device_id=<uuid>` query — when the guest's browser passes
  * its persisted device id, we look up the existing binding (table,
@@ -39,6 +41,9 @@ import { hasGuestConsent } from '../../../utils/consent'
  * Branding is the couple's design of this page (Pro and up). On Basic
  * it is left out, so the page shows the standard Memour design even if
  * a row was saved earlier.
+ *
+ * `event.uploads_paused`: the team paused uploads (the page shows a
+ * "paused" card instead of the camera; uploads get 423 uploads_paused).
  *
  * Returns 404 if the event doesn't exist, 410 if it is archived.
  */
@@ -67,11 +72,11 @@ export default defineEventHandler(async (event) => {
       venue_name,
       venue_lat,
       venue_lng,
-      geofence_radius,
       status,
       plan_tier,
       table_count,
       archive_expires_at,
+      uploads_paused,
       branding ( bride_name, groom_name, cover_photo, accent_color, greeting_text )
     `)
     .eq('id', id)
@@ -118,9 +123,11 @@ export default defineEventHandler(async (event) => {
 
   const now = Date.now()
   const window = uploadWindow(data.wedding_date)
+  const { venue_lat, venue_lng, ...guestFields } = data
+  const geofence = venue_lat != null && venue_lng != null
 
   return {
-    event: { ...data, branding: tierHas(data.plan_tier, 'branding') ? data.branding : null },
+    event: { ...guestFields, geofence, branding: tierHas(data.plan_tier, 'branding') ? data.branding : null },
     binding,
     consented,
     guests_full: guestsFull,

@@ -108,7 +108,7 @@ async function copyShare(code: string) {
 
 <template>
   <div>
-    <div class="mb-8 flex items-end justify-between gap-4">
+    <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
       <h1 class="heading-display-md">{{ t('admin.referrals.title') }}</h1>
       <button
         type="button"
@@ -124,9 +124,9 @@ async function copyShare(code: string) {
       v-if="showForm"
       class="mb-6 surface-card rounded-(--radius-xl) p-6"
     >
-      <form class="grid grid-cols-2 gap-4" novalidate @submit.prevent="submit">
+      <form class="grid gap-4 sm:grid-cols-2" novalidate @submit.prevent="submit">
         <div class="flex flex-col gap-1.5">
-          <label for="ref-code" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.referrals.code') }}</label>
+          <label for="ref-code" class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.referrals.code') }}</label>
           <input
             id="ref-code"
             v-model="form.code"
@@ -137,7 +137,7 @@ async function copyShare(code: string) {
           >
         </div>
         <div class="flex flex-col gap-1.5">
-          <label for="ref-name" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.referrals.partnerName') }}</label>
+          <label for="ref-name" class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.referrals.partnerName') }}</label>
           <input
             id="ref-name"
             v-model="form.partner_name"
@@ -146,7 +146,7 @@ async function copyShare(code: string) {
           >
         </div>
         <div class="flex flex-col gap-1.5">
-          <label for="ref-phone" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.referrals.partnerPhone') }}</label>
+          <label for="ref-phone" class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.referrals.partnerPhone') }}</label>
           <input
             id="ref-phone"
             v-model="form.partner_phone"
@@ -155,7 +155,7 @@ async function copyShare(code: string) {
           >
         </div>
         <div class="flex flex-col gap-1.5">
-          <label for="ref-pct" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.referrals.commission') }}</label>
+          <label for="ref-pct" class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.referrals.commission') }}</label>
           <input
             id="ref-pct"
             v-model.number="form.commission_pct"
@@ -166,11 +166,11 @@ async function copyShare(code: string) {
             class="h-11 rounded-md border border-(--color-border) bg-white px-3 text-sm"
           >
         </div>
-        <p v-if="error" role="alert" class="col-span-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+        <p v-if="error" role="alert" class="rounded-md sm:col-span-2 border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
         <button
           type="submit"
           :disabled="pending"
-          class="col-span-2 inline-flex h-11 items-center justify-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90 disabled:opacity-60"
+          class="inline-flex h-11 sm:col-span-2 items-center justify-center rounded-md bg-(--color-primary) px-5 text-sm font-medium text-(--color-primary-foreground) hover:opacity-90 disabled:opacity-60"
         >{{ pending ? t('admin.referrals.creating') : t('admin.referrals.create') }}</button>
       </form>
     </div>
@@ -196,14 +196,14 @@ async function copyShare(code: string) {
       <p class="mt-2 text-(--color-muted-foreground)">{{ t('admin.referrals.emptyDesc') }}</p>
     </div>
 
-    <ul v-else class="grid gap-3">
+    <ul v-else class="grid grid-cols-1 gap-3">
       <li v-for="r in data.referrals" :key="r.id">
-        <div class="surface-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-(--radius-xl) p-5">
-          <div>
+        <div class="surface-card flex flex-wrap items-center justify-between gap-4 rounded-(--radius-xl) p-5">
+          <div class="min-w-0 flex-1 basis-64">
             <div class="flex flex-wrap items-center gap-3">
-              <code class="rounded-md bg-(--color-muted) px-2 py-0.5 text-xs">{{ r.code }}</code>
-              <span v-if="r.partner_name" class="font-display text-lg">{{ r.partner_name }}</span>
-              <span v-if="r.commission_pct != null" class="rounded-full bg-(--color-accent)/60 px-2 py-0.5 text-[11px] text-(--color-primary)">
+              <code class="min-w-0 rounded-md bg-(--color-muted) px-2 py-0.5 text-xs wrap-anywhere">{{ r.code }}</code>
+              <span v-if="r.partner_name" class="min-w-0 font-display text-lg wrap-break-word">{{ r.partner_name }}</span>
+              <span v-if="r.commission_pct != null" class="rounded-full bg-(--color-accent)/60 px-2 py-0.5 text-[0.6875rem] text-(--color-primary)">
                 {{ r.commission_pct }}%
               </span>
             </div>
@@ -225,7 +225,7 @@ async function copyShare(code: string) {
           </div>
           <button
             type="button"
-            class="inline-flex h-8 items-center gap-1.5 rounded-full border border-(--color-border) bg-white px-3 text-xs hover:bg-(--color-muted)"
+            class="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-(--color-border) bg-white px-3 text-xs hover:bg-(--color-muted)"
             @click="copyShare(r.code)"
           >
             <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">

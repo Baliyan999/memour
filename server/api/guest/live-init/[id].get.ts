@@ -2,6 +2,7 @@ import { serverSupabaseServiceRole } from '#supabase/server'
 import type { Database } from '~/types/database.types'
 import { tierHas } from '#shared/plans'
 import { fail } from '../../../utils/errors'
+import { safeEqual } from '../../../utils/payments'
 
 /**
  * GET /api/guest/live-init/[id] — the feed behind the live slideshow:
@@ -12,17 +13,27 @@ import { fail } from '../../../utils/errors'
  * A cursor-based poll also backfills whatever arrived while the venue
  * Wi-Fi was down or the laptop slept.
  *
- * Anonymous: the event id is printed on every table's QR, so this is as
- * public as the /e/[id]/live page itself. The slideshow is part of Pro
- * and up (shared/plans.ts): a Basic event gets 403 not_in_plan whatever
- * its status. Only `active` events are
+ * No login (the projector is anonymous), but not open to whoever has
+ * the event id either: that id is printed on every table's QR card.
+ * Every request carries the event's own secret, `k=<events.live_token>`,
+ * from the private link the couple copies in the dashboard (the
+ * migration 20261108000100_events_live_token). A missing or wrong one
+ * is 403 live_link_invalid, compared in constant time, and comes before
+ * the answer says anything about the event beyond whether it exists
+ * (its tier, status or names). The couple can replace the secret ("new
+ * link", POST /api/couple/event/[id]/live-link); a screen still open on
+ * the old link closes at its next poll.
+ *
+ * The slideshow is part of Pro and up (shared/plans.ts): a Basic event
+ * gets 403 not_in_plan whatever its status. Only `active` events are
  * served (draft → 403, archived → 410), and never more than the newest
  * FEED_LIMIT visible items — the projector shows those plus whatever
- * arrives while it runs, and nobody holding the id can page back
- * through the whole album (guest names, tables, voice wishes).
+ * arrives while it runs, and even a valid link can't page back through
+ * the whole album (guest names, tables, voice wishes).
  *
  * Query — within those newest items:
- *   - (none)        all of them, newest first
+ *   - k=<token>     required, see above
+ *   - (nothing else) all of them, newest first
  *   - after=<ts>    the ones uploaded after the cursor, oldest first
  *   - ids=a,b,…     these too, e.g. ones the couple just un-hid
  *
@@ -40,6 +51,8 @@ const HIDDEN_LIMIT = 1000
 const AFTER_OVERLAP_MS = 10_000
 
 const UUID_RE = /^[0-9a-f-]{36}$/i
+// events.live_token: 32 hex characters (CHECK events_live_token_format).
+const LIVE_TOKEN_RE = /^[0-9a-f]{32}$/
 // The shape our responses carry (Postgres timestamptz as JSON). Date.parse
 // alone also takes "1", "Jan 1 2026 (x)" or "+275760-…", which Postgres
 // refuses — a 500 instead of the client's own mistake.
@@ -57,6 +70,10 @@ export default defineEventHandler(async (event) => {
   if (!id || !UUID_RE.test(id)) fail(400, 'invalid_id')
 
   const query = getQuery(event)
+  // Never cached anywhere: answers depend on the secret, and the page polls.
+  setResponseHeader(event, 'Cache-Control', 'no-store')
+  const key = typeof query.k === 'string' ? query.k : ''
+  if (!LIVE_TOKEN_RE.test(key)) fail(403, 'live_link_invalid')
   const after = parseCursor(query.after)
   const ids = new Set(typeof query.ids === 'string'
     ? query.ids.split(',').filter((s) => UUID_RE.test(s)).slice(0, IDS_LIMIT)
@@ -66,10 +83,11 @@ export default defineEventHandler(async (event) => {
 
   const { data: ev } = await admin
     .from('events')
-    .select('id, couple_names, status, plan_tier')
+    .select('id, couple_names, status, plan_tier, live_token')
     .eq('id', id!)
     .maybeSingle()
   if (!ev) fail(404, 'event_not_found')
+  if (!safeEqual(key, ev!.live_token)) fail(403, 'live_link_invalid')
   if (!tierHas(ev!.plan_tier, 'live_slideshow')) fail(403, 'not_in_plan')
   if (ev!.status === 'archived') fail(410, 'event_archived')
   if (ev!.status !== 'active') fail(403, 'event_not_active')
@@ -93,9 +111,6 @@ export default defineEventHandler(async (event) => {
     const since = Date.parse(after) - AFTER_OVERLAP_MS
     photos = photos.filter((p) => Date.parse(p.uploaded_at) > since || ids.has(p.id)).reverse()
   }
-
-  // Polled every few seconds — never let a proxy or the browser serve a stale page.
-  setResponseHeader(event, 'Cache-Control', 'no-store')
 
   return {
     event: { couple_names: ev!.couple_names },

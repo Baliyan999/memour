@@ -370,6 +370,34 @@ notify pgrst, 'reload schema';
 
 Connected chats are lost with it (couples connect again). The webhook can stay: the old app answers it with 404, Telegram retries for a while and then drops those updates.
 
+## 20261108000200_events_uploads_paused (pause guest uploads)
+
+One new column: `events.uploads_paused boolean not null default false`. The admin event page flips it (PATCH `/api/admin/events/[id]`); while it is true `POST /api/guest/upload` answers 423 `uploads_paused` and the guest page shows a "paused" card instead of the camera. The live slideshow, the couple's dashboard and everything else ignore it. Every existing event gets `false` and keeps taking uploads. No index, trigger, grant or RLS change. Additive and idempotent (`add column if not exists`).
+
+**Order: migration first, then the app.** The new app reads the column on every guest upload and on the guest page; without it both fail with a server error. The app running now never touches it, so applying the migration early is harmless.
+
+**Apply.** Option A: `npx supabase db push --dry-run` must list only `20261108000200_events_uploads_paused.sql` (plus anything above not applied yet), then `npx supabase db push`. Option B: paste the file into the SQL editor, run it, then `npx supabase migration repair --status applied 20261108000200`.
+
+**Post-check:** expect one row, `uploads_paused | boolean | false | NO`.
+
+```sql
+select column_name, data_type, column_default, is_nullable
+from information_schema.columns
+where table_schema = 'public' and table_name = 'events' and column_name = 'uploads_paused';
+```
+
+**Rollback.** Deploy the previous app first, then:
+
+```sql
+begin;
+alter table public.events drop column if exists uploads_paused;
+delete from supabase_migrations.schema_migrations where version = '20261108000200';
+commit;
+notify pgrst, 'reload schema';
+```
+
+Events paused at that moment start taking uploads again.
+
 ## After the migration: operations
 
 - **Login-code trail.** `phone_otps` / `admin_otps` rows older than 7 days are deleted every night by `memour_purge_otps`.

@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
 
   const { data, error } = await admin
     .from('events')
-    .select('id, couple_names, wedding_date, venue_name, status, plan_tier, owner_id, created_at, table_count, guest_devices(count)')
+    .select('id, couple_names, wedding_date, venue_name, status, plan_tier, owner_id, created_at, table_count, uploads_paused, guest_devices(count)')
     .order('created_at', { ascending: false })
 
   if (error) {

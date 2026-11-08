@@ -1,7 +1,8 @@
 {
   "meta": {
     "title": "Memour — to'ydagi barcha suratlar mehmonlardan",
-    "description": "Stollardagi QR-kodlar. Mehmonlar skanerlab, to'yingizdan suratlar yuborishadi. Siz to'liq albomni bir arxiv qilib olasiz."
+    "description": "Stollardagi QR-kodlar. Mehmonlar skanerlab, to'yingizdan suratlar yuborishadi. Siz to'liq albomni bir arxiv qilib olasiz.",
+    "ogImageAlt": "Memour logotipi va polaroid ramkalardagi to'y suratlari"
   },
   "nav": {
     "features": "Imkoniyatlar",
@@ -341,7 +342,8 @@
       "permission_denied_video": "Brauzer sozlamalarida kamera va mikrofonga ruxsat bering.",
       "permission_denied_voice": "Brauzer sozlamalarida mikrofonga ruxsat bering.",
       "consent_required": "Avval mehmonlar uchun qoidalarga roziligingizni belgilang.",
-      "guest_limit_reached": "Albomga sig'adigan barcha mehmonlar allaqachon ulangan — bu telefondan yuborib bo'lmaydi."
+      "guest_limit_reached": "Albomga sig'adigan barcha mehmonlar allaqachon ulangan — bu telefondan yuborib bo'lmaydi.",
+      "uploads_paused": "Yuklash vaqtincha to'xtatilgan — kadr yuborilmadi."
     },
     "state": {
       "loading": "Yuklanmoqda…",
@@ -397,6 +399,10 @@
         "notInPlan": {
           "title": "Slayd-shou — Pro va undan yuqori tariflarda",
           "desc": "Jonli slayd-shou Pro, Premium va Luxury tariflariga kiradi. Mehmonlar kadrlarini zaldagi ekranda ko'rsatish uchun bizga yozing — tarifni almashtirib beramiz."
+        },
+        "badLink": {
+          "title": "Kelin-kuyovdan havola kerak",
+          "desc": "Bu havola to'liq emas yoki allaqachon yangisiga almashtirilgan. Kelin-kuyovdan slayd-shouning amaldagi havolasini so'rang — u ularning Memour kabinetida bor."
         }
       }
     },
@@ -419,6 +425,11 @@
       "title": "Albomdagi barcha o'rinlar band",
       "desc": "Bu to'y albomiga sig'adigan barcha mehmonlar allaqachon ulangan, shuning uchun bu telefonni qo'shib bo'lmaydi.",
       "hint": "Kadrlaringiz baribir albomga tushishi mumkin: ularni allaqachon suratga olayotgan mehmonga yuboring — u o'z telefonidan jo'natadi. Yoki bu haqda kelin-kuyovga ayting."
+    },
+    "paused": {
+      "title": "Yuklash vaqtincha to'xtatilgan",
+      "desc": "Hozircha bu to'y albomiga kadr yuborib bo'lmaydi. Yuklash qayta ochilganda sahifa o'zi yangilanadi.",
+      "checkAgain": "Qayta tekshirish"
     }
   },
   "error": {
@@ -546,7 +557,27 @@
       "guestsOf": "{n} / {max}",
       "guestsAria": "Mehmonlar: {n} / {max}",
       "guestsNearLimit": "Deyarli barcha o'rinlar band: {max} ta mehmondan keyin yangi telefonlar ulana olmaydi. Ko'proq kerak bo'lsa, bizga yozing — tarifni almashtiramiz.",
-      "guestsAtLimit": "Barcha {max} ta o'rin band: yangi telefonlar ulana olmaydi, allaqachon ulangan mehmonlar esa avvalgidek suratga olishadi. Ko'proq kerak bo'lsa, bizga yozing — tarifni almashtiramiz."
+      "guestsAtLimit": "Barcha {max} ta o'rin band: yangi telefonlar ulana olmaydi, allaqachon ulangan mehmonlar esa avvalgidek suratga olishadi. Ko'proq kerak bo'lsa, bizga yozing — tarifni almashtiramiz.",
+      "liveTitle": "Zaldagi ekran uchun slayd-\u2060shou",
+      "liveDesc": "Bu havolani proyektor yoki ekranga ulangan kompyuterda oching: mehmonlar yuborgan kadrlar bir necha soniyadan keyin u yerda paydo bo'ladi.",
+      "liveCopy": "Nusxalash",
+      "liveLinkCopied": "Slayd-shou havolasi nusxalandi",
+      "liveHint": "Havola shaxsiy: u orqali mehmonlarning kadrlari ko'rinadi. Uni faqat zaldagi ekranga mas'ul odamga yuboring.",
+      "liveNewButton": "Yangi havola",
+      "liveNewTitle": "Slayd-shou uchun yangi havola yaratilsinmi?",
+      "liveNewConfirm": "Eski havola bir necha soniyada ishlamay qoladi — u orqali ochilgan ekran yopiladi. Ekranda yangi havolani oching.",
+      "liveNewDone": "Tayyor: endi faqat yangi havola ishlaydi",
+      "payEyebrow": "To'lov",
+      "payProcessingTitle": "To'lovni tasdiqlayapmiz",
+      "payProcessingDesc": "To'lov tizimi odatda bir necha soniyada to'lov haqida xabar beradi. Sahifa o'zi yangilanadi — uni yopmasangiz ham bo'ladi.",
+      "payNotFinished": "To'lov yakunlanmadimi? To'lovga qaytish",
+      "payConfirmedTitle": "To'lov qabul qilindi",
+      "payConfirmedDesc": "Rahmat! Tadbir faol — stollar uchun QR-kodlar quyida.",
+      "paySlowTitle": "Tasdiqlash kechikmoqda",
+      "paySlowDesc": "Ba'zan to'lov tizimiga bir necha daqiqa kerak bo'ladi. Agar pul yechib olingan bo'lsa, tadbir o'zi ochiladi — birozdan keyin shu yerga qayting. Agar to'lov yakunlanmagan bo'lsa, uni quyida qaytadan boshlashingiz mumkin.",
+      "paySlowContact": "Agar biror narsa noto'g'ri bo'lsa, biz bilan bog'laning: {contact}",
+      "payCheckAgain": "Qayta tekshirish",
+      "payStillPending": "To'lov hali tasdiqlanmadi. Birozdan keyin qayta urinib ko'ring."
     },
     "branding": {
       "title": "Bezatish",
@@ -697,6 +728,13 @@
     "copy_failed": "Nusxalab bo'lmadi. Havolani belgilab, qo'lda nusxalang.",
     "already_claimed": "Juftlik kabinetga kirib bo'lgan — telefon raqami endi o'zgarmaydi.",
     "admin_account": "Bu Memour xodimining hisobi — juftlik u orqali kira olmaydi. Juftlikning emailini kiriting.",
+    "geofence_location_required": "Geozona uchun to'yxona joylashuvini kiriting yoki geozonani o'chiring.",
+    "geofence_location_invalid": "To'yxona joylashuvidan koordinatalarni aniqlab bo'lmadi — maydon ostidagi izohni ko'ring.",
+    "invalid_coordinates": "Koordinatalarni tekshiring: kenglik −90 dan 90 gacha, uzunlik −180 dan 180 gacha.",
+    "invalid_radius": "Geozona radiusi 20 dan 2000 metrgacha bo'lishi kerak.",
+    "geofence_incomplete": "Geozona uchun nuqta ham, radius ham kerak — yoki geozonani o'chiring.",
+    "uploads_paused": "Bu tadbirga yuklash vaqtincha to'xtatilgan.",
+    "cannot_reopen_purged": "Bu to'yning surat, video va ovozli xabarlari allaqachon o'chirilgan — tadbirni qayta ochib bo'lmaydi.",
     "server_error": "Server javob bermadi. Birozdan so'ng urinib ko'ring.",
     "too_many_requests": "Kod allaqachon yuborilgan. Yangisini 30 soniyadan keyin so'rashingiz mumkin.",
     "too_many_attempts": "Juda ko'p urinishlar. Yangi kod so'rang.",
@@ -754,7 +792,8 @@
     "not_in_plan": "Bu Pro, Premium va Luxury tariflariga kiradi.",
     "guest_limit_reached": "Albomga sig'adigan barcha mehmonlar allaqachon ulangan.",
     "event_purged": "Bu to'y albomi allaqachon o'chirilgan — bildirishnomalar uchun hech narsa qolmadi.",
-    "telegram_unavailable": "Telegramni ulash hozircha mavjud emas. Keyinroq urinib ko'ring."
+    "telegram_unavailable": "Telegramni ulash hozircha mavjud emas. Keyinroq urinib ko'ring.",
+    "live_link_invalid": "Slayd-shou havolasi to'liq emas yoki eskirgan. Kelin-kuyovdan yangisini so'rang."
   },
   "common": {
     "close": "Yopish",
@@ -807,6 +846,7 @@
       "notClaimed": "⚠ Kelin-kuyov hali kabinetga kirmagan",
       "notClaimedHint": "SMS orqali birinchi kirishdan keyin kelin-kuyov hisobi ushbu tadbirga avtomatik bog'lanadi.",
       "qrHint": "QR PDF sozlamalarini ochish",
+      "paused": "Pauza",
       "edit": "Tahrirlash",
       "guests": "Mehmonlar: {n} / {max}"
     },
@@ -910,7 +950,26 @@
       "freeIdleTitle": "O'rinlar bo'shatilsinmi?",
       "freeIdleDesc": "Bu to'yga hali hech narsa yubormagan telefonlar o'z o'rnini yo'qotadi: {n} ta. Bunday mehmon qaytib kelsa, bo'sh o'rin bo'lsa, qaytadan ulanadi. Yuborilgan suratlar, videolar va ovozli xabarlarga tegilmaydi.",
       "freeIdleConfirm": "Bo'shatish",
-      "freedIdle": "Bo'shatilgan o'rinlar: {n}"
+      "freedIdle": "Bo'shatilgan o'rinlar: {n}",
+      "geofence": "Geozona",
+      "geofenceOff": "O'chiq — mehmonlar istalgan joydan yubora oladi.",
+      "geofenceLocation": "To'yxona joylashuvi",
+      "geofenceLocationPlaceholder": "41.311081, 69.240562 yoki xarita havolasi",
+      "geofenceLocationHint": "Koordinatalar yoki Google / Yandex xaritadagi havola.",
+      "geofencePoint": "Nuqta: {point}",
+      "geofenceCheckMap": "Xaritada tekshirish",
+      "geofenceShortLink": "Qisqa havolada koordinatalar bo'lmaydi. Havolani oching va manzil satridagi to'liq havolani yoki nuqta koordinatalarini nusxalab qo'ying.",
+      "geofenceNotFound": "Bu yerda koordinatalarni topa olmadik. 41.311081, 69.240562 kabi koordinatalarni yoki Google / Yandex xaritadagi nuqta havolasini qo'ying.",
+      "geofenceRadius": "Radius",
+      "geofenceMeters": "{n} m",
+      "geofenceExplain": "Suratga olishda brauzer mehmondan geolokatsiyani so'raydi. Kadr faqat mehmon radiusdan aniq tashqarida bo'lsa qabul qilinmaydi (GPS xatoligi uchun zaxira — kamida {slack} m); geolokatsiyaga ruxsat berilmasa, kadr qabul qilinadi.",
+      "uploads": "Mehmonlar yuklashi",
+      "uploadsSwitchLabel": "Mehmonlardan kadr qabul qilish",
+      "uploadsOpenDesc": "Ochiq — mehmonlar yuklash davrida kadr yubora oladi. Almashtirgich darhol ishlaydi.",
+      "uploadsPausedDesc": "Pauzada — mehmon sahifasida kamera o'rniga «Yuklash vaqtincha to'xtatilgan» ko'rinadi, yangi kadrlar qabul qilinmaydi. Jonli slayd-shou ishlashda davom etadi.",
+      "uploadsPausedToast": "Yuklash pauzaga qo'yildi",
+      "uploadsResumedToast": "Yuklash yana ochildi",
+      "purgedHint": "Media {date} kuni o'chirilgan — tadbirni qayta ochib bo'lmaydi, u arxivda qoladi."
     },
     "qr": {
       "preview": "Namuna",

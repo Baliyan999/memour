@@ -22,10 +22,14 @@ npx supabase migration new <name>
 npx supabase db reset         # re-apply all migrations from scratch
 npx supabase gen types typescript --local > app/types/database.types.ts
 
+pnpm test                     # unit tests (Vitest)
+pnpm test:e2e                 # e2e smoke on the built app — needs `pnpm build` and the local stack's env (CONTRIBUTING.md → Tests)
+
+scripts/deploy.sh deploy --dry-run   # deploy plan; then `deploy`, `rollback`, `status` (docs/DEPLOY.md)
 node --env-file=.env scripts/telegram-setup.mjs --dry-run   # bot webhook/commands; also --info
 ```
 
-There is no automated test suite. Verify UI changes in the running app in both locales, at 344 px wide and on desktop, before calling them done.
+Tests cover pure logic and a smoke path through the main flows; they don't replace looking. Verify UI changes in the running app in both locales, at 344 px wide and on desktop, before calling them done, and add an e2e scenario when you add a flow.
 
 ## Where things live
 
@@ -76,3 +80,4 @@ There is no automated test suite. Verify UI changes in the running app in both l
 - The Supabase MCP `apply_migration` records the current timestamp as the migration version. Right after it, set the version in `supabase_migrations.schema_migrations` to the one in the file name. Otherwise `supabase db push` will apply the migration a second time.
 - On the server, don't use `pkill -f` or `pgrep -f` inside `ssh '…'`: the pattern matches the ssh command line itself and kills your own session. Stop processes by their saved pid.
 - If the bot token, the webhook secret or the domain changes, re-run `scripts/telegram-setup.mjs`.
+- Deploy only with `scripts/deploy.sh` and only after the migrations it lists are applied to prod. It refuses otherwise; don't work around the guard.

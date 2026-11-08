@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useLocalePath } from '#imports'
 import { LEAD_TIERS, type LeadTier } from '#shared/lead'
+import { GEOFENCE_DEFAULT_RADIUS, parseVenueLocation } from '#shared/geofence'
 
 definePageMeta({ layout: 'admin' })
 
@@ -23,6 +24,9 @@ definePageMeta({ layout: 'admin' })
  * speak the browser's language, and a prefilled value never triggers
  * minlength) with the server's limits, and shows the first problem
  * above the buttons.
+ *
+ * The soft geofence is off unless switched on (<AdminGeofenceField>):
+ * then the venue point and the radius go with the event.
  */
 const localePath = useLocalePath()
 const router = useRouter()
@@ -42,6 +46,9 @@ const table_count = ref(10)
 const plan_tier = ref<'basic' | 'pro' | 'premium' | 'luxury'>('basic')
 const status = ref<'draft' | 'active'>('draft')
 const fromLeadId = ref<string | null>(null)
+const geoEnabled = ref(false)
+const geoLocation = ref('')
+const geoRadius = ref<number>(GEOFENCE_DEFAULT_RADIUS)
 
 // Prefill from query params (set by the /admin/leads → создать кнопка).
 // Done in setup, not onMounted: <PhoneInput> copies its `digits` prop
@@ -83,6 +90,10 @@ function validate(): string | null {
   if ((table_count.value as unknown) === '' || !Number.isInteger(tables) || tables < 1 || tables > 200) return 'invalid_table_count'
   if (channel.value === 'phone' && owner_phone_digits.value.length > 0 && owner_phone_digits.value.length < 9) return 'phone_incomplete'
   if (channel.value === 'email' && !EMAIL_RE.test(owner_email.value.trim())) return 'invalid_email'
+  if (geoEnabled.value) {
+    const venue = parseVenueLocation(geoLocation.value)
+    if (!venue.ok) return venue.reason === 'empty' ? 'geofence_location_required' : 'geofence_location_invalid'
+  }
   return null
 }
 
@@ -95,6 +106,10 @@ async function submit() {
   }
   error.value = null
   pending.value = true
+  const venue = parseVenueLocation(geoLocation.value)
+  const geofence = geoEnabled.value && venue.ok
+    ? { venue_lat: venue.point.lat, venue_lng: venue.point.lng, geofence_radius: geoRadius.value }
+    : {}
   try {
     const res = await $fetch<{ ok: boolean; event: { id: string }; notified: boolean | 'skipped' | null }>(
       '/api/admin/events',
@@ -114,6 +129,7 @@ async function submit() {
           // The server marks the lead won + linked and credits the
           // referral partner in the same request.
           lead_id: fromLeadId.value,
+          ...geofence,
         },
       },
     )
@@ -181,6 +197,12 @@ async function submit() {
         >
       </div>
 
+      <AdminGeofenceField
+        v-model:enabled="geoEnabled"
+        v-model:location="geoLocation"
+        v-model:radius="geoRadius"
+      />
+
       <div class="flex flex-col gap-1.5">
         <span class="text-xs uppercase tracking-wider text-(--color-muted-foreground)">{{ t('admin.eventForm.channel') }}</span>
         <div class="flex gap-1 rounded-full border border-(--color-border) bg-white p-0.5" role="radiogroup">
@@ -208,7 +230,7 @@ async function submit() {
           v-model="owner_phone"
           v-model:digits="owner_phone_digits"
         />
-        <p class="text-[11px] text-(--color-muted-foreground)">
+        <p class="text-[0.6875rem] text-(--color-muted-foreground)">
           {{ t('admin.eventForm.couplePhoneHint') }}
         </p>
       </div>
@@ -224,7 +246,7 @@ async function submit() {
           placeholder="couple@example.com"
           class="h-11 rounded-md border border-(--color-border) bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
         >
-        <p class="text-[11px] text-(--color-muted-foreground)">
+        <p class="text-[0.6875rem] text-(--color-muted-foreground)">
           {{ t('admin.eventForm.coupleEmailHint') }}
         </p>
       </div>

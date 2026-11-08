@@ -123,7 +123,7 @@ const fmtDate = (d: string) => formatDate(d, locale.value)
 
 <template>
   <div>
-    <div class="mb-6 flex items-end justify-between gap-4">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <h1 class="heading-display-md">{{ t('admin.team.title') }}</h1>
       <button
         v-if="isSuper"
@@ -139,7 +139,7 @@ const fmtDate = (d: string) => formatDate(d, locale.value)
       <form class="flex flex-col gap-4" novalidate @submit.prevent="invite">
         <div class="grid gap-4 sm:grid-cols-2">
           <div class="flex flex-col gap-1.5">
-            <label for="team-email" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.team.email') }}</label>
+            <label for="team-email" class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.team.email') }}</label>
             <input
               id="team-email"
               v-model="form.email"
@@ -150,7 +150,7 @@ const fmtDate = (d: string) => formatDate(d, locale.value)
             >
           </div>
           <div class="flex flex-col gap-1.5">
-            <label for="team-chat" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.team.chatId') }}</label>
+            <label for="team-chat" class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.team.chatId') }}</label>
             <input
               id="team-chat"
               v-model="form.telegram_chat_id"
@@ -164,7 +164,7 @@ const fmtDate = (d: string) => formatDate(d, locale.value)
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label for="team-password" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.team.password') }}</label>
+          <label for="team-password" class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.team.password') }}</label>
           <div class="relative">
             <input
               id="team-password"
@@ -172,7 +172,7 @@ const fmtDate = (d: string) => formatDate(d, locale.value)
               :type="showPwd ? 'text' : 'password'"
               autocomplete="new-password"
               :placeholder="t('admin.team.passwordPlaceholder')"
-              class="h-11 w-full rounded-md border border-(--color-border) bg-white pl-3 pr-11 text-sm"
+              class="h-11 w-full rounded-md border border-(--color-border) bg-white pl-3 pr-24 text-sm"
             >
             <button
               type="button"
@@ -186,7 +186,7 @@ const fmtDate = (d: string) => formatDate(d, locale.value)
           keypath="admin.team.note"
           tag="p"
           scope="global"
-          class="rounded-md border border-(--color-border) bg-(--color-muted)/30 px-3 py-2.5 text-[12px] text-(--color-muted-foreground)"
+          class="rounded-md border border-(--color-border) bg-(--color-muted)/30 px-3 py-2.5 text-[0.75rem] text-(--color-muted-foreground)"
         >
           <template #creds><strong class="text-(--color-foreground)">{{ t('admin.team.noteCreds') }}</strong></template>
           <template #bot><code>@QRFotografBot</code></template>
@@ -201,7 +201,7 @@ const fmtDate = (d: string) => formatDate(d, locale.value)
       </form>
     </div>
 
-    <ul v-if="pending" class="grid gap-3" aria-busy="true">
+    <ul v-if="pending" class="grid grid-cols-1 gap-3" aria-busy="true">
       <li v-for="i in 2" :key="i">
         <div class="surface-card rounded-(--radius-xl) p-5">
           <Skeleton class="h-5 w-64" />
@@ -221,15 +221,15 @@ const fmtDate = (d: string) => formatDate(d, locale.value)
       </button>
     </div>
 
-    <ul v-else-if="data?.admins.length" class="grid gap-3">
+    <ul v-else-if="data?.admins.length" class="grid grid-cols-1 gap-3">
       <li v-for="row in data.admins" :key="row.user_id">
-        <div class="surface-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-(--radius-xl) p-5">
+        <div class="surface-card grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-(--radius-xl) p-5">
           <div>
             <div class="flex flex-wrap items-center gap-2">
-              <p class="font-medium">{{ row.email ?? '—' }}</p>
+              <p class="min-w-0 font-medium wrap-anywhere">{{ row.email ?? '—' }}</p>
               <span
                 :class="[
-                  'rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider',
+                  'rounded-full px-2 py-0.5 text-[0.625rem] uppercase tracking-wider',
                   row.role === 'super'
                     ? 'bg-amber-100 text-amber-700'
                     : 'bg-(--color-muted) text-(--color-muted-foreground)',
@@ -237,7 +237,7 @@ const fmtDate = (d: string) => formatDate(d, locale.value)
               >{{ row.role === 'super' ? t('admin.team.roleSuper') : t('admin.team.roleAdmin') }}</span>
               <span
                 v-if="row.user_id === data.me.user_id"
-                class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] uppercase tracking-wider text-emerald-700"
+                class="rounded-full bg-emerald-100 px-2 py-0.5 text-[0.625rem] uppercase tracking-wider text-emerald-700"
               >{{ t('admin.team.you') }}</span>
             </div>
             <p class="mt-1 text-xs text-(--color-muted-foreground)">
@@ -247,7 +247,7 @@ const fmtDate = (d: string) => formatDate(d, locale.value)
           <button
             v-if="isSuper && row.user_id !== data.me.user_id"
             type="button"
-            class="inline-flex h-8 items-center rounded-full border border-red-200 bg-white px-3 text-xs text-red-700 hover:bg-red-50"
+            class="inline-flex min-h-8 items-center rounded-full border border-red-200 bg-white px-3 text-xs text-red-700 hover:bg-red-50"
             @click="remove(row)"
           >{{ t('admin.team.remove') }}</button>
         </div>

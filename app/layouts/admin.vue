@@ -17,6 +17,11 @@ import { useI18n, useLocalePath } from '#imports'
  * (the 2FA cookie expires after 8 h, or an email magic link) lands
  * there, and every nav link would just bounce back to the login. Every
  * other admin page is behind the full check in middleware/auth.global.
+ *
+ * Usable at 200 % text (WCAG 1.4.4): the header row grows and wraps
+ * instead of pushing the email and "sign out" off the screen — the
+ * breakpoints follow the window, not the text size, so the wide nav
+ * can meet doubled text.
  */
 const { t } = useI18n()
 const localePath = useLocalePath()
@@ -77,16 +82,16 @@ const navLinks = computed(() => [
     <MarketingGlobalBackground />
 
     <header class="sticky top-0 z-50 border-b border-(--color-border)/70 bg-white/85 backdrop-blur-xl">
-      <div class="container-page flex h-14 items-center justify-between gap-4">
-        <div class="flex items-center gap-6">
-          <NuxtLink :to="localePath('/admin')" class="flex items-center gap-2 font-display text-lg">
+      <div class="container-page flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
+        <div class="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-1">
+          <NuxtLink :to="localePath('/admin')" class="flex shrink-0 items-center gap-2 whitespace-nowrap font-display text-lg">
             <img src="/memour-logo.png" alt="Memour" width="28" height="28" class="h-7 w-7">
             <span>Memour <span class="text-(--color-muted-foreground)">/ admin</span></span>
           </NuxtLink>
 
           <!-- Nav only when actually an admin — otherwise the links
                look clickable but middleware would just bounce. -->
-          <nav v-if="showChrome" class="hidden gap-4 text-sm md:flex">
+          <nav v-if="showChrome" class="hidden flex-wrap gap-x-4 gap-y-1 text-sm md:flex">
             <NuxtLink
               v-for="link in navLinks"
               :key="link.to"
@@ -97,18 +102,18 @@ const navLinks = computed(() => [
           </nav>
         </div>
 
-        <div v-if="showChrome" class="flex items-center gap-3">
-          <span v-if="adminEmail" class="hidden text-xs text-(--color-muted-foreground) sm:inline">{{ adminEmail }}</span>
+        <div v-if="showChrome" class="ml-auto flex min-w-0 items-center gap-3">
+          <span v-if="adminEmail" class="hidden min-w-0 truncate text-xs text-(--color-muted-foreground) sm:inline" :title="adminEmail">{{ adminEmail }}</span>
           <button
             type="button"
-            class="rounded-full border border-(--color-border)/60 bg-white px-3 py-1.5 text-xs hover:bg-(--color-muted)"
+            class="shrink-0 whitespace-nowrap rounded-full border border-(--color-border)/60 bg-white px-3 py-1.5 text-xs hover:bg-(--color-muted)"
             @click="signOut"
           >{{ t('admin.nav.signOut') }}</button>
         </div>
         <NuxtLink
           v-else
           :to="localePath('/')"
-          class="inline-flex items-center gap-1.5 rounded-full border border-(--color-border) bg-white px-3 py-1.5 text-xs text-(--color-muted-foreground) hover:bg-(--color-muted)"
+          class="ml-auto inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-(--color-border) bg-white px-3 py-1.5 text-xs text-(--color-muted-foreground) hover:bg-(--color-muted)"
         >
           <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="19" y1="12" x2="5" y2="12" />

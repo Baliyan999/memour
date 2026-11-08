@@ -238,7 +238,7 @@ function backToCreds() {
                 <Lock class="h-3 w-3" :stroke-width="2.2" />
               </span>
             </div>
-            <p class="mt-4 text-[10px] uppercase tracking-[0.4em] text-(--color-muted-foreground)">Memour · admin</p>
+            <p class="mt-4 text-[0.625rem] uppercase tracking-[0.4em] text-(--color-muted-foreground)">Memour · admin</p>
             <h1 class="mt-2 font-display italic" style="font-size: 2.5rem; line-height: 1; letter-spacing: -0.02em;">
               <span class="text-gradient-gold">{{ step === 'creds' ? t('admin.login.titleCreds') : t('admin.login.titleCode') }}</span>
             </h1>
@@ -273,7 +273,7 @@ function backToCreds() {
               @submit.prevent="submitCreds"
             >
               <div class="flex flex-col gap-1.5">
-                <label for="admin-email" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.login.emailLabel') }}</label>
+                <label for="admin-email" class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.login.emailLabel') }}</label>
                 <div class="relative">
                   <Mail class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-muted-foreground)" :stroke-width="1.6" />
                   <input
@@ -288,7 +288,7 @@ function backToCreds() {
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label for="admin-password" class="text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.login.passwordLabel') }}</label>
+                <label for="admin-password" class="text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.login.passwordLabel') }}</label>
                 <div class="relative">
                   <Lock class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-muted-foreground)" :stroke-width="1.6" />
                   <input
@@ -322,7 +322,7 @@ function backToCreds() {
                 <ArrowRight v-if="!pending" class="h-4 w-4" />
               </button>
 
-              <p class="mt-1 flex items-center justify-center gap-1.5 text-center text-[11px] text-(--color-muted-foreground)">
+              <p class="mt-1 flex items-center justify-center gap-1.5 text-center text-[0.6875rem] text-(--color-muted-foreground)">
                 <MessageSquare class="h-3 w-3" :stroke-width="1.6" />
                 {{ t('admin.login.telegramNote') }}
               </p>
@@ -337,7 +337,7 @@ function backToCreds() {
               @submit.prevent="submitCode"
             >
               <div class="flex flex-col gap-2">
-                <label class="text-center text-[10px] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.login.codeLabel') }}</label>
+                <label class="text-center text-[0.625rem] uppercase tracking-[0.25em] text-(--color-muted-foreground)">{{ t('admin.login.codeLabel') }}</label>
                 <div class="flex justify-center gap-2 sm:gap-3">
                   <input
                     v-for="(_, i) in 6"
@@ -348,7 +348,7 @@ function backToCreds() {
                     inputmode="numeric"
                     :autocomplete="i === 0 ? 'one-time-code' : 'off'"
                     maxlength="1"
-                    class="h-14 w-11 rounded-md border border-(--color-border) bg-white text-center font-mono text-2xl font-medium tabular-nums sm:h-16 sm:w-12 sm:text-3xl focus-visible:border-(--color-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
+                    class="h-14 w-11 min-w-0 rounded-md border border-(--color-border) bg-white text-center font-mono text-2xl font-medium tabular-nums sm:h-16 sm:w-12 sm:text-3xl focus-visible:border-(--color-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
                     @input="onDigitInput(i, $event)"
                     @keydown="onDigitKeydown(i, $event)"
                     @paste="onDigitPaste(i, $event)"
@@ -368,7 +368,7 @@ function backToCreds() {
                 <span>{{ pending ? t('admin.login.checking') : t('admin.login.confirm') }}</span>
               </button>
 
-              <div class="flex items-center justify-between text-xs">
+              <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs">
                 <button
                   type="button"
                   class="text-(--color-muted-foreground) underline decoration-(--color-muted-foreground)/40 underline-offset-2 hover:text-(--color-foreground)"
